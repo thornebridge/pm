@@ -259,6 +259,25 @@
 		}
 	}
 
+	let deleting = $state(false);
+
+	async function deleteTask() {
+		if (!confirm('Delete this task? This cannot be undone.')) return;
+		deleting = true;
+		try {
+			await api(`/api/projects/${data.task.projectId}/tasks/${data.task.id}`, {
+				method: 'DELETE'
+			});
+			showToast('Task deleted');
+			const slug = window.location.pathname.split('/projects/')[1]?.split('/')[0];
+			goto(`/projects/${slug}/board`);
+		} catch {
+			showToast('Failed to delete task', 'error');
+		} finally {
+			deleting = false;
+		}
+	}
+
 	let duplicating = $state(false);
 
 	async function duplicateTask() {
@@ -659,6 +678,17 @@
 					<path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
 				</svg>
 				{duplicating ? 'Duplicating...' : 'Duplicate'}
+			</button>
+
+			<button
+				onclick={deleteTask}
+				disabled={deleting}
+				class="flex w-full items-center justify-center gap-1.5 rounded-md border border-surface-300 px-3 py-1.5 text-xs font-medium text-surface-400 transition hover:border-red-300 hover:text-red-500 disabled:opacity-50 dark:border-surface-700 dark:hover:border-red-800 dark:hover:text-red-400"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+					<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+				</svg>
+				{deleting ? 'Deleting...' : 'Delete'}
 			</button>
 
 			<div>

@@ -2,12 +2,13 @@
 	import KanbanBoard from '$lib/components/kanban/KanbanBoard.svelte';
 	import SprintPlanner from '$lib/components/sprint/SprintPlanner.svelte';
 	import { api } from '$lib/utils/api.js';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import { showToast } from '$lib/stores/toasts.js';
 
 	let { data } = $props();
 
 	let showPlanner = $state(false);
+	let deletingSprint = $state(false);
 
 	const totalPoints = $derived(data.tasks.reduce((sum, t) => sum + (t.estimatePoints || 0), 0));
 	const completedTasks = $derived(data.tasks.filter((t) => {
@@ -24,6 +25,22 @@
 			await invalidateAll();
 		} catch {
 			showToast('Failed to update sprint', 'error');
+		}
+	}
+
+	async function deleteSprint() {
+		if (!confirm('Delete this sprint? Tasks will be moved back to the backlog. This cannot be undone.')) return;
+		deletingSprint = true;
+		try {
+			await api(`/api/projects/${data.project.id}/sprints/${data.sprint.id}`, {
+				method: 'DELETE'
+			});
+			showToast('Sprint deleted');
+			goto(`/projects/${data.project.slug}/board`);
+		} catch {
+			showToast('Failed to delete sprint', 'error');
+		} finally {
+			deletingSprint = false;
 		}
 	}
 
@@ -75,6 +92,16 @@
 			{/if}
 			<button onclick={() => (showPlanner = !showPlanner)} class="rounded-md border border-surface-300 bg-surface-50 px-2.5 py-1 text-xs font-medium text-surface-700 hover:bg-surface-200 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700">
 				{showPlanner ? 'Hide Planner' : 'Plan Sprint'}
+			</button>
+			<button
+				onclick={deleteSprint}
+				disabled={deletingSprint}
+				class="rounded-md border border-surface-300 bg-surface-50 px-2.5 py-1 text-xs font-medium text-surface-400 hover:border-red-300 hover:text-red-500 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-red-800 dark:hover:text-red-400"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="inline h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+					<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+				</svg>
+				{deletingSprint ? 'Deleting...' : 'Delete'}
 			</button>
 		</div>
 	</div>

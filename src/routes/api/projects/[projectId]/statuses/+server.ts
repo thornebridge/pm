@@ -2,8 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { taskStatuses } from '$lib/server/db/schema.js';
-import { eq, asc } from 'drizzle-orm';
+import { taskStatuses, tasks } from '$lib/server/db/schema.js';
+import { eq, asc, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
@@ -56,6 +56,33 @@ export const PUT: RequestHandler = async (event) => {
 			.where(eq(taskStatuses.id, item.id))
 			.run();
 	}
+
+	return json({ ok: true });
+};
+
+export const DELETE: RequestHandler = async (event) => {
+	requireAuth(event);
+	const { id } = await event.request.json();
+
+	if (!id) {
+		return json({ error: 'id is required' }, { status: 400 });
+	}
+
+	// Check if any tasks use this status
+	const usage = db
+		.select({ id: tasks.id })
+		.from(tasks)
+		.where(and(eq(tasks.statusId, id), eq(tasks.projectId, event.params.projectId)))
+		.limit(1)
+		.all();
+
+	if (usage.length > 0) {
+		return json({ error: 'Cannot delete status — tasks are still using it. Move or delete those tasks first.' }, { status: 400 });
+	}
+
+	db.delete(taskStatuses)
+		.where(and(eq(taskStatuses.id, id), eq(taskStatuses.projectId, event.params.projectId)))
+		.run();
 
 	return json({ ok: true });
 };

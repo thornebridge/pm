@@ -87,6 +87,60 @@
 		}
 	}
 
+	let deletingStatusId = $state<string | null>(null);
+	let deletingLabelId = $state<string | null>(null);
+	let deletingProject = $state(false);
+
+	async function deleteStatus(id: string) {
+		if (!confirm('Delete this status? This cannot be undone.')) return;
+		deletingStatusId = id;
+		try {
+			await api(`/api/projects/${data.project.id}/statuses`, {
+				method: 'DELETE',
+				body: JSON.stringify({ id })
+			});
+			showToast('Status deleted');
+			await invalidateAll();
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to delete status', 'error');
+		} finally {
+			deletingStatusId = null;
+		}
+	}
+
+	async function deleteLabel(id: string) {
+		if (!confirm('Delete this label? This cannot be undone.')) return;
+		deletingLabelId = id;
+		try {
+			await api(`/api/projects/${data.project.id}/labels`, {
+				method: 'DELETE',
+				body: JSON.stringify({ id })
+			});
+			showToast('Label deleted');
+			await invalidateAll();
+		} catch {
+			showToast('Failed to delete label', 'error');
+		} finally {
+			deletingLabelId = null;
+		}
+	}
+
+	async function deleteProject() {
+		if (!confirm('Delete this project and ALL its tasks? This cannot be undone.')) return;
+		deletingProject = true;
+		try {
+			await api(`/api/projects/${data.project.id}`, {
+				method: 'DELETE'
+			});
+			showToast('Project deleted');
+			goto('/projects');
+		} catch {
+			showToast('Failed to delete project', 'error');
+		} finally {
+			deletingProject = false;
+		}
+	}
+
 	async function toggleArchive() {
 		const newState = !data.project.archived;
 		try {
@@ -190,12 +244,18 @@
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Statuses</h2>
 		<div class="mb-3 space-y-1">
 			{#each data.statuses as status}
-				<div class="flex items-center gap-2 rounded-md border border-surface-300 px-3 py-2 dark:border-surface-800">
+				<div class="group flex items-center gap-2 rounded-md border border-surface-300 px-3 py-2 dark:border-surface-800">
 					<div class="h-3 w-3 rounded-full" style="background-color: {status.color}"></div>
-					<span class="text-sm text-surface-700 dark:text-surface-300">{status.name}</span>
+					<span class="flex-1 text-sm text-surface-700 dark:text-surface-300">{status.name}</span>
 					{#if status.isClosed}
 						<span class="text-xs text-surface-500 dark:text-surface-600">(closed)</span>
 					{/if}
+					<button
+						onclick={() => deleteStatus(status.id)}
+						disabled={deletingStatusId === status.id}
+						class="text-surface-400 opacity-0 transition hover:text-red-500 group-hover:opacity-100 disabled:opacity-50"
+						title="Delete status"
+					>&times;</button>
 				</div>
 			{/each}
 		</div>
@@ -228,9 +288,15 @@
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Labels</h2>
 		<div class="mb-3 space-y-1">
 			{#each data.labels as label}
-				<div class="flex items-center gap-2 rounded-md border border-surface-300 px-3 py-2 dark:border-surface-800">
+				<div class="group flex items-center gap-2 rounded-md border border-surface-300 px-3 py-2 dark:border-surface-800">
 					<div class="h-3 w-3 rounded-full" style="background-color: {label.color}"></div>
-					<span class="text-sm text-surface-700 dark:text-surface-300">{label.name}</span>
+					<span class="flex-1 text-sm text-surface-700 dark:text-surface-300">{label.name}</span>
+					<button
+						onclick={() => deleteLabel(label.id)}
+						disabled={deletingLabelId === label.id}
+						class="text-surface-400 opacity-0 transition hover:text-red-500 group-hover:opacity-100 disabled:opacity-50"
+						title="Delete label"
+					>&times;</button>
 				</div>
 			{/each}
 			{#if data.labels.length === 0}
@@ -300,22 +366,40 @@
 	<!-- Archive -->
 	<section class="border-t border-surface-300 pt-8 dark:border-surface-800">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Danger Zone</h2>
-		<div class="rounded-md border border-surface-300 p-4 dark:border-surface-800">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="text-sm font-medium text-surface-900 dark:text-surface-100">
-						{data.project.archived ? 'Unarchive project' : 'Archive project'}
-					</p>
-					<p class="text-xs text-surface-500">
-						{data.project.archived ? 'Restore this project to the sidebar and active projects list.' : 'Hide this project from the sidebar. It can be restored later.'}
-					</p>
+		<div class="space-y-4">
+			<div class="rounded-md border border-surface-300 p-4 dark:border-surface-800">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm font-medium text-surface-900 dark:text-surface-100">
+							{data.project.archived ? 'Unarchive project' : 'Archive project'}
+						</p>
+						<p class="text-xs text-surface-500">
+							{data.project.archived ? 'Restore this project to the sidebar and active projects list.' : 'Hide this project from the sidebar. It can be restored later.'}
+						</p>
+					</div>
+					<button
+						onclick={toggleArchive}
+						class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-600 hover:border-surface-400 hover:text-surface-900 dark:border-surface-700 dark:text-surface-400 dark:hover:text-surface-100"
+					>
+						{data.project.archived ? 'Unarchive' : 'Archive'}
+					</button>
 				</div>
-				<button
-					onclick={toggleArchive}
-					class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-600 hover:border-surface-400 hover:text-surface-900 dark:border-surface-700 dark:text-surface-400 dark:hover:text-surface-100"
-				>
-					{data.project.archived ? 'Unarchive' : 'Archive'}
-				</button>
+			</div>
+
+			<div class="rounded-md border border-red-300 p-4 dark:border-red-900">
+				<div class="flex items-center justify-between">
+					<div>
+						<p class="text-sm font-medium text-surface-900 dark:text-surface-100">Delete project</p>
+						<p class="text-xs text-surface-500">Permanently delete this project and all its tasks.</p>
+					</div>
+					<button
+						onclick={deleteProject}
+						disabled={deletingProject}
+						class="rounded-md border border-red-300 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 dark:hover:text-red-300"
+					>
+						{deletingProject ? 'Deleting...' : 'Delete'}
+					</button>
+				</div>
 			</div>
 		</div>
 	</section>

@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { taskLabels } from '$lib/server/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
@@ -36,4 +36,20 @@ export const POST: RequestHandler = async (event) => {
 
 	db.insert(taskLabels).values(label).run();
 	return json(label, { status: 201 });
+};
+
+export const DELETE: RequestHandler = async (event) => {
+	requireAuth(event);
+	const { id } = await event.request.json();
+
+	if (!id) {
+		return json({ error: 'id is required' }, { status: 400 });
+	}
+
+	// CASCADE on task_label_assignments handles cleanup
+	db.delete(taskLabels)
+		.where(and(eq(taskLabels.id, id), eq(taskLabels.projectId, event.params.projectId)))
+		.run();
+
+	return json({ ok: true });
 };

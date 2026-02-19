@@ -9,6 +9,7 @@
 	import { showToast } from '$lib/stores/toasts.js';
 	import { pushScope, popScope } from '$lib/utils/keyboard.js';
 	import { onDestroy } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 
 	interface TaskDetail {
 		id: string;
@@ -61,6 +62,7 @@
 	let descriptionInput = $state('');
 	let commentBody = $state('');
 	let submitting = $state(false);
+	let deleting = $state(false);
 
 	// Contextual keyboard scope
 	let scope: ReturnType<typeof pushScope> | null = null;
@@ -193,6 +195,23 @@
 		return labels[action] || action;
 	}
 
+	async function deleteTask() {
+		if (!task || !confirm('Delete this task? This cannot be undone.')) return;
+		deleting = true;
+		try {
+			await api(`/api/projects/${task.projectId}/tasks/${task.id}`, {
+				method: 'DELETE'
+			});
+			showToast('Task deleted');
+			onclose();
+			await invalidateAll();
+		} catch {
+			showToast('Failed to delete task', 'error');
+		} finally {
+			deleting = false;
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onclose();
 	}
@@ -236,6 +255,16 @@
 					<span class="text-xs text-surface-400">#{task.number}</span>
 				</div>
 				<div class="flex items-center gap-2">
+					<button
+						onclick={deleteTask}
+						disabled={deleting}
+						class="rounded-md px-2 py-1 text-xs text-surface-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-950 dark:hover:text-red-400"
+						title="Delete task"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+						</svg>
+					</button>
 					<a
 						href="/projects/{projectSlug}/task/{task.number}"
 						class="rounded-md px-2 py-1 text-xs text-surface-500 hover:bg-surface-200 hover:text-surface-700 dark:hover:bg-surface-800 dark:hover:text-surface-300"
