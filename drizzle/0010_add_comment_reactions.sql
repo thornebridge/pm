@@ -5,4 +5,5 @@ CREATE TABLE `comment_reactions` (
 	`created_at` integer NOT NULL,
 	PRIMARY KEY (`comment_id`, `user_id`, `emoji`)
 );
+--> statement-breakpoint
 CREATE INDEX `idx_reactions_comment` ON `comment_reactions` (`comment_id`);

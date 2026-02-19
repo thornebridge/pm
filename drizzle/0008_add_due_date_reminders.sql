@@ -1,12 +1,18 @@
 -- Add due date reminder preference columns
 ALTER TABLE `notification_preferences` ADD COLUMN `reminder_due_soon` integer NOT NULL DEFAULT 1;
+--> statement-breakpoint
 ALTER TABLE `notification_preferences` ADD COLUMN `reminder_due_today` integer NOT NULL DEFAULT 1;
+--> statement-breakpoint
 ALTER TABLE `notification_preferences` ADD COLUMN `reminder_overdue` integer NOT NULL DEFAULT 1;
+--> statement-breakpoint
 ALTER TABLE `notification_preferences` ADD COLUMN `due_date_email_mode` text NOT NULL DEFAULT 'off';
+--> statement-breakpoint
 ALTER TABLE `notification_preferences` ADD COLUMN `digest_day` integer NOT NULL DEFAULT 1;
+--> statement-breakpoint
 ALTER TABLE `notification_preferences` ADD COLUMN `digest_hour` integer NOT NULL DEFAULT 8;
+--> statement-breakpoint
 ALTER TABLE `notification_preferences` ADD COLUMN `last_digest_sent_at` integer NOT NULL DEFAULT 0;
-
+--> statement-breakpoint
 -- Create due date reminders sent tracking table
 CREATE TABLE `due_date_reminders_sent` (
 	`id` text PRIMARY KEY NOT NULL,
@@ -15,5 +21,7 @@ CREATE TABLE `due_date_reminders_sent` (
 	`tier` text NOT NULL,
 	`sent_at` integer NOT NULL
 );
+--> statement-breakpoint
 CREATE UNIQUE INDEX `idx_reminders_unique` ON `due_date_reminders_sent` (`user_id`, `task_id`, `tier`);
+--> statement-breakpoint
 CREATE INDEX `idx_reminders_task` ON `due_date_reminders_sent` (`task_id`);
