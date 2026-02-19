@@ -28,6 +28,10 @@
 	let newChecklistItem = $state('');
 	let addingChecklist = $state(false);
 
+	// Activity/comments tab state
+	let activityTab = $state<'all' | 'comments' | 'history'>('all');
+	let activityLimit = $state(10);
+
 	// Subtask state
 	let newSubtaskTitle = $state('');
 	let addingSubtask = $state(false);
@@ -229,6 +233,55 @@
 		} catch {
 			showToast('Failed to delete item', 'error');
 		}
+	}
+
+	// Checklist drag-and-drop reorder
+	let dragIndex = $state<number | null>(null);
+	let dropIndex = $state<number | null>(null);
+
+	function handleDragStart(e: DragEvent, index: number) {
+		dragIndex = index;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', String(index));
+		}
+	}
+
+	function handleDragOver(e: DragEvent, index: number) {
+		e.preventDefault();
+		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+		dropIndex = index;
+	}
+
+	function handleDragLeave() {
+		dropIndex = null;
+	}
+
+	async function handleDrop(e: DragEvent, toIndex: number) {
+		e.preventDefault();
+		dropIndex = null;
+		if (dragIndex === null || dragIndex === toIndex) { dragIndex = null; return; }
+
+		const items = [...data.checklist];
+		const [moved] = items.splice(dragIndex, 1);
+		items.splice(toIndex, 0, moved);
+		dragIndex = null;
+
+		const order = items.map((i) => i.id);
+		try {
+			await api(`/api/projects/${data.task.projectId}/tasks/${data.task.id}/checklist`, {
+				method: 'PATCH',
+				body: JSON.stringify({ order })
+			});
+			await invalidateAll();
+		} catch {
+			showToast('Failed to reorder checklist', 'error');
+		}
+	}
+
+	function handleDragEnd() {
+		dragIndex = null;
+		dropIndex = null;
 	}
 
 	async function addSubtask() {
@@ -495,23 +548,37 @@
 					</div>
 					{#if data.checklist.length > 0}
 						{@const done = data.checklist.filter((i) => i.completed).length}
-						<div class="mb-2 h-1 overflow-hidden rounded-full bg-surface-200 dark:bg-surface-800">
+						<div class="mb-2 h-1 overflow-hidden rounded-full bg-surface-800">
 							<div class="h-full rounded-full bg-brand-500 transition-all" style="width: {data.checklist.length ? (done / data.checklist.length * 100) : 0}%"></div>
 						</div>
 					{/if}
 					<div class="space-y-1">
-						{#each data.checklist as item (item.id)}
-							<div class="group flex items-center gap-2">
+						{#each data.checklist as item, i (item.id)}
+							<div
+								class="group flex items-center gap-2 rounded-md px-1 py-0.5 transition-colors {dragIndex === i ? 'opacity-40' : ''} {dropIndex === i && dragIndex !== i ? 'border-t-2 border-brand-500' : ''}"
+								draggable="true"
+								ondragstart={(e) => handleDragStart(e, i)}
+								ondragover={(e) => handleDragOver(e, i)}
+								ondragleave={handleDragLeave}
+								ondrop={(e) => handleDrop(e, i)}
+								ondragend={handleDragEnd}
+								role="listitem"
+							>
+								<span class="cursor-grab text-surface-600 opacity-0 group-hover:opacity-100" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+										<path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+									</svg>
+								</span>
 								<input
 									type="checkbox"
 									checked={item.completed}
 									onchange={() => toggleChecklistItem(item.id, item.completed)}
-									class="h-4 w-4 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700"
+									class="h-4 w-4 rounded border-surface-700 bg-surface-800 text-brand-600 focus:ring-brand-500"
 								/>
-								<span class="flex-1 text-sm {item.completed ? 'text-surface-400 line-through dark:text-surface-600' : 'text-surface-700 dark:text-surface-300'}">{item.title}</span>
+								<span class="flex-1 text-sm {item.completed ? 'text-surface-600 line-through' : 'text-surface-300'}">{item.title}</span>
 								<button
 									onclick={() => deleteChecklistItem(item.id)}
-									class="text-xs text-surface-400 opacity-0 hover:text-red-500 group-hover:opacity-100"
+									class="text-xs text-surface-600 opacity-0 hover:text-red-500 group-hover:opacity-100"
 								>&times;</button>
 							</div>
 						{/each}
@@ -523,7 +590,7 @@
 						<input
 							bind:value={newChecklistItem}
 							placeholder="Add item..."
-							class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							class="flex-1 rounded-md border border-surface-700 bg-surface-800 px-2 py-1 text-sm text-surface-100 outline-none placeholder:text-surface-500 focus:border-brand-500"
 						/>
 						<button
 							type="submit"
@@ -536,114 +603,185 @@
 
 			<!-- Activity + Comments -->
 			<div class="space-y-3">
-				<h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500">Activity</h3>
-
-				{#each data.activity as item (item.id)}
-					<div class="flex items-start gap-2 text-sm">
-						<Avatar name={item.userName} size="xs" />
-						<div>
-							<span class="font-medium text-surface-700 dark:text-surface-300">{item.userName}</span>
-							<span class="text-surface-500">{actionLabel(item.action)}</span>
-							<span class="ml-1 text-xs text-surface-400 dark:text-surface-600">{formatDate(item.createdAt)}</span>
-						</div>
+				<div class="flex items-center gap-2">
+					<h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500">Activity</h3>
+					<div class="flex gap-1">
+						<button
+							onclick={() => { activityTab = 'all'; activityLimit = 10; }}
+							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition {activityTab === 'all' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:bg-surface-800 hover:text-surface-200'}"
+						>All</button>
+						<button
+							onclick={() => { activityTab = 'comments'; activityLimit = 10; }}
+							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition {activityTab === 'comments' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:bg-surface-800 hover:text-surface-200'}"
+						>Comments</button>
+						<button
+							onclick={() => { activityTab = 'history'; activityLimit = 10; }}
+							class="rounded-full px-2.5 py-0.5 text-xs font-medium transition {activityTab === 'history' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:bg-surface-800 hover:text-surface-200'}"
+						>History</button>
 					</div>
-				{/each}
+				</div>
 
-				{#each data.comments as comment (comment.id)}
-					<div class="rounded-md border border-surface-300 p-3 dark:border-surface-800">
-						<div class="mb-1 flex items-center justify-between">
-							<div class="flex items-center gap-2 text-xs">
-								<Avatar name={comment.userName} size="xs" />
-								<span class="font-medium text-surface-700 dark:text-surface-300">{comment.userName}</span>
-								<span class="text-surface-400 dark:text-surface-600">{formatDate(comment.createdAt)}</span>
-							</div>
-							{#if data.user && comment.userId === data.user.id}
-								<div class="flex gap-1">
-									<button
-										onclick={() => startEditComment(comment)}
-										class="text-xs text-surface-400 hover:text-surface-700 dark:hover:text-surface-300"
-									>edit</button>
-									<button
-										onclick={() => deleteComment(comment.id)}
-										class="text-xs text-surface-400 hover:text-red-500"
-									>delete</button>
+				{#if activityTab === 'all'}
+					{@const merged = [
+						...data.activity.map((a) => ({ ...a, _type: 'activity' as const, _ts: a.createdAt })),
+						...data.comments.map((c) => ({ ...c, _type: 'comment' as const, _ts: c.createdAt }))
+					].sort((a, b) => a._ts - b._ts)}
+					{@const visible = merged.slice(-activityLimit).sort((a, b) => a._ts - b._ts)}
+					{#if merged.length > activityLimit}
+						<button
+							onclick={() => (activityLimit += 10)}
+							class="text-xs text-brand-500 hover:text-brand-400"
+						>Load more ({merged.length - activityLimit} older)</button>
+					{/if}
+					{#each visible as entry (entry.id)}
+						{#if entry._type === 'activity'}
+							<div class="flex items-start gap-2 text-sm">
+								<Avatar name={entry.userName} size="xs" />
+								<div>
+									<span class="font-medium text-surface-300">{entry.userName}</span>
+									<span class="text-surface-500">{actionLabel(entry.action)}</span>
+									<span class="ml-1 text-xs text-surface-600">{formatDate(entry.createdAt)}</span>
 								</div>
-							{/if}
-						</div>
-						{#if editingCommentId === comment.id}
-							<textarea
-								bind:value={editingCommentBody}
-								rows={3}
-								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-							></textarea>
-							<div class="mt-2 flex gap-2">
-								<button
-									onclick={() => saveComment(comment.id)}
-									class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-500"
-								>Save</button>
-								<button
-									onclick={() => { editingCommentId = null; editingCommentBody = ''; }}
-									class="text-xs text-surface-600 hover:text-surface-900 dark:text-surface-400"
-								>Cancel</button>
 							</div>
 						{:else}
-							<MarkdownPreview content={comment.body} />
+							{@const comment = entry}
+							<div class="rounded-md border border-surface-800 p-3">
+								<div class="mb-1 flex items-center justify-between">
+									<div class="flex items-center gap-2 text-xs">
+										<Avatar name={comment.userName} size="xs" />
+										<span class="font-medium text-surface-300">{comment.userName}</span>
+										<span class="text-surface-600">{formatDate(comment.createdAt)}</span>
+									</div>
+									{#if data.user && comment.userId === data.user.id}
+										<div class="flex gap-1">
+											<button onclick={() => startEditComment(comment)} class="text-xs text-surface-400 hover:text-surface-300">edit</button>
+											<button onclick={() => deleteComment(comment.id)} class="text-xs text-surface-400 hover:text-red-500">delete</button>
+										</div>
+									{/if}
+								</div>
+								{#if editingCommentId === comment.id}
+									<textarea bind:value={editingCommentBody} rows={3} class="w-full rounded-md border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 outline-none focus:border-brand-500"></textarea>
+									<div class="mt-2 flex gap-2">
+										<button onclick={() => saveComment(comment.id)} class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-500">Save</button>
+										<button onclick={() => { editingCommentId = null; editingCommentBody = ''; }} class="text-xs text-surface-400">Cancel</button>
+									</div>
+								{:else}
+									<MarkdownPreview content={comment.body} />
+								{/if}
+								<div class="mt-2 flex flex-wrap items-center gap-1">
+									{#each groupReactions(comment.reactions || []) as [emoji, info]}
+										<button onclick={() => toggleReaction(comment.id, emoji)} title={info.users.join(', ')} class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors {info.userIds.includes(data.user?.id ?? '') ? 'border-brand-700 bg-brand-950' : 'border-surface-700 bg-surface-800'}">
+											<span>{emoji}</span><span class="text-surface-400">{info.users.length}</span>
+										</button>
+									{/each}
+									<div class="relative">
+										<button onclick={() => reactionPickerOpen = reactionPickerOpen === comment.id ? null : comment.id} class="inline-flex items-center rounded-full border border-surface-700 px-1.5 py-0.5 text-xs text-surface-400 hover:border-surface-600 hover:text-surface-300" title="Add reaction">+</button>
+										{#if reactionPickerOpen === comment.id}
+											<div class="absolute bottom-full left-0 z-10 mb-1 flex gap-0.5 rounded-lg border border-surface-700 bg-surface-900 p-1.5 shadow-lg">
+												{#each REACTION_EMOJIS as emoji}
+													<button onclick={() => toggleReaction(comment.id, emoji)} class="rounded p-1 text-base hover:bg-surface-800">{emoji}</button>
+												{/each}
+											</div>
+										{/if}
+									</div>
+								</div>
+							</div>
 						{/if}
-
-						<!-- Reactions -->
-						<div class="mt-2 flex flex-wrap items-center gap-1">
-							{#each groupReactions(comment.reactions || []) as [emoji, info]}
-								<button
-									onclick={() => toggleReaction(comment.id, emoji)}
-									title={info.users.join(', ')}
-									class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors {info.userIds.includes(data.user?.id ?? '') ? 'border-brand-300 bg-brand-50 dark:border-brand-700 dark:bg-brand-950' : 'border-surface-300 bg-surface-50 hover:border-surface-400 dark:border-surface-700 dark:bg-surface-800'}"
-								>
-									<span>{emoji}</span>
-									<span class="text-surface-600 dark:text-surface-400">{info.users.length}</span>
-								</button>
-							{/each}
-							<div class="relative">
-								<button
-									onclick={() => reactionPickerOpen = reactionPickerOpen === comment.id ? null : comment.id}
-									class="inline-flex items-center rounded-full border border-surface-300 px-1.5 py-0.5 text-xs text-surface-400 transition-colors hover:border-surface-400 hover:text-surface-600 dark:border-surface-700 dark:hover:border-surface-600 dark:hover:text-surface-300"
-									title="Add reaction"
-								>+</button>
-								{#if reactionPickerOpen === comment.id}
-									<div class="absolute bottom-full left-0 z-10 mb-1 flex gap-0.5 rounded-lg border border-surface-300 bg-white p-1.5 shadow-lg dark:border-surface-700 dark:bg-surface-900">
-										{#each REACTION_EMOJIS as emoji}
-											<button
-												onclick={() => toggleReaction(comment.id, emoji)}
-												class="rounded p-1 text-base hover:bg-surface-100 dark:hover:bg-surface-800"
-											>{emoji}</button>
-										{/each}
+					{/each}
+				{:else if activityTab === 'comments'}
+					{@const visibleComments = data.comments.slice(-activityLimit)}
+					{#if data.comments.length > activityLimit}
+						<button
+							onclick={() => (activityLimit += 10)}
+							class="text-xs text-brand-500 hover:text-brand-400"
+						>Load more ({data.comments.length - activityLimit} older)</button>
+					{/if}
+					{#each visibleComments as comment (comment.id)}
+						<div class="rounded-md border border-surface-800 p-3">
+							<div class="mb-1 flex items-center justify-between">
+								<div class="flex items-center gap-2 text-xs">
+									<Avatar name={comment.userName} size="xs" />
+									<span class="font-medium text-surface-300">{comment.userName}</span>
+									<span class="text-surface-600">{formatDate(comment.createdAt)}</span>
+								</div>
+								{#if data.user && comment.userId === data.user.id}
+									<div class="flex gap-1">
+										<button onclick={() => startEditComment(comment)} class="text-xs text-surface-400 hover:text-surface-300">edit</button>
+										<button onclick={() => deleteComment(comment.id)} class="text-xs text-surface-400 hover:text-red-500">delete</button>
 									</div>
 								{/if}
 							</div>
+							{#if editingCommentId === comment.id}
+								<textarea bind:value={editingCommentBody} rows={3} class="w-full rounded-md border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 outline-none focus:border-brand-500"></textarea>
+								<div class="mt-2 flex gap-2">
+									<button onclick={() => saveComment(comment.id)} class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-500">Save</button>
+									<button onclick={() => { editingCommentId = null; editingCommentBody = ''; }} class="text-xs text-surface-400">Cancel</button>
+								</div>
+							{:else}
+								<MarkdownPreview content={comment.body} />
+							{/if}
+							<div class="mt-2 flex flex-wrap items-center gap-1">
+								{#each groupReactions(comment.reactions || []) as [emoji, info]}
+									<button onclick={() => toggleReaction(comment.id, emoji)} title={info.users.join(', ')} class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors {info.userIds.includes(data.user?.id ?? '') ? 'border-brand-700 bg-brand-950' : 'border-surface-700 bg-surface-800'}">
+										<span>{emoji}</span><span class="text-surface-400">{info.users.length}</span>
+									</button>
+								{/each}
+								<div class="relative">
+									<button onclick={() => reactionPickerOpen = reactionPickerOpen === comment.id ? null : comment.id} class="inline-flex items-center rounded-full border border-surface-700 px-1.5 py-0.5 text-xs text-surface-400 hover:border-surface-600 hover:text-surface-300" title="Add reaction">+</button>
+									{#if reactionPickerOpen === comment.id}
+										<div class="absolute bottom-full left-0 z-10 mb-1 flex gap-0.5 rounded-lg border border-surface-700 bg-surface-900 p-1.5 shadow-lg">
+											{#each REACTION_EMOJIS as emoji}
+												<button onclick={() => toggleReaction(comment.id, emoji)} class="rounded p-1 text-base hover:bg-surface-800">{emoji}</button>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							</div>
 						</div>
-					</div>
-				{/each}
-
-				<!-- Comment form -->
-				<form
-					onsubmit={(e) => { e.preventDefault(); addComment(); }}
-					class="mt-4"
-				>
-					<MentionInput
-						bind:value={commentBody}
-						users={data.members}
-						placeholder="Write a comment (markdown supported, @mention users)... Ctrl+Enter to submit"
-						rows={3}
-					/>
-					<div class="mt-2 flex justify-end">
+					{/each}
+				{:else}
+					{@const visibleHistory = data.activity.slice(-activityLimit)}
+					{#if data.activity.length > activityLimit}
 						<button
-							type="submit"
-							disabled={submitting || !commentBody.trim()}
-							class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
-						>
-							{submitting ? 'Posting...' : 'Comment'}
-						</button>
-					</div>
-				</form>
+							onclick={() => (activityLimit += 10)}
+							class="text-xs text-brand-500 hover:text-brand-400"
+						>Load more ({data.activity.length - activityLimit} older)</button>
+					{/if}
+					{#each visibleHistory as item (item.id)}
+						<div class="flex items-start gap-2 text-sm">
+							<Avatar name={item.userName} size="xs" />
+							<div>
+								<span class="font-medium text-surface-300">{item.userName}</span>
+								<span class="text-surface-500">{actionLabel(item.action)}</span>
+								<span class="ml-1 text-xs text-surface-600">{formatDate(item.createdAt)}</span>
+							</div>
+						</div>
+					{/each}
+				{/if}
+
+				<!-- Comment form (visible in All and Comments tabs) -->
+				{#if activityTab !== 'history'}
+					<form
+						onsubmit={(e) => { e.preventDefault(); addComment(); }}
+						class="mt-4"
+					>
+						<MentionInput
+							bind:value={commentBody}
+							users={data.members}
+							placeholder="Write a comment (markdown supported, @mention users)... Ctrl+Enter to submit"
+							rows={3}
+						/>
+						<div class="mt-2 flex justify-end">
+							<button
+								type="submit"
+								disabled={submitting || !commentBody.trim()}
+								class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+							>
+								{submitting ? 'Posting...' : 'Comment'}
+							</button>
+						</div>
+					</form>
+				{/if}
 			</div>
 		</div>
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { refreshUnreadCount } from '$lib/stores/notifications.js';
+	import { api } from '$lib/utils/api.js';
 
 	interface Props {
 		onclose: () => void;
@@ -35,9 +36,8 @@
 	});
 
 	async function markAllRead() {
-		await fetch('/api/notifications', {
+		await api('/api/notifications', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ action: 'mark_all_read' })
 		});
 		notifications = notifications.map((n) => ({ ...n, read: true }));
@@ -45,9 +45,8 @@
 	}
 
 	async function markRead(id: string) {
-		await fetch('/api/notifications', {
+		await api('/api/notifications', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ action: 'mark_read', id })
 		});
 		notifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n));

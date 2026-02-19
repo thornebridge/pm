@@ -9,11 +9,19 @@
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
 	import QuickCreateTask from '$lib/components/task/QuickCreateTask.svelte';
 
+	import { browser } from '$app/environment';
+
 	let { data, children } = $props();
 	let sidebarOpen = $state(false);
+	let sidebarCollapsed = $state(browser ? localStorage.getItem('pm-sidebar-collapsed') === 'true' : false);
 	let showShortcuts = $state(false);
 	let showSearch = $state(false);
 	let showQuickCreate = $state(false);
+
+	function toggleSidebarCollapse() {
+		sidebarCollapsed = !sidebarCollapsed;
+		localStorage.setItem('pm-sidebar-collapsed', String(sidebarCollapsed));
+	}
 
 	// Derive current project slug from URL
 	const currentProjectSlug = $derived.by(() => {
@@ -77,6 +85,8 @@
 		projects={data.sidebarProjects}
 		open={sidebarOpen}
 		onclose={() => (sidebarOpen = false)}
+		collapsed={sidebarCollapsed}
+		ontogglecollapse={toggleSidebarCollapse}
 	/>
 
 	<!-- Main content -->

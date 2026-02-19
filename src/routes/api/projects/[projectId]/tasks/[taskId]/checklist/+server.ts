@@ -19,6 +19,24 @@ export const GET: RequestHandler = async (event) => {
 	return json(items);
 };
 
+export const PATCH: RequestHandler = async (event) => {
+	requireAuth(event);
+	const { order } = await event.request.json();
+
+	if (!Array.isArray(order)) {
+		return json({ error: 'order must be an array of item IDs' }, { status: 400 });
+	}
+
+	for (let i = 0; i < order.length; i++) {
+		db.update(checklistItems)
+			.set({ position: i })
+			.where(eq(checklistItems.id, order[i]))
+			.run();
+	}
+
+	return json({ ok: true });
+};
+
 export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { title } = await event.request.json();

@@ -186,10 +186,16 @@ export const PATCH: RequestHandler = async (event) => {
 			detail: JSON.stringify({ from: existing.assigneeId, to: body.assigneeId })
 		});
 	}
+	if (body.startDate !== undefined) {
+		updates.startDate = body.startDate || null;
+	}
 	if (body.dueDate !== undefined) {
 		updates.dueDate = body.dueDate || null;
 		// Clear sent reminders so they re-fire for new due date
 		db.delete(dueDateRemindersSent).where(eq(dueDateRemindersSent.taskId, taskId)).run();
+	}
+	if (body.sprintId !== undefined) {
+		updates.sprintId = body.sprintId || null;
 	}
 	if (body.position !== undefined) {
 		updates.position = body.position;
