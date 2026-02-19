@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
 import { tasks, projects, taskStatuses, activityLog, users } from '$lib/server/db/schema.js';
-import { eq, desc, and, isNotNull } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { user } = await parent();

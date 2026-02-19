@@ -11,6 +11,7 @@
 	let submitting = $state(false);
 	let editingTitle = $state(false);
 	let titleInput = $state(data.task.title);
+	$effect(() => { titleInput = data.task.title; });
 
 	const statusMap = $derived(new Map(data.statuses.map((s) => [s.id, s])));
 	const currentStatus = $derived(statusMap.get(data.task.statusId));
@@ -169,8 +170,9 @@
 		<!-- Sidebar metadata -->
 		<div class="space-y-4">
 			<div>
-				<label class="mb-1 block text-xs text-surface-500">Status</label>
+				<label for="task-status" class="mb-1 block text-xs text-surface-500">Status</label>
 				<select
+					id="task-status"
 					value={data.task.statusId}
 					onchange={(e) => updateField('statusId', e.currentTarget.value)}
 					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
@@ -182,8 +184,9 @@
 			</div>
 
 			<div>
-				<label class="mb-1 block text-xs text-surface-500">Priority</label>
+				<label for="task-priority" class="mb-1 block text-xs text-surface-500">Priority</label>
 				<select
+					id="task-priority"
 					value={data.task.priority}
 					onchange={(e) => updateField('priority', e.currentTarget.value)}
 					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
@@ -196,8 +199,9 @@
 			</div>
 
 			<div>
-				<label class="mb-1 block text-xs text-surface-500">Assignee</label>
+				<label for="task-assignee" class="mb-1 block text-xs text-surface-500">Assignee</label>
 				<select
+					id="task-assignee"
 					value={data.task.assigneeId ?? ''}
 					onchange={(e) => updateField('assigneeId', e.currentTarget.value || null)}
 					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"

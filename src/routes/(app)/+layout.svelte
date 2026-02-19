@@ -46,7 +46,7 @@
 	<div class="flex flex-1 flex-col overflow-hidden">
 		<!-- Mobile header -->
 		<header class="flex h-12 items-center border-b border-surface-300 px-4 dark:border-surface-800 md:hidden">
-			<button onclick={() => (sidebarOpen = true)} class="text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100">
+			<button onclick={() => (sidebarOpen = true)} aria-label="Open menu" class="text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100">
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 					<path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
 				</svg>

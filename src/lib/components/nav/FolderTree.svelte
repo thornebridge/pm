@@ -1,4 +1,6 @@
 <script lang="ts">
+	import FolderTree from './FolderTree.svelte';
+
 	interface Folder {
 		id: string;
 		name: string;
@@ -57,7 +59,7 @@
 			<span class="truncate">{folder.name}</span>
 		</button>
 		{#if !collapsed[folder.id]}
-			<svelte:self
+			<FolderTree
 				{folders}
 				{projects}
 				parentId={folder.id}
