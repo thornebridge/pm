@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import TaskCard from '$lib/components/task/TaskCard.svelte';
 
 	interface Status {
@@ -25,9 +24,10 @@
 		projectSlug: string;
 		ondrop: (e: DragEvent, statusId: string) => void;
 		ondragstart: (e: DragEvent, task: Task) => void;
+		ontaskclick?: (task: Task) => void;
 	}
 
-	let { status, tasks, projectSlug, ondrop, ondragstart }: Props = $props();
+	let { status, tasks, projectSlug, ondrop, ondragstart, ontaskclick }: Props = $props();
 	let dragover = $state(false);
 
 	function handleDragOver(e: DragEvent) {
@@ -65,6 +65,7 @@
 				{task}
 				{projectSlug}
 				ondragstart={(e) => ondragstart(e, task)}
+				onclick={ontaskclick ? () => ontaskclick(task) : undefined}
 			/>
 		{/each}
 	</div>

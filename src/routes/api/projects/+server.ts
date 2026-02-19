@@ -2,8 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { projects, taskStatuses } from '$lib/server/db/schema.js';
-import { desc } from 'drizzle-orm';
+import { projects, taskStatuses, taskLabels, taskTemplates } from '$lib/server/db/schema.js';
+import { desc, eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
@@ -28,7 +28,7 @@ function slugify(text: string): string {
 
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	const { name, description, color } = await event.request.json();
+	const { name, description, color, templateProjectId } = await event.request.json();
 
 	if (!name?.trim()) {
 		return json({ error: 'Name is required' }, { status: 400 });
@@ -51,19 +51,84 @@ export const POST: RequestHandler = async (event) => {
 
 	db.insert(projects).values(project).run();
 
-	// Create default statuses
-	for (const s of DEFAULT_STATUSES) {
-		db.insert(taskStatuses)
-			.values({
-				id: nanoid(12),
-				projectId: id,
-				name: s.name,
-				color: s.color,
-				position: s.position,
-				isClosed: s.isClosed,
-				createdAt: now
-			})
-			.run();
+	if (templateProjectId) {
+		// Clone statuses from template project
+		const templateStatuses = db
+			.select()
+			.from(taskStatuses)
+			.where(eq(taskStatuses.projectId, templateProjectId))
+			.orderBy(asc(taskStatuses.position))
+			.all();
+
+		for (const s of templateStatuses) {
+			db.insert(taskStatuses)
+				.values({
+					id: nanoid(12),
+					projectId: id,
+					name: s.name,
+					color: s.color,
+					position: s.position,
+					isClosed: s.isClosed,
+					createdAt: now
+				})
+				.run();
+		}
+
+		// Clone labels from template project
+		const templateLabels = db
+			.select()
+			.from(taskLabels)
+			.where(eq(taskLabels.projectId, templateProjectId))
+			.all();
+
+		for (const l of templateLabels) {
+			db.insert(taskLabels)
+				.values({
+					id: nanoid(12),
+					projectId: id,
+					name: l.name,
+					color: l.color,
+					createdAt: now
+				})
+				.run();
+		}
+
+		// Clone task templates
+		const templates = db
+			.select()
+			.from(taskTemplates)
+			.where(eq(taskTemplates.projectId, templateProjectId))
+			.all();
+
+		for (const t of templates) {
+			db.insert(taskTemplates)
+				.values({
+					id: nanoid(12),
+					projectId: id,
+					name: t.name,
+					title: t.title,
+					description: t.description,
+					priority: t.priority,
+					createdAt: now
+				})
+				.run();
+		}
+
+		// If no statuses were copied (template had none), add defaults
+		if (templateStatuses.length === 0) {
+			for (const s of DEFAULT_STATUSES) {
+				db.insert(taskStatuses)
+					.values({ id: nanoid(12), projectId: id, ...s, createdAt: now })
+					.run();
+			}
+		}
+	} else {
+		// Create default statuses
+		for (const s of DEFAULT_STATUSES) {
+			db.insert(taskStatuses)
+				.values({ id: nanoid(12), projectId: id, ...s, createdAt: now })
+				.run();
+		}
 	}
 
 	return json(project, { status: 201 });

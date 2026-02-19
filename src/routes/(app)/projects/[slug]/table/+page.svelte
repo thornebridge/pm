@@ -1,7 +1,10 @@
 <script lang="ts">
 	import DataTable from '$lib/components/table/DataTable.svelte';
+	import BulkActions from '$lib/components/task/BulkActions.svelte';
 
 	let { data } = $props();
+
+	let selectedIds = $state<string[]>([]);
 </script>
 
 <svelte:head>
@@ -19,5 +22,14 @@
 		projectSlug={data.project.slug}
 		projectId={data.project.id}
 		members={data.members}
+		bind:selectedIds
 	/>
 </div>
+
+<BulkActions
+	{selectedIds}
+	projectId={data.project.id}
+	statuses={data.statuses}
+	members={data.members}
+	onclear={() => (selectedIds = [])}
+/>

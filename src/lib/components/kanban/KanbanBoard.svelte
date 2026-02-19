@@ -27,9 +27,10 @@
 		tasks: Task[];
 		projectId: string;
 		projectSlug: string;
+		ontaskclick?: (task: Task) => void;
 	}
 
-	let { statuses, tasks, projectId, projectSlug }: Props = $props();
+	let { statuses, tasks, projectId, projectSlug, ontaskclick }: Props = $props();
 
 	let draggedTask: Task | null = $state(null);
 	let localTasks = $state<Task[]>([]);
@@ -88,6 +89,7 @@
 			{projectSlug}
 			ondrop={handleDrop}
 			ondragstart={handleDragStart}
+			{ontaskclick}
 		/>
 	{/each}
 </div>

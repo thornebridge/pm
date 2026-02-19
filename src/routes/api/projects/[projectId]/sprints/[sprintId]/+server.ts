@@ -5,6 +5,13 @@ import { db } from '$lib/server/db/index.js';
 import { sprints, tasks, taskStatuses } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
+const VALID_TRANSITIONS: Record<string, string[]> = {
+	planning: ['active', 'cancelled'],
+	active: ['completed', 'cancelled'],
+	completed: [],
+	cancelled: []
+};
+
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { projectId, sprintId } = event.params;
@@ -45,7 +52,16 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.goal !== undefined) updates.goal = body.goal?.trim() || null;
 	if (body.startDate !== undefined) updates.startDate = body.startDate;
 	if (body.endDate !== undefined) updates.endDate = body.endDate;
-	if (body.status !== undefined) updates.status = body.status;
+
+	if (body.status !== undefined) {
+		const sprint = db.select().from(sprints).where(eq(sprints.id, sprintId)).get();
+		if (!sprint) return json({ error: 'Sprint not found' }, { status: 404 });
+		const allowed = VALID_TRANSITIONS[sprint.status] ?? [];
+		if (!allowed.includes(body.status)) {
+			return json({ error: `Cannot transition from '${sprint.status}' to '${body.status}'` }, { status: 400 });
+		}
+		updates.status = body.status;
+	}
 
 	if (Object.keys(updates).length > 0) {
 		db.update(sprints)

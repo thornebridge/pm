@@ -13,6 +13,7 @@ import {
 import { eq, and, desc, asc, sql, like, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastTaskCreated } from '$lib/server/ws/handlers.js';
+import { fireWebhooks } from '$lib/server/webhooks/fire.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -41,11 +42,16 @@ export const GET: RequestHandler = async (event) => {
 
 	const orderFn = sortDir === 'desc' ? desc : asc;
 
+	const limit = Math.min(parseInt(url.searchParams.get('limit') || '500'), 500);
+	const offset = parseInt(url.searchParams.get('offset') || '0');
+
 	const result = db
 		.select()
 		.from(tasks)
 		.where(and(...conditions))
 		.orderBy(orderFn(orderCol))
+		.limit(limit)
+		.offset(offset)
 		.all();
 
 	// Fetch label assignments for all tasks
@@ -79,7 +85,7 @@ export const GET: RequestHandler = async (event) => {
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const projectId = event.params.projectId;
-	const { title, description, statusId, priority, assigneeId, dueDate } =
+	const { title, description, statusId, priority, assigneeId, dueDate, labelIds } =
 		await event.request.json();
 
 	if (!title?.trim()) {
@@ -155,7 +161,20 @@ export const POST: RequestHandler = async (event) => {
 		})
 		.run();
 
-	const result = { ...task, labels: [] };
+	// Assign labels if provided
+	const assignedLabels: Array<{ labelId: string; name: string; color: string }> = [];
+	if (labelIds && Array.isArray(labelIds) && labelIds.length > 0) {
+		for (const labelId of labelIds) {
+			const label = db.select().from(taskLabels).where(eq(taskLabels.id, labelId)).get();
+			if (label && label.projectId === projectId) {
+				db.insert(taskLabelAssignments).values({ taskId: id, labelId }).run();
+				assignedLabels.push({ labelId: label.id, name: label.name, color: label.color });
+			}
+		}
+	}
+
+	const result = { ...task, labels: assignedLabels };
 	broadcastTaskCreated(projectId, result, user.id);
+	fireWebhooks('task.created', { projectId, task: result }).catch(() => {});
 	return json(result, { status: 201 });
 };

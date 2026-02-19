@@ -18,10 +18,17 @@
 
 	let showDropdown = $state(false);
 	let mentionQuery = $state('');
+	let mentionSelectedIndex = $state(0);
 	let dropdownX = $state(0);
 	let dropdownY = $state(0);
 	let textarea: HTMLTextAreaElement | undefined = $state();
 	let containerEl: HTMLDivElement | undefined = $state();
+
+	const mentionFiltered = $derived(
+		mentionQuery
+			? users.filter((u) => u.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
+			: users.slice(0, 5)
+	);
 
 	function handleInput(e: Event) {
 		const el = e.target as HTMLTextAreaElement;
@@ -34,6 +41,7 @@
 
 		if (atMatch) {
 			mentionQuery = atMatch[1];
+			mentionSelectedIndex = 0;
 			showDropdown = true;
 			// Position dropdown near cursor
 			dropdownX = 8;
@@ -64,9 +72,22 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (showDropdown && e.key === 'Escape') {
-			showDropdown = false;
-			e.stopPropagation();
+		if (showDropdown) {
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				mentionSelectedIndex = (mentionSelectedIndex + 1) % mentionFiltered.length;
+			} else if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				mentionSelectedIndex = (mentionSelectedIndex - 1 + mentionFiltered.length) % mentionFiltered.length;
+			} else if (e.key === 'Enter') {
+				e.preventDefault();
+				if (mentionFiltered[mentionSelectedIndex]) {
+					selectUser(mentionFiltered[mentionSelectedIndex]);
+				}
+			} else if (e.key === 'Escape') {
+				showDropdown = false;
+				e.stopPropagation();
+			}
 		}
 	}
 </script>
@@ -87,6 +108,7 @@
 		visible={showDropdown}
 		x={dropdownX}
 		y={dropdownY}
+		selectedIndex={mentionSelectedIndex}
 		onselect={selectUser}
 	/>
 </div>

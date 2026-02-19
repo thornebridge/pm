@@ -13,9 +13,17 @@
 		};
 		projectSlug: string;
 		ondragstart?: (e: DragEvent) => void;
+		onclick?: (e: MouseEvent) => void;
 	}
 
-	let { task, projectSlug, ondragstart }: Props = $props();
+	let { task, projectSlug, ondragstart, onclick }: Props = $props();
+
+	function handleClick(e: MouseEvent) {
+		if (onclick) {
+			e.preventDefault();
+			onclick(e);
+		}
+	}
 </script>
 
 <a
@@ -23,6 +31,7 @@
 	class="block rounded-md border border-surface-300 bg-surface-50 p-3 transition hover:border-surface-400 hover:shadow-sm dark:border-surface-800 dark:bg-surface-900 dark:hover:border-surface-700"
 	draggable="true"
 	ondragstart={ondragstart}
+	onclick={handleClick}
 	data-task-id={task.id}
 >
 	<div class="mb-1 flex items-center gap-2">

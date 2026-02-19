@@ -16,6 +16,18 @@
 	}>({ tasks: [], projects: [], comments: [] });
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let inputEl: HTMLInputElement | undefined = $state();
+	let selectedIndex = $state(-1);
+
+	interface FlatItem {
+		url: string;
+		type: 'project' | 'task' | 'comment';
+	}
+
+	const flatResults = $derived<FlatItem[]>([
+		...results.projects.map((p) => ({ url: `/projects/${p.slug}/board`, type: 'project' as const })),
+		...results.tasks.map((t) => ({ url: `/projects/${t.projectSlug}/task/${t.number}`, type: 'task' as const })),
+		...results.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const }))
+	]);
 
 	$effect(() => {
 		if (open) {
@@ -23,7 +35,14 @@
 		} else {
 			query = '';
 			results = { tasks: [], projects: [], comments: [] };
+			selectedIndex = -1;
 		}
+	});
+
+	// Reset index when results change
+	$effect(() => {
+		flatResults;
+		selectedIndex = -1;
 	});
 
 	function handleInput() {
@@ -48,10 +67,33 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onclose();
+		if (e.key === 'Escape') {
+			onclose();
+			return;
+		}
+		if (flatResults.length === 0) return;
+
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			selectedIndex = (selectedIndex + 1) % flatResults.length;
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			selectedIndex = (selectedIndex - 1 + flatResults.length) % flatResults.length;
+		} else if (e.key === 'Enter' && selectedIndex >= 0 && flatResults[selectedIndex]) {
+			e.preventDefault();
+			navigate(flatResults[selectedIndex].url);
+		}
+	}
+
+	// Compute offsets for highlighting: projects come first, then tasks, then comments
+	function isSelected(sectionOffset: number, itemIndex: number): boolean {
+		return selectedIndex === sectionOffset + itemIndex;
 	}
 
 	const hasResults = $derived(results.tasks.length > 0 || results.projects.length > 0 || results.comments.length > 0);
+	const projectsOffset = 0;
+	const tasksOffset = $derived(results.projects.length);
+	const commentsOffset = $derived(results.projects.length + results.tasks.length);
 </script>
 
 {#if open}
@@ -81,10 +123,10 @@
 					{#if results.projects.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Projects</span>
-							{#each results.projects as project}
+							{#each results.projects as project, i}
 								<button
 									onclick={() => navigate(`/projects/${project.slug}/board`)}
-									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800"
+									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(projectsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
 								>
 									{project.name}
 								</button>
@@ -95,14 +137,14 @@
 					{#if results.tasks.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Tasks</span>
-							{#each results.tasks as task}
+							{#each results.tasks as task, i}
 								<button
 									onclick={() => navigate(`/projects/${task.projectSlug}/task/${task.number}`)}
-									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface-200 dark:hover:bg-surface-800"
+									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(tasksOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'hover:bg-surface-200 dark:hover:bg-surface-800'}"
 								>
-									<span class="text-xs text-surface-400">#{task.number}</span>
-									<span class="flex-1 truncate text-surface-700 dark:text-surface-300">{task.title}</span>
-									<span class="text-[10px] text-surface-400">{task.projectName}</span>
+									<span class="text-xs {isSelected(tasksOffset, i) ? 'text-brand-500' : 'text-surface-400'}">#{task.number}</span>
+									<span class="flex-1 truncate {isSelected(tasksOffset, i) ? '' : 'text-surface-700 dark:text-surface-300'}">{task.title}</span>
+									<span class="text-[10px] {isSelected(tasksOffset, i) ? 'text-brand-500' : 'text-surface-400'}">{task.projectName}</span>
 								</button>
 							{/each}
 						</div>
@@ -111,13 +153,13 @@
 					{#if results.comments.length > 0}
 						<div>
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Comments</span>
-							{#each results.comments as comment}
+							{#each results.comments as comment, i}
 								<button
 									onclick={() => navigate(`/projects/${comment.projectSlug}/task/${comment.taskNumber}`)}
-									class="mt-0.5 flex w-full flex-col rounded-md px-2 py-1.5 text-left hover:bg-surface-200 dark:hover:bg-surface-800"
+									class="mt-0.5 flex w-full flex-col rounded-md px-2 py-1.5 text-left {isSelected(commentsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'hover:bg-surface-200 dark:hover:bg-surface-800'}"
 								>
-									<span class="text-xs text-surface-700 dark:text-surface-300">#{comment.taskNumber} {comment.taskTitle}</span>
-									<span class="truncate text-[10px] text-surface-500">{comment.body}</span>
+									<span class="text-xs {isSelected(commentsOffset, i) ? '' : 'text-surface-700 dark:text-surface-300'}">#{comment.taskNumber} {comment.taskTitle}</span>
+									<span class="truncate text-[10px] {isSelected(commentsOffset, i) ? 'text-brand-500' : 'text-surface-500'}">{comment.body}</span>
 								</button>
 							{/each}
 						</div>

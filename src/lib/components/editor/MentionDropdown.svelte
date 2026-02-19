@@ -10,24 +10,17 @@
 		visible: boolean;
 		x: number;
 		y: number;
+		selectedIndex: number;
 		onselect: (user: User) => void;
 	}
 
-	let { users, query, visible, x, y, onselect }: Props = $props();
+	let { users, query, visible, x, y, selectedIndex, onselect }: Props = $props();
 
 	const filtered = $derived(
 		query
 			? users.filter((u) => u.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5)
 			: users.slice(0, 5)
 	);
-
-	let selectedIndex = $state(0);
-
-	$effect(() => {
-		// Reset selection when query changes
-		query;
-		selectedIndex = 0;
-	});
 </script>
 
 {#if visible && filtered.length > 0}

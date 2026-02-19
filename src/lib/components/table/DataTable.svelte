@@ -36,9 +36,11 @@
 		projectSlug: string;
 		projectId: string;
 		members: Member[];
+		selectedIds?: string[];
+		onselect?: (ids: string[]) => void;
 	}
 
-	let { tasks, statuses, projectSlug, projectId, members }: Props = $props();
+	let { tasks, statuses, projectSlug, projectId, members, selectedIds = $bindable([]), onselect }: Props = $props();
 
 	let sortColumn = $state<'number' | 'priority' | 'title' | 'status' | 'assignee' | 'dueDate' | 'points'>('number');
 	let sortAsc = $state(true);
@@ -169,6 +171,25 @@
 		}
 	}
 
+	const allSortedIds = $derived(sortedTasks.map((t) => t.id));
+	const allSelected = $derived(allSortedIds.length > 0 && allSortedIds.every((id) => selectedIds.includes(id)));
+
+	function toggleAll() {
+		if (allSelected) {
+			selectedIds = [];
+		} else {
+			selectedIds = [...allSortedIds];
+		}
+	}
+
+	function toggleOne(id: string) {
+		if (selectedIds.includes(id)) {
+			selectedIds = selectedIds.filter((i) => i !== id);
+		} else {
+			selectedIds = [...selectedIds, id];
+		}
+	}
+
 	function formatDate(ts: number | null): string {
 		if (!ts) return '';
 		return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -193,6 +214,14 @@
 		<table class="w-full text-sm">
 			<thead>
 				<tr class="border-b border-surface-300 bg-surface-100 text-left text-xs font-medium uppercase tracking-wide text-surface-500 dark:border-surface-800 dark:bg-surface-800">
+					<th class="w-8 px-2 py-2">
+						<input
+							type="checkbox"
+							checked={allSelected}
+							onchange={toggleAll}
+							class="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700"
+						/>
+					</th>
 					<th class="w-14 cursor-pointer px-3 py-2 select-none" onclick={() => toggleSort('number')}>
 						#{sortIndicator('number')}
 					</th>
@@ -222,7 +251,7 @@
 						{@const status = statusMap.get(statusId)}
 						{#if status}
 							<tr>
-								<td colspan="7" class="border-b border-surface-200 bg-surface-100/70 px-3 py-1.5 dark:border-surface-800/50 dark:bg-surface-800/40">
+								<td colspan="8" class="border-b border-surface-200 bg-surface-100/70 px-3 py-1.5 dark:border-surface-800/50 dark:bg-surface-800/40">
 									<span class="flex items-center gap-2 text-xs font-semibold text-surface-700 dark:text-surface-300">
 										<span class="h-2.5 w-2.5 rounded-full" style="background-color: {status.color}"></span>
 										{status.name}
@@ -234,7 +263,7 @@
 								{@render taskRow(task)}
 							{:else}
 								<tr>
-									<td colspan="7" class="border-b border-surface-200 px-3 py-2 text-center text-xs text-surface-400 dark:border-surface-800/50">
+									<td colspan="8" class="border-b border-surface-200 px-3 py-2 text-center text-xs text-surface-400 dark:border-surface-800/50">
 										No tasks
 									</td>
 								</tr>
@@ -246,7 +275,7 @@
 						{@render taskRow(task)}
 					{:else}
 						<tr>
-							<td colspan="7" class="px-3 py-8 text-center text-sm text-surface-500">No tasks found</td>
+							<td colspan="8" class="px-3 py-8 text-center text-sm text-surface-500">No tasks found</td>
 						</tr>
 					{/each}
 				{/if}
@@ -258,7 +287,15 @@
 {#snippet taskRow(task: Task)}
 	{@const status = statusMap.get(task.statusId)}
 	{@const assignee = memberMap.get(task.assigneeId ?? '')}
-	<tr class="border-b border-surface-200 transition hover:bg-surface-100 dark:border-surface-800/50 dark:hover:bg-surface-800/30">
+	<tr class="border-b border-surface-200 transition hover:bg-surface-100 dark:border-surface-800/50 dark:hover:bg-surface-800/30 {selectedIds.includes(task.id) ? 'bg-brand-50 dark:bg-brand-900/10' : ''}">
+		<td class="px-2 py-2">
+			<input
+				type="checkbox"
+				checked={selectedIds.includes(task.id)}
+				onchange={() => toggleOne(task.id)}
+				class="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700"
+			/>
+		</td>
 		<td class="px-3 py-2">
 			<a
 				href="/projects/{projectSlug}/task/{task.number}"

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { refreshUnreadCount } from '$lib/stores/notifications.js';
+	import { api } from '$lib/utils/api.js';
 
 	interface Notification {
 		id: string;
@@ -15,22 +16,43 @@
 
 	let notifications = $state<Notification[]>([]);
 	let loading = $state(true);
+	let total = $state(0);
+	let hasMore = $state(false);
+	let loadingMore = $state(false);
+
+	const PAGE_SIZE = 30;
 
 	onMount(async () => {
+		await loadNotifications(0);
+	});
+
+	async function loadNotifications(offset: number) {
 		try {
-			const res = await fetch('/api/notifications');
+			const res = await fetch(`/api/notifications?limit=${PAGE_SIZE}&offset=${offset}`);
 			if (res.ok) {
-				notifications = await res.json();
+				const data = await res.json();
+				if (offset === 0) {
+					notifications = data.items;
+				} else {
+					notifications = [...notifications, ...data.items];
+				}
+				total = data.total;
+				hasMore = notifications.length < total;
 			}
 		} finally {
 			loading = false;
+			loadingMore = false;
 		}
-	});
+	}
+
+	async function loadMore() {
+		loadingMore = true;
+		await loadNotifications(notifications.length);
+	}
 
 	async function markRead(id: string) {
-		await fetch('/api/notifications', {
+		await api('/api/notifications', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ action: 'mark_read', id })
 		});
 		notifications = notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
@@ -38,9 +60,8 @@
 	}
 
 	async function markAllRead() {
-		await fetch('/api/notifications', {
+		await api('/api/notifications', {
 			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ action: 'mark_all_read' })
 		});
 		notifications = notifications.map((n) => ({ ...n, read: true }));
@@ -101,5 +122,17 @@
 				</a>
 			{/each}
 		</div>
+
+		{#if hasMore}
+			<div class="mt-4 text-center">
+				<button
+					onclick={loadMore}
+					disabled={loadingMore}
+					class="rounded-md border border-surface-300 px-4 py-1.5 text-sm text-surface-600 hover:border-surface-400 hover:text-surface-900 disabled:opacity-50 dark:border-surface-700 dark:text-surface-400 dark:hover:border-surface-600"
+				>
+					{loadingMore ? 'Loading...' : 'Load more'}
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>

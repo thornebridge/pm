@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { tasks } from '$lib/server/db/schema.js';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 
 export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -25,16 +25,21 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'No valid updates' }, { status: 400 });
 	}
 
-	for (const taskId of taskIds) {
-		db.update(tasks)
-			.set(allowed)
-			.where(eq(tasks.id, taskId))
-			.run();
-	}
+	const updated = db.transaction((tx) => {
+		let count = 0;
+		for (const taskId of taskIds) {
+			const r = tx.update(tasks)
+				.set(allowed)
+				.where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
+				.run();
+			count += r.changes;
+		}
+		return count;
+	});
 
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'tasks:bulk_updated', taskIds });
 	}
 
-	return json({ ok: true, updated: taskIds.length });
+	return json({ ok: true, updated });
 };

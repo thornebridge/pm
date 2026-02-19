@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
 import { sprints, tasks, taskStatuses, taskLabels, taskLabelAssignments } from '$lib/server/db/schema.js';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
@@ -39,7 +39,10 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
 	// Get labels for tasks
 	const allLabels = db.select().from(taskLabels).where(eq(taskLabels.projectId, project.id)).all();
-	const assignments = db.select().from(taskLabelAssignments).all();
+	const allTaskIds = [...sprintTasks, ...backlogTasks].map((t) => t.id);
+	const assignments = allTaskIds.length > 0
+		? db.select().from(taskLabelAssignments).where(inArray(taskLabelAssignments.taskId, allTaskIds)).all()
+		: [];
 
 	const taskIds = new Set([...sprintTasks, ...backlogTasks].map((t) => t.id));
 	const labelMap = new Map(allLabels.map((l) => [l.id, l]));

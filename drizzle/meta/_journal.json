@@ -15,6 +15,34 @@
       "when": 1739936896000,
       "tag": "0001_add_folders_sprints_and_more",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1740000000000,
+      "tag": "0002_add_checklist_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1740000001000,
+      "tag": "0003_add_saved_views_and_webhooks",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1740000002000,
+      "tag": "0004_add_task_watchers",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1740000003000,
+      "tag": "0005_add_email_notifications",
+      "breakpoints": true
     }
   ]
 }

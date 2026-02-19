@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { connectWs, disconnectWs } from '$lib/stores/websocket.js';
-	import { handleGlobalKeydown, registerShortcut, unregisterShortcut } from '$lib/utils/keyboard.js';
+	import { handleGlobalKeydown, registerShortcut, unregisterShortcut, registerMetaShortcut, unregisterMetaShortcut, SHORTCUT_HELP } from '$lib/utils/keyboard.js';
 	import Sidebar from '$lib/components/nav/Sidebar.svelte';
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
 
@@ -15,13 +15,26 @@
 		connectWs();
 		registerShortcut('?', () => (showShortcuts = !showShortcuts));
 		registerShortcut('p', () => goto('/projects'));
+		registerShortcut('d', () => goto('/dashboard'));
+		registerShortcut('m', () => goto('/my-tasks'));
+		registerShortcut('a', () => goto('/activity'));
 		registerShortcut('/', () => (showSearch = true));
+		registerShortcut('escape', () => {
+			showShortcuts = false;
+			showSearch = false;
+		});
+		registerMetaShortcut('k', () => (showSearch = true));
 	});
 	onDestroy(() => {
 		disconnectWs();
 		unregisterShortcut('?');
 		unregisterShortcut('p');
+		unregisterShortcut('d');
+		unregisterShortcut('m');
+		unregisterShortcut('a');
 		unregisterShortcut('/');
+		unregisterShortcut('escape');
+		unregisterMetaShortcut('k');
 	});
 </script>
 
@@ -73,10 +86,10 @@
 		<div class="w-80 rounded-lg border border-surface-300 bg-surface-50 p-4 shadow-xl dark:border-surface-700 dark:bg-surface-900">
 			<h3 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Keyboard Shortcuts</h3>
 			<div class="space-y-2">
-				{#each [['C', 'New task'], ['P', 'Go to projects'], ['/', 'Search'], ['?', 'Toggle this help']] as [key, desc]}
+				{#each SHORTCUT_HELP as shortcut}
 					<div class="flex items-center justify-between">
-						<span class="text-sm text-surface-600 dark:text-surface-400">{desc}</span>
-						<kbd class="rounded border border-surface-300 bg-surface-200 px-1.5 py-0.5 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300">{key}</kbd>
+						<span class="text-sm text-surface-600 dark:text-surface-400">{shortcut.description}</span>
+						<kbd class="rounded border border-surface-300 bg-surface-200 px-1.5 py-0.5 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300">{shortcut.key}</kbd>
 					</div>
 				{/each}
 			</div>

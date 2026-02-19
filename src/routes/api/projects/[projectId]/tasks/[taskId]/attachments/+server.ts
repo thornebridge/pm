@@ -26,7 +26,6 @@ export const GET: RequestHandler = async (event) => {
 			originalName: attachments.originalName,
 			mimeType: attachments.mimeType,
 			size: attachments.size,
-			storagePath: attachments.storagePath,
 			uploadedBy: attachments.uploadedBy,
 			createdAt: attachments.createdAt,
 			uploaderName: users.name
@@ -111,7 +110,6 @@ export const POST: RequestHandler = async (event) => {
 		originalName: file.name,
 		mimeType: file.type || 'application/octet-stream',
 		size: file.size,
-		storagePath,
 		uploadedBy: user.id,
 		uploaderName: user.name,
 		createdAt: timestamp

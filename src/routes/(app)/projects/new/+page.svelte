@@ -3,9 +3,12 @@
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
 
+	let { data } = $props();
+
 	let name = $state('');
 	let description = $state('');
 	let color = $state('#2d4f3e');
+	let templateProjectId = $state('');
 	let creating = $state(false);
 
 	async function create() {
@@ -14,7 +17,12 @@
 		try {
 			const project = await api<{ slug: string }>('/api/projects', {
 				method: 'POST',
-				body: JSON.stringify({ name, description, color })
+				body: JSON.stringify({
+					name,
+					description,
+					color,
+					templateProjectId: templateProjectId || undefined
+				})
 			});
 			goto(`/projects/${project.slug}/board`);
 		} catch (err) {
@@ -60,6 +68,23 @@
 			<label for="color" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Color</label>
 			<input id="color" type="color" bind:value={color} class="h-8 w-12 cursor-pointer rounded border border-surface-300 bg-surface-50 dark:border-surface-700 dark:bg-surface-800" />
 		</div>
+
+		{#if data.existingProjects.length > 0}
+			<div>
+				<label for="template" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Template (optional)</label>
+				<select
+					id="template"
+					bind:value={templateProjectId}
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+				>
+					<option value="">None — use default statuses</option>
+					{#each data.existingProjects as project}
+						<option value={project.id}>{project.name}</option>
+					{/each}
+				</select>
+				<p class="mt-1 text-[10px] text-surface-400">Copies statuses, labels, and task templates from the selected project.</p>
+			</div>
+		{/if}
 
 		<div class="flex justify-end gap-2 pt-2">
 			<a href="/projects" class="rounded-md px-3 py-1.5 text-sm text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100">Cancel</a>

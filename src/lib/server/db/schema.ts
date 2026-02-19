@@ -164,6 +164,23 @@ export const taskLabelAssignments = sqliteTable(
 	(table) => [primaryKey({ columns: [table.taskId, table.labelId] })]
 );
 
+// ─── Checklist Items ─────────────────────────────────────────────────────────
+
+export const checklistItems = sqliteTable(
+	'checklist_items',
+	{
+		id: text('id').primaryKey(),
+		taskId: text('task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
+		position: integer('position').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_checklist_task').on(table.taskId, table.position)]
+);
+
 // ─── Task Dependencies ───────────────────────────────────────────────────────
 
 export const taskDependencies = sqliteTable(
@@ -276,7 +293,8 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
 	onAssigned: integer('on_assigned', { mode: 'boolean' }).notNull().default(true),
 	onStatusChange: integer('on_status_change', { mode: 'boolean' }).notNull().default(true),
 	onComment: integer('on_comment', { mode: 'boolean' }).notNull().default(true),
-	onMention: integer('on_mention', { mode: 'boolean' }).notNull().default(true)
+	onMention: integer('on_mention', { mode: 'boolean' }).notNull().default(true),
+	emailEnabled: integer('email_enabled', { mode: 'boolean' }).notNull().default(true)
 });
 
 // ─── In-App Notifications ────────────────────────────────────────────────────
@@ -288,7 +306,7 @@ export const notifications = sqliteTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment'] }).notNull(),
+		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment', 'due_soon', 'overdue'] }).notNull(),
 		title: text('title').notNull(),
 		body: text('body'),
 		url: text('url'),
@@ -337,6 +355,60 @@ export const taskTemplates = sqliteTable('task_templates', {
 	labelIds: text('label_ids'),
 	createdAt: integer('created_at', { mode: 'number' }).notNull()
 });
+
+// ─── Saved Views ─────────────────────────────────────────────────────────────
+
+export const savedViews = sqliteTable(
+	'saved_views',
+	{
+		id: text('id').primaryKey(),
+		projectId: text('project_id')
+			.notNull()
+			.references(() => projects.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		filters: text('filters').notNull(), // JSON string: { status, priority, assignee, search, sort, dir }
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_views_project_user').on(table.projectId, table.userId)]
+);
+
+// ─── Webhooks ────────────────────────────────────────────────────────────────
+
+export const webhooks = sqliteTable(
+	'webhooks',
+	{
+		id: text('id').primaryKey(),
+		url: text('url').notNull(),
+		secret: text('secret'),
+		events: text('events').notNull(), // JSON array: ["task.created", "task.updated", ...]
+		active: integer('active', { mode: 'boolean' }).notNull().default(true),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	}
+);
+
+// ─── Task Watchers ──────────────────────────────────────────────────────────
+
+export const taskWatchers = sqliteTable(
+	'task_watchers',
+	{
+		taskId: text('task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.taskId, table.userId] })
+	]
+);
 
 // ─── Sprint Snapshots ────────────────────────────────────────────────────────
 

@@ -15,12 +15,12 @@ export const GET: RequestHandler = async (event) => {
 		.where(eq(notificationPreferences.userId, user.id))
 		.get();
 
-	return json(prefs || { onAssigned: true, onStatusChange: true, onComment: true });
+	return json(prefs || { onAssigned: true, onStatusChange: true, onComment: true, emailEnabled: true });
 };
 
 export const PUT: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	const { onAssigned, onStatusChange, onComment } = await event.request.json();
+	const { onAssigned, onStatusChange, onComment, emailEnabled } = await event.request.json();
 
 	const existing = db
 		.select()
@@ -33,7 +33,8 @@ export const PUT: RequestHandler = async (event) => {
 			.set({
 				onAssigned: onAssigned ?? existing.onAssigned,
 				onStatusChange: onStatusChange ?? existing.onStatusChange,
-				onComment: onComment ?? existing.onComment
+				onComment: onComment ?? existing.onComment,
+				emailEnabled: emailEnabled ?? existing.emailEnabled
 			})
 			.where(eq(notificationPreferences.userId, user.id))
 			.run();
@@ -44,7 +45,8 @@ export const PUT: RequestHandler = async (event) => {
 				userId: user.id,
 				onAssigned: onAssigned ?? true,
 				onStatusChange: onStatusChange ?? true,
-				onComment: onComment ?? true
+				onComment: onComment ?? true,
+				emailEnabled: emailEnabled ?? true
 			})
 			.run();
 	}

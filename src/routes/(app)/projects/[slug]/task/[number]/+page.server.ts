@@ -9,11 +9,14 @@ import {
 	users,
 	taskLabelAssignments,
 	taskLabels,
-	taskStatuses
+	taskStatuses,
+	checklistItems,
+	taskWatchers
 } from '$lib/server/db/schema.js';
 import { eq, and, asc } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, parent }) => {
+	const { user } = await parent();
 	const project = db.select().from(projects).where(eq(projects.slug, params.slug)).get();
 	if (!project) throw error(404, 'Project not found');
 
@@ -67,5 +70,21 @@ export const load: PageServerLoad = async ({ params }) => {
 		.orderBy(asc(taskStatuses.position))
 		.all();
 
-	return { task, labels, activity, comments: taskComments, statuses };
+	const checklist = db
+		.select()
+		.from(checklistItems)
+		.where(eq(checklistItems.taskId, task.id))
+		.orderBy(asc(checklistItems.position))
+		.all();
+
+	const watcherRows = db
+		.select({ userId: taskWatchers.userId, userName: users.name })
+		.from(taskWatchers)
+		.innerJoin(users, eq(taskWatchers.userId, users.id))
+		.where(eq(taskWatchers.taskId, task.id))
+		.all();
+
+	const isWatching = user ? watcherRows.some((w) => w.userId === user.id) : false;
+
+	return { task, labels, activity, comments: taskComments, statuses, checklist, watchers: watcherRows, isWatching };
 };

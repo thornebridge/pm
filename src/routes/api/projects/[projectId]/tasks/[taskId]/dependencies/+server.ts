@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { taskDependencies, tasks } from '$lib/server/db/schema.js';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, or, inArray } from 'drizzle-orm';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -42,8 +42,8 @@ export const GET: RequestHandler = async (event) => {
 					statusId: tasks.statusId
 				})
 				.from(tasks)
+				.where(inArray(tasks.id, [...relatedIds]))
 				.all()
-				.filter((t) => relatedIds.has(t.id))
 		: [];
 
 	const taskMap = new Map(relatedTasks.map((t) => [t.id, t]));

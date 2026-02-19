@@ -14,6 +14,7 @@ import { eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastTaskUpdated, broadcastTaskDeleted } from '$lib/server/ws/handlers.js';
 import { notifyTaskAssigned, notifyStatusChanged } from '$lib/server/notifications/triggers.js';
+import { fireWebhooks } from '$lib/server/webhooks/fire.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -131,10 +132,11 @@ export const PATCH: RequestHandler = async (event) => {
 
 	const updated = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
 	broadcastTaskUpdated(event.params.projectId, updated, user.id);
+	fireWebhooks('task.updated', { projectId: event.params.projectId, task: updated, changes: body }).catch(() => {});
 
 	// Fire push notifications (non-blocking)
 	if (body.assigneeId !== undefined && body.assigneeId && body.assigneeId !== existing.assigneeId) {
-		notifyTaskAssigned(taskId, body.assigneeId, user.name).catch(() => {});
+		notifyTaskAssigned(taskId, body.assigneeId, user.name, user.id).catch(() => {});
 	}
 	if (body.statusId !== undefined && body.statusId !== existing.statusId) {
 		notifyStatusChanged(taskId, user.id, user.name).catch(() => {});
@@ -147,5 +149,6 @@ export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	db.delete(tasks).where(eq(tasks.id, event.params.taskId)).run();
 	broadcastTaskDeleted(event.params.projectId, event.params.taskId, user.id);
+	fireWebhooks('task.deleted', { projectId: event.params.projectId, taskId: event.params.taskId }).catch(() => {});
 	return json({ ok: true });
 };

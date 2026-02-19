@@ -24,9 +24,10 @@
 
 	onMount(async () => {
 		try {
-			const res = await fetch('/api/notifications');
+			const res = await fetch('/api/notifications?limit=10');
 			if (res.ok) {
-				notifications = await res.json();
+				const data = await res.json();
+				notifications = data.items ?? data;
 			}
 		} finally {
 			loading = false;

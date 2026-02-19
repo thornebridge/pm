@@ -10,6 +10,11 @@
 	let newLabelName = $state('');
 	let newLabelColor = $state('#2d4f3e');
 
+	// Import state
+	let importFile = $state<File | null>(null);
+	let importing = $state(false);
+	let importResult = $state<{ imported: number; total: number } | null>(null);
+
 	async function addStatus() {
 		if (!newStatusName.trim()) return;
 		try {
@@ -42,6 +47,38 @@
 			await invalidateAll();
 		} catch {
 			showToast('Failed to add label', 'error');
+		}
+	}
+
+	async function handleImport() {
+		if (!importFile) return;
+		importing = true;
+		importResult = null;
+		try {
+			const formData = new FormData();
+			formData.append('file', importFile);
+
+			// Use fetch directly for FormData (no JSON content-type)
+			const csrfMatch = document.cookie.match(/(?:^|;\s*)pm_csrf=([^;]*)/);
+			const res = await fetch(`/api/projects/${data.project.id}/import`, {
+				method: 'POST',
+				body: formData,
+				headers: csrfMatch ? { 'x-csrf-token': csrfMatch[1] } : {}
+			});
+
+			if (!res.ok) {
+				const err = await res.json();
+				throw new Error(err.error || 'Import failed');
+			}
+
+			importResult = await res.json();
+			showToast(`Imported ${importResult!.imported} tasks`);
+			importFile = null;
+			await invalidateAll();
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Import failed', 'error');
+		} finally {
+			importing = false;
 		}
 	}
 </script>
@@ -90,7 +127,7 @@
 	</section>
 
 	<!-- Labels -->
-	<section>
+	<section class="mb-8">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Labels</h2>
 		<div class="mb-3 space-y-1">
 			{#each data.labels as label}
@@ -125,5 +162,41 @@
 				Add
 			</button>
 		</form>
+	</section>
+
+	<!-- Import -->
+	<section>
+		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Import Tasks</h2>
+		<p class="mb-3 text-xs text-surface-500">
+			Upload a CSV file with columns: <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">title</code> (required),
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">description</code>,
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">priority</code> (urgent/high/medium/low),
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">status</code> (match by name),
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">assignee</code> (name or email),
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">due_date</code>.
+		</p>
+		<div class="flex items-center gap-2">
+			<input
+				type="file"
+				accept=".csv,text/csv"
+				onchange={(e) => {
+					const input = e.currentTarget;
+					importFile = input.files?.[0] ?? null;
+				}}
+				class="flex-1 text-sm text-surface-700 file:mr-2 file:rounded-md file:border-0 file:bg-surface-200 file:px-3 file:py-1.5 file:text-sm file:text-surface-700 dark:text-surface-300 dark:file:bg-surface-700 dark:file:text-surface-200"
+			/>
+			<button
+				onclick={handleImport}
+				disabled={!importFile || importing}
+				class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+			>
+				{importing ? 'Importing...' : 'Import'}
+			</button>
+		</div>
+		{#if importResult}
+			<p class="mt-2 text-xs text-green-600 dark:text-green-500">
+				Successfully imported {importResult.imported} of {importResult.total} tasks.
+			</p>
+		{/if}
 	</section>
 </div>

@@ -6,7 +6,7 @@ import { comments, activityLog, users } from '$lib/server/db/schema.js';
 import { eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastCommentAdded } from '$lib/server/ws/handlers.js';
-import { notifyNewComment } from '$lib/server/notifications/triggers.js';
+import { notifyNewComment, notifyMention } from '$lib/server/notifications/triggers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -65,5 +65,18 @@ export const POST: RequestHandler = async (event) => {
 	const result = { id, body: body.trim(), userId: user.id, userName: user.name, createdAt: now, updatedAt: now };
 	broadcastCommentAdded(event.params.projectId, event.params.taskId, result, user.id);
 	notifyNewComment(event.params.taskId, user.id, user.name).catch(() => {});
+
+	// Parse @mentions and notify mentioned users
+	const mentionMatches = body.matchAll(/@(\w[\w\s]*?\w|\w+)/g);
+	const allUsers = db.select({ id: users.id, name: users.name }).from(users).all();
+	const userNameMap = new Map(allUsers.map((u: { id: string; name: string }) => [u.name.toLowerCase(), u.id]));
+	for (const match of mentionMatches) {
+		const mentionedName = match[1].trim().toLowerCase();
+		const mentionedId = userNameMap.get(mentionedName);
+		if (mentionedId && mentionedId !== user.id) {
+			notifyMention(event.params.taskId, mentionedId, user.name, user.id).catch(() => {});
+		}
+	}
+
 	return json(result, { status: 201 });
 };

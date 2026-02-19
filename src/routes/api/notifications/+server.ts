@@ -18,6 +18,9 @@ export const GET: RequestHandler = async (event) => {
 		return json({ count: result?.count ?? 0 });
 	}
 
+	const limit = Math.min(parseInt(event.url.searchParams.get('limit') || '50'), 100);
+	const offset = parseInt(event.url.searchParams.get('offset') || '0');
+
 	const all = db
 		.select({
 			id: notifications.id,
@@ -33,10 +36,17 @@ export const GET: RequestHandler = async (event) => {
 		.leftJoin(users, eq(notifications.actorId, users.id))
 		.where(eq(notifications.userId, user.id))
 		.orderBy(desc(notifications.createdAt))
-		.limit(50)
+		.limit(limit)
+		.offset(offset)
 		.all();
 
-	return json(all);
+	const total = db
+		.select({ count: sql<number>`count(*)` })
+		.from(notifications)
+		.where(eq(notifications.userId, user.id))
+		.get();
+
+	return json({ items: all, total: total?.count ?? 0, limit, offset });
 };
 
 export const PATCH: RequestHandler = async (event) => {
