@@ -465,6 +465,51 @@ export const sprintSnapshots = sqliteTable(
 	(table) => [index('idx_snapshots_sprint').on(table.sprintId, table.date)]
 );
 
+// ─── Automation Rules ────────────────────────────────────────────────────────
+
+export const automationRules = sqliteTable(
+	'automation_rules',
+	{
+		id: text('id').primaryKey(),
+		projectId: text('project_id')
+			.notNull()
+			.references(() => projects.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		description: text('description'),
+		trigger: text('trigger').notNull(), // JSON: { event, config? }
+		conditions: text('conditions'), // JSON: [{ field, operator, value }] or null
+		actions: text('actions').notNull(), // JSON: [{ type, ...config }]
+		enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_automation_rules_project').on(table.projectId, table.enabled)]
+);
+
+export const automationExecutions = sqliteTable(
+	'automation_executions',
+	{
+		id: text('id').primaryKey(),
+		ruleId: text('rule_id')
+			.notNull()
+			.references(() => automationRules.id, { onDelete: 'cascade' }),
+		taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+		triggerEvent: text('trigger_event').notNull(),
+		status: text('status', { enum: ['success', 'error', 'skipped'] }).notNull(),
+		actionsRun: text('actions_run'), // JSON: [{ action, result, error? }]
+		error: text('error'),
+		durationMs: integer('duration_ms'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [
+		index('idx_automation_exec_rule').on(table.ruleId, table.createdAt),
+		index('idx_automation_exec_task').on(table.taskId)
+	]
+);
+
 // ─── Due Date Reminder Tracking ──────────────────────────────────────────────
 
 export const dueDateRemindersSent = sqliteTable(

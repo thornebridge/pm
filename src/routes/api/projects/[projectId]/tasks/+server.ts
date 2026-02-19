@@ -15,6 +15,7 @@ import { eq, and, desc, asc, sql, like, inArray, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastTaskCreated } from '$lib/server/ws/handlers.js';
 import { fireWebhooks } from '$lib/server/webhooks/fire.js';
+import { emitAutomationEvent } from '$lib/server/automations/emit.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -199,5 +200,6 @@ export const POST: RequestHandler = async (event) => {
 	const result = { ...task, labels: assignedLabels };
 	broadcastTaskCreated(projectId, result, user.id);
 	fireWebhooks('task.created', { projectId, task: result }).catch(() => {});
+	emitAutomationEvent({ event: 'task.created', projectId, taskId: id, task: result, userId: user.id });
 	return json(result, { status: 201 });
 };

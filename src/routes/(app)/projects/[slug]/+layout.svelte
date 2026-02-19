@@ -31,6 +31,7 @@
 			['Calendar', `/projects/${slug}/calendar`],
 			['Sprints', `/projects/${slug}/sprints`],
 			['Analytics', `/projects/${slug}/analytics`],
+			['Automations', `/projects/${slug}/automations`],
 			['Settings', `/projects/${slug}/settings`]
 		] as const).map(([label, href]) => {
 			const preserve = filterViews.has(href);

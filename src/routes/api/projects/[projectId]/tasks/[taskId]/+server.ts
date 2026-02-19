@@ -19,6 +19,7 @@ import { nanoid } from 'nanoid';
 import { broadcastTaskCreated, broadcastTaskUpdated, broadcastTaskDeleted } from '$lib/server/ws/handlers.js';
 import { notifyTaskAssigned, notifyStatusChanged } from '$lib/server/notifications/triggers.js';
 import { fireWebhooks } from '$lib/server/webhooks/fire.js';
+import { emitAutomationEvent } from '$lib/server/automations/emit.js';
 
 function computeNextDueDate(currentDue: number, rule: { freq: string; interval?: number; endDate?: number }): number {
 	const d = new Date(currentDue);
@@ -222,6 +223,24 @@ export const PATCH: RequestHandler = async (event) => {
 	broadcastTaskUpdated(event.params.projectId, updated, user.id);
 	fireWebhooks('task.updated', { projectId: event.params.projectId, task: updated, changes: body }).catch(() => {});
 
+	// Fire automation events for specific field changes
+	const autoPayload = { projectId: event.params.projectId, taskId, task: updated as unknown as Record<string, unknown>, changes: body, userId: user.id };
+	if (body.statusId !== undefined && body.statusId !== existing.statusId) {
+		emitAutomationEvent({ ...autoPayload, event: 'task.status_changed' });
+	}
+	if (body.priority !== undefined && body.priority !== existing.priority) {
+		emitAutomationEvent({ ...autoPayload, event: 'task.priority_changed' });
+	}
+	if (body.assigneeId !== undefined && body.assigneeId !== existing.assigneeId) {
+		emitAutomationEvent({ ...autoPayload, event: 'task.assigned' });
+	}
+	if (body.dueDate !== undefined) {
+		emitAutomationEvent({ ...autoPayload, event: 'task.due_date_changed' });
+	}
+	if (body.type !== undefined && body.type !== existing.type) {
+		emitAutomationEvent({ ...autoPayload, event: 'task.type_changed' });
+	}
+
 	// Fire push notifications (non-blocking)
 	if (body.assigneeId !== undefined && body.assigneeId && body.assigneeId !== existing.assigneeId) {
 		notifyTaskAssigned(taskId, body.assigneeId, user.name, user.id).catch(() => {});
@@ -327,8 +346,13 @@ export const PATCH: RequestHandler = async (event) => {
 
 export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	db.delete(tasks).where(eq(tasks.id, event.params.taskId)).run();
-	broadcastTaskDeleted(event.params.projectId, event.params.taskId, user.id);
-	fireWebhooks('task.deleted', { projectId: event.params.projectId, taskId: event.params.taskId }).catch(() => {});
+	const taskId = event.params.taskId;
+	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	db.delete(tasks).where(eq(tasks.id, taskId)).run();
+	broadcastTaskDeleted(event.params.projectId, taskId, user.id);
+	fireWebhooks('task.deleted', { projectId: event.params.projectId, taskId }).catch(() => {});
+	if (task) {
+		emitAutomationEvent({ event: 'task.deleted', projectId: event.params.projectId, taskId, task: task as unknown as Record<string, unknown>, userId: user.id });
+	}
 	return json({ ok: true });
 };

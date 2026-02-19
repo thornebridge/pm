@@ -3,6 +3,7 @@ import { getSessionCookie, validateSession } from '$lib/server/auth/session.js';
 import { seed } from '$lib/server/db/seed.js';
 import { checkRateLimit } from '$lib/server/security/rateLimit.js';
 import { generateCsrfToken, validateCsrf } from '$lib/server/security/csrf.js';
+import { startAutomationPoller } from '$lib/server/automations/polling.js';
 
 // Run seed on first request
 let seeded = false;
@@ -12,6 +13,7 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 export const handle: Handle = async ({ event, resolve }) => {
 	if (!seeded) {
 		await seed();
+		startAutomationPoller(60_000);
 		seeded = true;
 	}
 

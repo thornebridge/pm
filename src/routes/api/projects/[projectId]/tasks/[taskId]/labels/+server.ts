@@ -2,9 +2,10 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { taskLabelAssignments, activityLog } from '$lib/server/db/schema.js';
+import { taskLabelAssignments, activityLog, tasks } from '$lib/server/db/schema.js';
 import { and, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { emitAutomationEvent } from '$lib/server/automations/emit.js';
 
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -29,6 +30,11 @@ export const POST: RequestHandler = async (event) => {
 			createdAt: Date.now()
 		})
 		.run();
+
+	const task = db.select().from(tasks).where(eq(tasks.id, event.params.taskId)).get();
+	if (task) {
+		emitAutomationEvent({ event: 'label.added', projectId: event.params.projectId, taskId: event.params.taskId, task: task as unknown as Record<string, unknown>, changes: { labelId }, userId: user.id });
+	}
 
 	return json({ ok: true });
 };
@@ -60,6 +66,11 @@ export const DELETE: RequestHandler = async (event) => {
 			createdAt: Date.now()
 		})
 		.run();
+
+	const taskForRemove = db.select().from(tasks).where(eq(tasks.id, event.params.taskId)).get();
+	if (taskForRemove) {
+		emitAutomationEvent({ event: 'label.removed', projectId: event.params.projectId, taskId: event.params.taskId, task: taskForRemove as unknown as Record<string, unknown>, changes: { labelId }, userId: user.id });
+	}
 
 	return json({ ok: true });
 };
