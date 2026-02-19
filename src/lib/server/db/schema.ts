@@ -134,6 +134,8 @@ export const tasks = sqliteTable(
 		startDate: integer('start_date', { mode: 'number' }),
 		sprintId: text('sprint_id').references(() => sprints.id, { onDelete: 'set null' }),
 		estimatePoints: integer('estimate_points'),
+		recurrence: text('recurrence'), // JSON: { freq, interval, endDate? }
+		recurrenceSourceId: text('recurrence_source_id'),
 		position: real('position').notNull(),
 		createdAt: integer('created_at', { mode: 'number' }).notNull(),
 		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
@@ -247,6 +249,24 @@ export const comments = sqliteTable(
 	(table) => [index('idx_comments_task').on(table.taskId, table.createdAt)]
 );
 
+export const commentReactions = sqliteTable(
+	'comment_reactions',
+	{
+		commentId: text('comment_id')
+			.notNull()
+			.references(() => comments.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		emoji: text('emoji').notNull(),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.commentId, table.userId, table.emoji] }),
+		index('idx_reactions_comment').on(table.commentId)
+	]
+);
+
 export const activityLog = sqliteTable(
 	'activity_log',
 	{
@@ -300,7 +320,14 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
 	onStatusChange: integer('on_status_change', { mode: 'boolean' }).notNull().default(true),
 	onComment: integer('on_comment', { mode: 'boolean' }).notNull().default(true),
 	onMention: integer('on_mention', { mode: 'boolean' }).notNull().default(true),
-	emailEnabled: integer('email_enabled', { mode: 'boolean' }).notNull().default(true)
+	emailEnabled: integer('email_enabled', { mode: 'boolean' }).notNull().default(true),
+	reminderDueSoon: integer('reminder_due_soon', { mode: 'boolean' }).notNull().default(true),
+	reminderDueToday: integer('reminder_due_today', { mode: 'boolean' }).notNull().default(true),
+	reminderOverdue: integer('reminder_overdue', { mode: 'boolean' }).notNull().default(true),
+	dueDateEmailMode: text('due_date_email_mode', { enum: ['off', 'each', 'daily', 'weekly'] }).notNull().default('off'),
+	digestDay: integer('digest_day').notNull().default(1),
+	digestHour: integer('digest_hour').notNull().default(8),
+	lastDigestSentAt: integer('last_digest_sent_at', { mode: 'number' }).notNull().default(0)
 });
 
 // ─── In-App Notifications ────────────────────────────────────────────────────
@@ -312,7 +339,7 @@ export const notifications = sqliteTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment', 'due_soon', 'overdue'] }).notNull(),
+		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment', 'due_day_before', 'due_soon', 'overdue'] }).notNull(),
 		title: text('title').notNull(),
 		body: text('body'),
 		url: text('url'),
@@ -436,4 +463,25 @@ export const sprintSnapshots = sqliteTable(
 		createdAt: integer('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_snapshots_sprint').on(table.sprintId, table.date)]
+);
+
+// ─── Due Date Reminder Tracking ──────────────────────────────────────────────
+
+export const dueDateRemindersSent = sqliteTable(
+	'due_date_reminders_sent',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		taskId: text('task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		tier: text('tier', { enum: ['day_before', 'day_of', 'overdue'] }).notNull(),
+		sentAt: integer('sent_at', { mode: 'number' }).notNull()
+	},
+	(table) => [
+		uniqueIndex('idx_reminders_unique').on(table.userId, table.taskId, table.tier),
+		index('idx_reminders_task').on(table.taskId)
+	]
 );

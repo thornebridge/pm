@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TaskCard from '$lib/components/task/TaskCard.svelte';
+	import InlineQuickAdd from '$lib/components/task/InlineQuickAdd.svelte';
 
 	interface Status {
 		id: string;
@@ -29,6 +30,7 @@
 	interface Props {
 		status: Status;
 		tasks: Task[];
+		projectId: string;
 		projectSlug: string;
 		ondrop: (e: DragEvent, statusId: string) => void;
 		ondragstart: (e: DragEvent, task: Task) => void;
@@ -36,7 +38,7 @@
 		focusedTaskId?: string | null;
 	}
 
-	let { status, tasks, projectSlug, ondrop, ondragstart, ontaskclick, focusedTaskId }: Props = $props();
+	let { status, tasks, projectId, projectSlug, ondrop, ondragstart, ontaskclick, focusedTaskId }: Props = $props();
 	let dragover = $state(false);
 
 	function handleDragOver(e: DragEvent) {
@@ -83,5 +85,9 @@
 				Drag tasks here
 			</div>
 		{/if}
+	</div>
+
+	<div class="mt-1.5 rounded-md border border-dashed border-surface-300 px-3 py-1.5 transition-colors focus-within:border-brand-400 focus-within:bg-surface-50 dark:border-surface-700 dark:focus-within:border-brand-600 dark:focus-within:bg-surface-800/50">
+		<InlineQuickAdd {projectId} statusId={status.id} placeholder="+ Add task..." class="text-xs" />
 	</div>
 </div>

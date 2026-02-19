@@ -3,7 +3,6 @@ import { getSessionCookie, validateSession } from '$lib/server/auth/session.js';
 import { seed } from '$lib/server/db/seed.js';
 import { checkRateLimit } from '$lib/server/security/rateLimit.js';
 import { generateCsrfToken, validateCsrf } from '$lib/server/security/csrf.js';
-import { checkDueDateReminders } from '$lib/server/scheduled/dueDateReminders.js';
 
 // Run seed on first request
 let seeded = false;
@@ -15,9 +14,6 @@ export const handle: Handle = async ({ event, resolve }) => {
 		await seed();
 		seeded = true;
 	}
-
-	// Check due date reminders (throttled internally to once per hour)
-	checkDueDateReminders();
 
 	const sessionId = getSessionCookie(event.cookies);
 

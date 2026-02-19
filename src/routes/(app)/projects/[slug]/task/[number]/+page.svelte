@@ -6,7 +6,7 @@
 	import MarkdownPreview from '$lib/components/markdown/MarkdownPreview.svelte';
 	import MentionInput from '$lib/components/editor/MentionInput.svelte';
 	import { api } from '$lib/utils/api.js';
-	import { invalidateAll } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { showToast } from '$lib/stores/toasts.js';
 	import { pushScope, popScope } from '$lib/utils/keyboard.js';
 	import { onMount, onDestroy } from 'svelte';
@@ -31,6 +31,32 @@
 	// Subtask state
 	let newSubtaskTitle = $state('');
 	let addingSubtask = $state(false);
+
+	// Recurrence state
+	let recurrence = $state<{ freq: string; interval: number; endDate?: number | null } | null>(
+		data.task.recurrence ? JSON.parse(data.task.recurrence) : null
+	);
+	$effect(() => {
+		recurrence = data.task.recurrence ? JSON.parse(data.task.recurrence) : null;
+	});
+
+	function updateRecurrence(freq: string | null) {
+		if (!freq) {
+			recurrence = null;
+			updateField('recurrence', null);
+		} else {
+			const rule = { freq, interval: recurrence?.interval || 1 };
+			recurrence = rule;
+			updateField('recurrence', rule);
+		}
+	}
+
+	function updateRecurrenceInterval(interval: number) {
+		if (!recurrence) return;
+		const rule = { ...recurrence, interval };
+		recurrence = rule;
+		updateField('recurrence', rule);
+	}
 
 	// Watch state
 	let watching = $state(data.isWatching);
@@ -139,6 +165,32 @@
 		}
 	}
 
+	const REACTION_EMOJIS = ['👍', '👎', '❤️', '🎉', '😄', '👀', '🚀', '💯'];
+	let reactionPickerOpen = $state<string | null>(null);
+
+	function groupReactions(reactions: Array<{ emoji: string; userName: string; userId: string }>): Array<[string, { users: string[]; userIds: string[] }]> {
+		const map: Record<string, { users: string[]; userIds: string[] }> = {};
+		for (const r of reactions) {
+			if (!map[r.emoji]) map[r.emoji] = { users: [], userIds: [] };
+			map[r.emoji].users.push(r.userName);
+			map[r.emoji].userIds.push(r.userId);
+		}
+		return Object.entries(map);
+	}
+
+	async function toggleReaction(commentId: string, emoji: string) {
+		reactionPickerOpen = null;
+		try {
+			await api(`/api/projects/${data.task.projectId}/tasks/${data.task.id}/comments/${commentId}/reactions`, {
+				method: 'POST',
+				body: JSON.stringify({ emoji })
+			});
+			await invalidateAll();
+		} catch {
+			showToast('Failed to react', 'error');
+		}
+	}
+
 	async function addChecklistItem() {
 		if (!newChecklistItem.trim()) return;
 		addingChecklist = true;
@@ -204,6 +256,27 @@
 			watching = !watching;
 		} catch {
 			showToast('Failed to update watch status', 'error');
+		}
+	}
+
+	let duplicating = $state(false);
+
+	async function duplicateTask() {
+		duplicating = true;
+		try {
+			const result = await api<{ number: number }>(`/api/projects/${data.task.projectId}/tasks/${data.task.id}/duplicate`, {
+				method: 'POST'
+			});
+			showToast(`Task duplicated as #${result.number}`);
+			// Navigate to the project slug from URL params to build the correct path
+			const slug = window.location.pathname.split('/projects/')[1]?.split('/')[0];
+			if (slug && result.number) {
+				goto(`/projects/${slug}/task/${result.number}`);
+			}
+		} catch {
+			showToast('Failed to duplicate task', 'error');
+		} finally {
+			duplicating = false;
 		}
 	}
 
@@ -497,6 +570,37 @@
 						{:else}
 							<MarkdownPreview content={comment.body} />
 						{/if}
+
+						<!-- Reactions -->
+						<div class="mt-2 flex flex-wrap items-center gap-1">
+							{#each groupReactions(comment.reactions || []) as [emoji, info]}
+								<button
+									onclick={() => toggleReaction(comment.id, emoji)}
+									title={info.users.join(', ')}
+									class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors {info.userIds.includes(data.user?.id ?? '') ? 'border-brand-300 bg-brand-50 dark:border-brand-700 dark:bg-brand-950' : 'border-surface-300 bg-surface-50 hover:border-surface-400 dark:border-surface-700 dark:bg-surface-800'}"
+								>
+									<span>{emoji}</span>
+									<span class="text-surface-600 dark:text-surface-400">{info.users.length}</span>
+								</button>
+							{/each}
+							<div class="relative">
+								<button
+									onclick={() => reactionPickerOpen = reactionPickerOpen === comment.id ? null : comment.id}
+									class="inline-flex items-center rounded-full border border-surface-300 px-1.5 py-0.5 text-xs text-surface-400 transition-colors hover:border-surface-400 hover:text-surface-600 dark:border-surface-700 dark:hover:border-surface-600 dark:hover:text-surface-300"
+									title="Add reaction"
+								>+</button>
+								{#if reactionPickerOpen === comment.id}
+									<div class="absolute bottom-full left-0 z-10 mb-1 flex gap-0.5 rounded-lg border border-surface-300 bg-white p-1.5 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+										{#each REACTION_EMOJIS as emoji}
+											<button
+												onclick={() => toggleReaction(comment.id, emoji)}
+												class="rounded p-1 text-base hover:bg-surface-100 dark:hover:bg-surface-800"
+											>{emoji}</button>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						</div>
 					</div>
 				{/each}
 
@@ -543,6 +647,18 @@
 				{#if data.watchers.length > 0}
 					<span class="text-[10px] opacity-60">({data.watchers.length})</span>
 				{/if}
+			</button>
+
+			<button
+				onclick={duplicateTask}
+				disabled={duplicating}
+				class="flex w-full items-center justify-center gap-1.5 rounded-md border border-surface-300 px-3 py-1.5 text-xs font-medium text-surface-600 transition hover:border-surface-400 disabled:opacity-50 dark:border-surface-700 dark:text-surface-400 dark:hover:border-surface-600"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+					<path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
+					<path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
+				</svg>
+				{duplicating ? 'Duplicating...' : 'Duplicate'}
 			</button>
 
 			<div>
@@ -624,6 +740,38 @@
 					onchange={(e) => updateField('startDate', e.currentTarget.value ? new Date(e.currentTarget.value).getTime() : null)}
 					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
 				/>
+			</div>
+
+			<div>
+				<label for="task-recurrence" class="mb-1 block text-xs text-surface-500">Repeat</label>
+				<select
+					id="task-recurrence"
+					value={recurrence?.freq ?? ''}
+					onchange={(e) => updateRecurrence(e.currentTarget.value || null)}
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+				>
+					<option value="">None</option>
+					<option value="daily">Daily</option>
+					<option value="weekly">Weekly</option>
+					<option value="monthly">Monthly</option>
+				</select>
+				{#if recurrence}
+					<div class="mt-1.5 flex items-center gap-1.5">
+						<span class="text-xs text-surface-500">Every</span>
+						<input
+							type="number"
+							min="1"
+							max="99"
+							value={recurrence.interval}
+							onchange={(e) => updateRecurrenceInterval(parseInt(e.currentTarget.value) || 1)}
+							class="w-14 rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+						/>
+						<span class="text-xs text-surface-500">{recurrence.freq === 'daily' ? 'day(s)' : recurrence.freq === 'weekly' ? 'week(s)' : 'month(s)'}</span>
+					</div>
+					{#if data.task.recurrenceSourceId}
+						<p class="mt-1 text-xs text-surface-400">Part of a recurring series</p>
+					{/if}
+				{/if}
 			</div>
 
 			{#if data.task.estimatePoints !== null && data.task.estimatePoints !== undefined}

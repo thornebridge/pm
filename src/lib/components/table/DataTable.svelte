@@ -3,6 +3,7 @@
 	import { showToast } from '$lib/stores/toasts.js';
 	import { invalidateAll } from '$app/navigation';
 	import PriorityIcon from '$lib/components/task/PriorityIcon.svelte';
+	import InlineQuickAdd from '$lib/components/task/InlineQuickAdd.svelte';
 	import type { SortConfig, SortColumn, TaskGroup } from '$lib/types/filters.js';
 
 	interface Status {
@@ -227,6 +228,14 @@
 						</tr>
 					{/each}
 				{/if}
+				<tr class="transition-colors focus-within:bg-surface-50 dark:focus-within:bg-surface-800/30">
+					<td class="px-2 py-1.5"></td>
+					<td class="px-3 py-1.5 text-xs text-surface-400">+</td>
+					<td class="px-3 py-1.5"></td>
+					<td colspan="5" class="px-3 py-1.5">
+						<InlineQuickAdd {projectId} placeholder="Add task... (Enter to create)" class="text-surface-900 dark:text-surface-200" />
+					</td>
+				</tr>
 			</tbody>
 		</table>
 	</div>

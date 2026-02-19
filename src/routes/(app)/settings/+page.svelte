@@ -20,14 +20,32 @@
 	let onStatusChange = $state(true);
 	let onComment = $state(true);
 	let emailEnabled = $state(true);
+	let reminderDueSoon = $state(true);
+	let reminderDueToday = $state(true);
+	let reminderOverdue = $state(true);
+	let dueDateEmailMode = $state('off');
+	let digestDay = $state(1);
+	let digestHour = $state(8);
 	let savingNotifs = $state(false);
 
+	const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 	$effect(() => {
-		api<{ onAssigned: boolean; onStatusChange: boolean; onComment: boolean; emailEnabled: boolean }>('/api/notifications/preferences').then((prefs) => {
+		api<{
+			onAssigned: boolean; onStatusChange: boolean; onComment: boolean; emailEnabled: boolean;
+			reminderDueSoon: boolean; reminderDueToday: boolean; reminderOverdue: boolean;
+			dueDateEmailMode: string; digestDay: number; digestHour: number;
+		}>('/api/notifications/preferences').then((prefs) => {
 			onAssigned = prefs.onAssigned ?? true;
 			onStatusChange = prefs.onStatusChange ?? true;
 			onComment = prefs.onComment ?? true;
 			emailEnabled = prefs.emailEnabled ?? true;
+			reminderDueSoon = prefs.reminderDueSoon ?? true;
+			reminderDueToday = prefs.reminderDueToday ?? true;
+			reminderOverdue = prefs.reminderOverdue ?? true;
+			dueDateEmailMode = prefs.dueDateEmailMode ?? 'off';
+			digestDay = prefs.digestDay ?? 1;
+			digestHour = prefs.digestHour ?? 8;
 			notifLoaded = true;
 		}).catch(() => { notifLoaded = true; });
 	});
@@ -37,7 +55,11 @@
 		try {
 			await api('/api/notifications/preferences', {
 				method: 'PUT',
-				body: JSON.stringify({ onAssigned, onStatusChange, onComment, emailEnabled })
+				body: JSON.stringify({
+					onAssigned, onStatusChange, onComment, emailEnabled,
+					reminderDueSoon, reminderDueToday, reminderOverdue,
+					dueDateEmailMode, digestDay, digestHour
+				})
 			});
 			showToast('Notification preferences saved');
 		} catch (err) {
@@ -199,6 +221,7 @@
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Notifications</h2>
 		{#if notifLoaded}
 			<div class="space-y-3">
+				<p class="text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-500">Activity Notifications</p>
 				<label class="flex items-center gap-3">
 					<input type="checkbox" bind:checked={onAssigned} class="rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700" />
 					<span class="text-sm text-surface-700 dark:text-surface-300">Task assigned to me</span>
@@ -212,12 +235,82 @@
 					<span class="text-sm text-surface-700 dark:text-surface-300">Comments &amp; mentions</span>
 				</label>
 
-				<div class="mt-2 border-t border-surface-200 pt-3 dark:border-surface-800">
+				<div class="border-t border-surface-200 pt-3 dark:border-surface-800">
+					<p class="mb-2 text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-500">Due Date Reminders</p>
+					<div class="space-y-2">
+						<label class="flex items-center gap-3">
+							<input type="checkbox" bind:checked={reminderDueSoon} class="rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700" />
+							<span class="text-sm text-surface-700 dark:text-surface-300">1 day before due date</span>
+						</label>
+						<label class="flex items-center gap-3">
+							<input type="checkbox" bind:checked={reminderDueToday} class="rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700" />
+							<span class="text-sm text-surface-700 dark:text-surface-300">Day of due date</span>
+						</label>
+						<label class="flex items-center gap-3">
+							<input type="checkbox" bind:checked={reminderOverdue} class="rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700" />
+							<span class="text-sm text-surface-700 dark:text-surface-300">Overdue tasks</span>
+						</label>
+					</div>
+					<p class="mt-2 text-xs text-surface-400 dark:text-surface-600">In-app and push notifications for selected reminder types</p>
+				</div>
+
+				<div class="border-t border-surface-200 pt-3 dark:border-surface-800">
+					<p class="mb-2 text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-500">Due Date Emails</p>
+					<div class="space-y-3">
+						<div>
+							<label for="email-mode" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Mode</label>
+							<select
+								id="email-mode"
+								bind:value={dueDateEmailMode}
+								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							>
+								<option value="off">Off</option>
+								<option value="each">Individual</option>
+								<option value="daily">Daily Digest</option>
+								<option value="weekly">Weekly Digest</option>
+							</select>
+						</div>
+
+						{#if dueDateEmailMode === 'weekly'}
+							<div>
+								<label for="digest-day" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Send on</label>
+								<select
+									id="digest-day"
+									bind:value={digestDay}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+								>
+									{#each dayNames as day, i}
+										<option value={i}>{day}</option>
+									{/each}
+								</select>
+							</div>
+						{/if}
+
+						{#if dueDateEmailMode === 'daily' || dueDateEmailMode === 'weekly'}
+							<div>
+								<label for="digest-hour" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Send at (UTC)</label>
+								<select
+									id="digest-hour"
+									bind:value={digestHour}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+								>
+									{#each Array.from({ length: 24 }, (_, i) => i) as hour}
+										<option value={hour}>{String(hour).padStart(2, '0')}:00 UTC</option>
+									{/each}
+								</select>
+							</div>
+							<p class="text-xs text-surface-400 dark:text-surface-600">A summary of your upcoming and overdue tasks</p>
+						{/if}
+					</div>
+				</div>
+
+				<div class="border-t border-surface-200 pt-3 dark:border-surface-800">
+					<p class="mb-2 text-xs font-medium uppercase tracking-wide text-surface-500 dark:text-surface-500">Email</p>
 					<label class="flex items-center gap-3">
 						<input type="checkbox" bind:checked={emailEnabled} class="rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700" />
 						<span class="text-sm text-surface-700 dark:text-surface-300">Email notifications</span>
 					</label>
-					<p class="ml-8 mt-1 text-xs text-surface-400 dark:text-surface-600">Receive email for enabled notification types above</p>
+					<p class="ml-8 mt-1 text-xs text-surface-400 dark:text-surface-600">Master switch — turns off all email when disabled</p>
 				</div>
 
 				<div class="flex justify-end pt-1">

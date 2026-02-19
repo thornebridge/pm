@@ -96,7 +96,7 @@ export const GET: RequestHandler = async (event) => {
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const projectId = event.params.projectId;
-	const { title, description, statusId, priority, assigneeId, dueDate, labelIds, type, parentId } =
+	const { title, description, statusId, priority, assigneeId, dueDate, labelIds, type, parentId, recurrence } =
 		await event.request.json();
 
 	if (!title?.trim()) {
@@ -165,6 +165,7 @@ export const POST: RequestHandler = async (event) => {
 		parentId: parentId || null,
 		createdBy: user.id,
 		dueDate: dueDate || null,
+		recurrence: recurrence ? JSON.stringify(recurrence) : null,
 		position,
 		createdAt: now,
 		updatedAt: now

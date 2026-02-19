@@ -4,6 +4,7 @@
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import BulkActions from '$lib/components/task/BulkActions.svelte';
+	import InlineQuickAdd from '$lib/components/task/InlineQuickAdd.svelte';
 	import { getFilters, getSort, getGroupBy } from '$lib/stores/filters.svelte.js';
 	import { processTaskView } from '$lib/utils/taskFilters.js';
 	import type { EnrichedTask } from '$lib/types/filters.js';
@@ -128,6 +129,15 @@
 						</tr>
 					{/each}
 				{/if}
+				<tr class="transition-colors focus-within:bg-surface-50 dark:focus-within:bg-surface-800/30">
+					<td class="px-3 py-1.5"></td>
+					<td class="px-4 py-1.5 text-xs text-surface-400">+</td>
+					<td class="px-4 py-1.5"></td>
+					<td class="px-4 py-1.5"></td>
+					<td colspan="3" class="px-4 py-1.5">
+						<InlineQuickAdd projectId={data.project.id} placeholder="Add task... (Enter to create)" class="text-surface-900 dark:text-surface-200" />
+					</td>
+				</tr>
 			</tbody>
 		</table>
 	</div>

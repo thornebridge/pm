@@ -8,15 +8,36 @@ import {
 	taskLabelAssignments,
 	taskLabels,
 	comments,
+	commentReactions,
 	users,
 	taskStatuses,
-	checklistItems
+	checklistItems,
+	dueDateRemindersSent
 } from '$lib/server/db/schema.js';
-import { eq, asc, sql } from 'drizzle-orm';
+import { eq, asc, sql, inArray } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import { broadcastTaskUpdated, broadcastTaskDeleted } from '$lib/server/ws/handlers.js';
+import { broadcastTaskCreated, broadcastTaskUpdated, broadcastTaskDeleted } from '$lib/server/ws/handlers.js';
 import { notifyTaskAssigned, notifyStatusChanged } from '$lib/server/notifications/triggers.js';
 import { fireWebhooks } from '$lib/server/webhooks/fire.js';
+
+function computeNextDueDate(currentDue: number, rule: { freq: string; interval?: number; endDate?: number }): number {
+	const d = new Date(currentDue);
+	const interval = rule.interval || 1;
+	switch (rule.freq) {
+		case 'daily':
+			d.setUTCDate(d.getUTCDate() + interval);
+			break;
+		case 'weekly':
+			d.setUTCDate(d.getUTCDate() + interval * 7);
+			break;
+		case 'monthly':
+			d.setUTCMonth(d.getUTCMonth() + interval);
+			break;
+		default:
+			d.setUTCDate(d.getUTCDate() + interval);
+	}
+	return d.getTime();
+}
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -64,6 +85,34 @@ export const GET: RequestHandler = async (event) => {
 		.orderBy(asc(comments.createdAt))
 		.all();
 
+	// Load reactions for comments
+	const commentIds = taskComments.map((c) => c.id);
+	const reactions = commentIds.length > 0
+		? db
+			.select({
+				commentId: commentReactions.commentId,
+				userId: commentReactions.userId,
+				userName: users.name,
+				emoji: commentReactions.emoji
+			})
+			.from(commentReactions)
+			.innerJoin(users, eq(commentReactions.userId, users.id))
+			.where(inArray(commentReactions.commentId, commentIds))
+			.all()
+		: [];
+
+	const reactionsByComment = new Map<string, typeof reactions>();
+	for (const r of reactions) {
+		const arr = reactionsByComment.get(r.commentId) || [];
+		arr.push(r);
+		reactionsByComment.set(r.commentId, arr);
+	}
+
+	const commentsWithReactions = taskComments.map((c) => ({
+		...c,
+		reactions: reactionsByComment.get(c.id) || []
+	}));
+
 	const checklist = db
 		.select()
 		.from(checklistItems)
@@ -86,7 +135,7 @@ export const GET: RequestHandler = async (event) => {
 		...task,
 		labels,
 		activity,
-		comments: taskComments,
+		comments: commentsWithReactions,
 		checklist,
 		subtaskTotal: subtaskSummary?.total || 0,
 		subtaskDone: subtaskSummary?.done || 0
@@ -138,6 +187,8 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 	if (body.dueDate !== undefined) {
 		updates.dueDate = body.dueDate || null;
+		// Clear sent reminders so they re-fire for new due date
+		db.delete(dueDateRemindersSent).where(eq(dueDateRemindersSent.taskId, taskId)).run();
 	}
 	if (body.position !== undefined) {
 		updates.position = body.position;
@@ -147,6 +198,9 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 	if (body.parentId !== undefined) {
 		updates.parentId = body.parentId || null;
+	}
+	if (body.recurrence !== undefined) {
+		updates.recurrence = body.recurrence ? JSON.stringify(body.recurrence) : null;
 	}
 
 	db.update(tasks).set(updates).where(eq(tasks.id, taskId)).run();
@@ -174,6 +228,98 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 	if (body.statusId !== undefined && body.statusId !== existing.statusId) {
 		notifyStatusChanged(taskId, user.id, user.name).catch(() => {});
+	}
+
+	// Auto-create next recurring task when moved to a closed status
+	if (body.statusId !== undefined && body.statusId !== existing.statusId && updated?.recurrence) {
+		const newStatus = db.select().from(taskStatuses).where(eq(taskStatuses.id, body.statusId)).get();
+		if (newStatus?.isClosed) {
+			try {
+				const rule = JSON.parse(updated.recurrence);
+				const nextDue = computeNextDueDate(updated.dueDate || now, rule);
+
+				// Check endDate
+				if (!rule.endDate || nextDue <= rule.endDate) {
+					// Find first open status for this project
+					const firstStatus = db.select().from(taskStatuses)
+						.where(eq(taskStatuses.projectId, event.params.projectId))
+						.orderBy(asc(taskStatuses.position))
+						.limit(1)
+						.get();
+
+					// Auto-increment number
+					const maxNum = db
+						.select({ max: sql<number>`coalesce(max(${tasks.number}), 0)` })
+						.from(tasks)
+						.where(eq(tasks.projectId, event.params.projectId))
+						.get();
+
+					// Position at end
+					const lastPos = db.select({ pos: tasks.position }).from(tasks)
+						.where(sql`${tasks.projectId} = ${event.params.projectId} AND ${tasks.statusId} = ${firstStatus?.id}`)
+						.orderBy(sql`${tasks.position} DESC`)
+						.limit(1)
+						.get();
+
+					const nextId = nanoid(12);
+					const sourceId = updated.recurrenceSourceId || updated.id;
+
+					// Shift start date by same delta if present
+					let nextStart: number | null = null;
+					if (updated.startDate && updated.dueDate) {
+						const delta = nextDue - updated.dueDate;
+						nextStart = updated.startDate + delta;
+					}
+
+					const nextTask = {
+						id: nextId,
+						projectId: event.params.projectId,
+						number: (maxNum?.max || 0) + 1,
+						title: updated.title,
+						description: updated.description,
+						type: updated.type,
+						statusId: firstStatus?.id || body.statusId,
+						priority: updated.priority,
+						assigneeId: updated.assigneeId,
+						parentId: updated.parentId,
+						createdBy: user.id,
+						dueDate: nextDue,
+						startDate: nextStart,
+						estimatePoints: updated.estimatePoints,
+						recurrence: updated.recurrence,
+						recurrenceSourceId: sourceId,
+						position: (lastPos?.pos || 0) + 1,
+						createdAt: now,
+						updatedAt: now
+					};
+
+					db.insert(tasks).values(nextTask).run();
+
+					db.insert(activityLog).values({
+						id: nanoid(12),
+						taskId: nextId,
+						userId: user.id,
+						action: 'created',
+						detail: JSON.stringify({ recurring: true, sourceTaskId: taskId }),
+						createdAt: now
+					}).run();
+
+					// Copy labels from closed task
+					const existingLabels = db.select()
+						.from(taskLabelAssignments)
+						.where(eq(taskLabelAssignments.taskId, taskId))
+						.all();
+					for (const la of existingLabels) {
+						db.insert(taskLabelAssignments).values({ taskId: nextId, labelId: la.labelId }).run();
+					}
+
+					broadcastTaskCreated(event.params.projectId, nextTask, user.id);
+					fireWebhooks('task.created', { projectId: event.params.projectId, task: nextTask }).catch(() => {});
+				}
+			} catch {
+				// Invalid recurrence JSON — skip silently
+			}
+		}
 	}
 
 	return json(updated);

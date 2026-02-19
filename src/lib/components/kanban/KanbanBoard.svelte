@@ -105,6 +105,7 @@
 		<KanbanColumn
 			{status}
 			tasks={tasksByStatus(status.id)}
+			{projectId}
 			{projectSlug}
 			ondrop={handleDrop}
 			ondragstart={handleDragStart}

@@ -6,6 +6,7 @@ import {
 	projects,
 	activityLog,
 	comments,
+	commentReactions,
 	users,
 	taskLabelAssignments,
 	taskLabels,
@@ -13,7 +14,7 @@ import {
 	checklistItems,
 	taskWatchers
 } from '$lib/server/db/schema.js';
-import { eq, and, asc, sql } from 'drizzle-orm';
+import { eq, and, asc, sql, inArray } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { user } = await parent();
@@ -62,6 +63,35 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		.where(eq(comments.taskId, task.id))
 		.orderBy(asc(comments.createdAt))
 		.all();
+
+	// Load reactions for all comments
+	const commentIds = taskComments.map((c) => c.id);
+	const reactions = commentIds.length > 0
+		? db
+			.select({
+				commentId: commentReactions.commentId,
+				userId: commentReactions.userId,
+				userName: users.name,
+				emoji: commentReactions.emoji
+			})
+			.from(commentReactions)
+			.innerJoin(users, eq(commentReactions.userId, users.id))
+			.where(inArray(commentReactions.commentId, commentIds))
+			.all()
+		: [];
+
+	// Group reactions by comment
+	const reactionsByComment = new Map<string, typeof reactions>();
+	for (const r of reactions) {
+		const arr = reactionsByComment.get(r.commentId) || [];
+		arr.push(r);
+		reactionsByComment.set(r.commentId, arr);
+	}
+
+	const commentsWithReactions = taskComments.map((c) => ({
+		...c,
+		reactions: reactionsByComment.get(c.id) || []
+	}));
 
 	const statuses = db
 		.select()
@@ -121,7 +151,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		task,
 		labels,
 		activity,
-		comments: taskComments,
+		comments: commentsWithReactions,
 		statuses,
 		checklist,
 		watchers: watcherRows,

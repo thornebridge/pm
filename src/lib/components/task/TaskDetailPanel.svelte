@@ -339,6 +339,19 @@
 						</select>
 					</div>
 
+					<!-- Recurrence indicator -->
+					{#if task.recurrence}
+						{@const rule = (() => { try { return JSON.parse(task.recurrence); } catch { return null; } })()}
+						{#if rule}
+							<div class="mb-4">
+								<span class="text-[10px] font-medium uppercase tracking-wider text-surface-400">Repeat</span>
+								<p class="text-xs text-surface-600 dark:text-surface-400">
+									Every {rule.interval > 1 ? `${rule.interval} ` : ''}{rule.freq === 'daily' ? (rule.interval > 1 ? 'days' : 'day') : rule.freq === 'weekly' ? (rule.interval > 1 ? 'weeks' : 'week') : (rule.interval > 1 ? 'months' : 'month')}
+								</p>
+							</div>
+						{/if}
+					{/if}
+
 					<!-- Labels -->
 					{#if task.labels.length > 0}
 						<div class="mb-4 flex flex-wrap gap-1">
