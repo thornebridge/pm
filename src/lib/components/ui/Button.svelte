@@ -10,12 +10,12 @@
 
 	let { variant = 'primary', size = 'md', children, class: className = '', ...rest }: Props = $props();
 
-	const base = 'inline-flex items-center justify-center rounded-md font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50';
+	const base = 'inline-flex items-center justify-center rounded-md font-medium transition focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-surface-50 dark:focus:ring-offset-surface-900 disabled:opacity-50';
 
 	const variants = {
-		primary: 'bg-indigo-600 text-white hover:bg-indigo-500',
-		secondary: 'border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700',
-		ghost: 'text-slate-400 hover:bg-slate-800 hover:text-slate-200',
+		primary: 'bg-brand-600 text-white hover:bg-brand-500',
+		secondary: 'border border-surface-300 bg-surface-50 text-surface-900 hover:bg-surface-200 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100 dark:hover:bg-surface-700',
+		ghost: 'text-surface-600 hover:bg-surface-200 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100',
 		danger: 'bg-red-600 text-white hover:bg-red-500'
 	};
 

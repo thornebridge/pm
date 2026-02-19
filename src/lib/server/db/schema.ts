@@ -35,6 +35,21 @@ export const inviteTokens = sqliteTable('invite_tokens', {
 	createdAt: integer('created_at', { mode: 'number' }).notNull()
 });
 
+// ─── Folders ──────────────────────────────────────────────────────────────────
+
+export const folders = sqliteTable('folders', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	slug: text('slug').notNull(),
+	parentId: text('parent_id'),
+	color: text('color'),
+	position: integer('position').notNull().default(0),
+	createdBy: text('created_by')
+		.notNull()
+		.references(() => users.id),
+	createdAt: integer('created_at', { mode: 'number' }).notNull()
+});
+
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
 export const projects = sqliteTable('projects', {
@@ -42,7 +57,8 @@ export const projects = sqliteTable('projects', {
 	name: text('name').notNull(),
 	slug: text('slug').notNull().unique(),
 	description: text('description'),
-	color: text('color').notNull().default('#6366f1'),
+	color: text('color').notNull().default('#2d4f3e'),
+	folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
 	createdBy: text('created_by')
 		.notNull()
 		.references(() => users.id),
@@ -64,6 +80,27 @@ export const taskStatuses = sqliteTable(
 		createdAt: integer('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_statuses_project').on(table.projectId, table.position)]
+);
+
+// ─── Sprints ──────────────────────────────────────────────────────────────────
+
+export const sprints = sqliteTable(
+	'sprints',
+	{
+		id: text('id').primaryKey(),
+		projectId: text('project_id')
+			.notNull()
+			.references(() => projects.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		goal: text('goal'),
+		startDate: integer('start_date', { mode: 'number' }),
+		endDate: integer('end_date', { mode: 'number' }),
+		status: text('status', { enum: ['planning', 'active', 'completed', 'cancelled'] })
+			.notNull()
+			.default('planning'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_sprints_project').on(table.projectId, table.status)]
 );
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
@@ -89,6 +126,9 @@ export const tasks = sqliteTable(
 			.notNull()
 			.references(() => users.id),
 		dueDate: integer('due_date', { mode: 'number' }),
+		startDate: integer('start_date', { mode: 'number' }),
+		sprintId: text('sprint_id').references(() => sprints.id, { onDelete: 'set null' }),
+		estimatePoints: integer('estimate_points'),
 		position: real('position').notNull(),
 		createdAt: integer('created_at', { mode: 'number' }).notNull(),
 		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
@@ -96,7 +136,8 @@ export const tasks = sqliteTable(
 	(table) => [
 		index('idx_tasks_board').on(table.projectId, table.statusId, table.position),
 		uniqueIndex('idx_tasks_number').on(table.projectId, table.number),
-		index('idx_tasks_assignee').on(table.assigneeId)
+		index('idx_tasks_assignee').on(table.assigneeId),
+		index('idx_tasks_sprint').on(table.sprintId)
 	]
 );
 
@@ -121,6 +162,47 @@ export const taskLabelAssignments = sqliteTable(
 			.references(() => taskLabels.id, { onDelete: 'cascade' })
 	},
 	(table) => [primaryKey({ columns: [table.taskId, table.labelId] })]
+);
+
+// ─── Task Dependencies ───────────────────────────────────────────────────────
+
+export const taskDependencies = sqliteTable(
+	'task_dependencies',
+	{
+		taskId: text('task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		dependsOnTaskId: text('depends_on_task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: ['blocks', 'blocked_by'] }).notNull().default('blocks')
+	},
+	(table) => [
+		primaryKey({ columns: [table.taskId, table.dependsOnTaskId] }),
+		index('idx_deps_depends_on').on(table.dependsOnTaskId)
+	]
+);
+
+// ─── Attachments ─────────────────────────────────────────────────────────────
+
+export const attachments = sqliteTable(
+	'attachments',
+	{
+		id: text('id').primaryKey(),
+		taskId: text('task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		filename: text('filename').notNull(),
+		originalName: text('original_name').notNull(),
+		mimeType: text('mime_type').notNull(),
+		size: integer('size').notNull(),
+		storagePath: text('storage_path').notNull(),
+		uploadedBy: text('uploaded_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_attachments_task').on(table.taskId)]
 );
 
 // ─── Collaboration ────────────────────────────────────────────────────────────
@@ -161,7 +243,9 @@ export const activityLog = sqliteTable(
 				'commented',
 				'label_added',
 				'label_removed',
-				'edited'
+				'edited',
+				'attachment_added',
+				'attachment_removed'
 			]
 		}).notNull(),
 		detail: text('detail'),
@@ -191,5 +275,84 @@ export const notificationPreferences = sqliteTable('notification_preferences', {
 		.unique(),
 	onAssigned: integer('on_assigned', { mode: 'boolean' }).notNull().default(true),
 	onStatusChange: integer('on_status_change', { mode: 'boolean' }).notNull().default(true),
-	onComment: integer('on_comment', { mode: 'boolean' }).notNull().default(true)
+	onComment: integer('on_comment', { mode: 'boolean' }).notNull().default(true),
+	onMention: integer('on_mention', { mode: 'boolean' }).notNull().default(true)
 });
+
+// ─── In-App Notifications ────────────────────────────────────────────────────
+
+export const notifications = sqliteTable(
+	'notifications',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment'] }).notNull(),
+		title: text('title').notNull(),
+		body: text('body'),
+		url: text('url'),
+		taskId: text('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
+		actorId: text('actor_id').references(() => users.id),
+		read: integer('read', { mode: 'boolean' }).notNull().default(false),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [
+		index('idx_notifications_user').on(table.userId, table.read, table.createdAt)
+	]
+);
+
+// ─── Time Tracking ───────────────────────────────────────────────────────────
+
+export const timeEntries = sqliteTable(
+	'time_entries',
+	{
+		id: text('id').primaryKey(),
+		taskId: text('task_id')
+			.notNull()
+			.references(() => tasks.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id),
+		description: text('description'),
+		startedAt: integer('started_at', { mode: 'number' }).notNull(),
+		stoppedAt: integer('stopped_at', { mode: 'number' }),
+		durationMs: integer('duration_ms'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_time_entries_task').on(table.taskId)]
+);
+
+// ─── Task Templates ──────────────────────────────────────────────────────────
+
+export const taskTemplates = sqliteTable('task_templates', {
+	id: text('id').primaryKey(),
+	projectId: text('project_id')
+		.notNull()
+		.references(() => projects.id, { onDelete: 'cascade' }),
+	name: text('name').notNull(),
+	title: text('title').notNull(),
+	description: text('description'),
+	priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] }).default('medium'),
+	labelIds: text('label_ids'),
+	createdAt: integer('created_at', { mode: 'number' }).notNull()
+});
+
+// ─── Sprint Snapshots ────────────────────────────────────────────────────────
+
+export const sprintSnapshots = sqliteTable(
+	'sprint_snapshots',
+	{
+		id: text('id').primaryKey(),
+		sprintId: text('sprint_id')
+			.notNull()
+			.references(() => sprints.id, { onDelete: 'cascade' }),
+		date: integer('date', { mode: 'number' }).notNull(),
+		totalTasks: integer('total_tasks').notNull(),
+		completedTasks: integer('completed_tasks').notNull(),
+		totalPoints: integer('total_points').notNull().default(0),
+		completedPoints: integer('completed_points').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(table) => [index('idx_snapshots_sprint').on(table.sprintId, table.date)]
+);

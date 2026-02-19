@@ -47,7 +47,7 @@
 </script>
 
 <div
-	class="flex w-72 shrink-0 flex-col rounded-lg {dragover ? 'bg-slate-800/60' : ''}"
+	class="flex w-72 shrink-0 flex-col rounded-lg {dragover ? 'bg-surface-200/60 dark:bg-surface-800/60' : ''}"
 	ondragover={handleDragOver}
 	ondragleave={handleDragLeave}
 	ondrop={handleDrop}
@@ -55,8 +55,8 @@
 >
 	<div class="mb-2 flex items-center gap-2 px-1">
 		<div class="h-2.5 w-2.5 rounded-full" style="background-color: {status.color}"></div>
-		<span class="text-xs font-semibold uppercase tracking-wide text-slate-400">{status.name}</span>
-		<span class="text-xs text-slate-600">{tasks.length}</span>
+		<span class="text-xs font-semibold uppercase tracking-wide text-surface-600 dark:text-surface-400">{status.name}</span>
+		<span class="text-xs text-surface-400 dark:text-surface-600">{tasks.length}</span>
 	</div>
 
 	<div class="flex flex-col gap-1.5">

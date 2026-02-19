@@ -9,8 +9,8 @@
 	const colors = {
 		urgent: 'text-red-500',
 		high: 'text-orange-400',
-		medium: 'text-yellow-400',
-		low: 'text-slate-500'
+		medium: 'text-yellow-500 dark:text-yellow-400',
+		low: 'text-surface-500'
 	};
 
 	const labels = {

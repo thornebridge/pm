@@ -6,7 +6,7 @@
 		children: Snippet;
 	}
 
-	let { color = '#6366f1', children }: Props = $props();
+	let { color = '#2d4f3e', children }: Props = $props();
 </script>
 
 <span

@@ -43,7 +43,7 @@ export const POST: RequestHandler = async (event) => {
 		name: name.trim(),
 		slug,
 		description: description?.trim() || null,
-		color: color || '#6366f1',
+		color: color || '#2d4f3e',
 		createdBy: user.id,
 		createdAt: now,
 		updatedAt: now

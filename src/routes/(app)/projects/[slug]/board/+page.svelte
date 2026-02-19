@@ -49,12 +49,12 @@
 
 <div class="pt-4">
 	<div class="mb-4 flex items-center justify-between px-6">
-		<h2 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Board</h2>
+		<h2 class="text-xs font-semibold uppercase tracking-wide text-surface-500">Board</h2>
 		<button
 			onclick={() => (showCreate = true)}
-			class="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-indigo-500"
+			class="rounded-md bg-brand-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-brand-500"
 		>
-			New task <kbd class="ml-1 rounded bg-indigo-700 px-1 text-[10px]">C</kbd>
+			New task <kbd class="ml-1 rounded bg-brand-700 px-1 text-[10px]">C</kbd>
 		</button>
 	</div>
 
@@ -77,15 +77,15 @@
 		<input
 			bind:value={title}
 			placeholder="Task title"
-			class="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-500"
+			class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 			autofocus
 		/>
 		<div>
-			<label for="priority" class="mb-1 block text-xs text-slate-400">Priority</label>
+			<label for="priority" class="mb-1 block text-xs text-surface-600 dark:text-surface-400">Priority</label>
 			<select
 				id="priority"
 				bind:value={priority}
-				class="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+				class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 			>
 				<option value="urgent">Urgent</option>
 				<option value="high">High</option>
@@ -97,14 +97,14 @@
 			<button
 				type="button"
 				onclick={() => (showCreate = false)}
-				class="rounded-md px-3 py-1.5 text-sm text-slate-400 hover:text-slate-200"
+				class="rounded-md px-3 py-1.5 text-sm text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100"
 			>
 				Cancel
 			</button>
 			<button
 				type="submit"
 				disabled={creating || !title.trim()}
-				class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+				class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
 			>
 				{creating ? 'Creating...' : 'Create'}
 			</button>

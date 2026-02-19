@@ -90,12 +90,12 @@
 						bind:value={titleInput}
 						onblur={saveTitle}
 						onkeydown={(e) => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') { editingTitle = false; titleInput = data.task.title; } }}
-						class="w-full rounded bg-slate-800 px-2 py-1 text-lg font-semibold text-slate-100 outline-none focus:ring-1 focus:ring-indigo-500"
+						class="w-full rounded bg-surface-100 px-2 py-1 text-lg font-semibold text-surface-900 outline-none focus:ring-1 focus:ring-brand-500 dark:bg-surface-800 dark:text-surface-100"
 						autofocus
 					/>
 				{:else}
-					<button onclick={() => (editingTitle = true)} class="text-left text-lg font-semibold text-slate-100 hover:text-white">
-						<span class="mr-2 text-slate-500">#{data.task.number}</span>
+					<button onclick={() => (editingTitle = true)} class="text-left text-lg font-semibold text-surface-900 hover:text-brand-600 dark:text-surface-100 dark:hover:text-white">
+						<span class="mr-2 text-surface-500">#{data.task.number}</span>
 						{data.task.title}
 					</button>
 				{/if}
@@ -103,7 +103,7 @@
 
 			<!-- Description -->
 			{#if data.task.description}
-				<div class="mb-6 rounded-md bg-slate-800/50 p-4 text-sm text-slate-300 whitespace-pre-wrap">
+				<div class="mb-6 rounded-md bg-surface-100 p-4 text-sm text-surface-700 whitespace-pre-wrap dark:bg-surface-800/50 dark:text-surface-300">
 					{data.task.description}
 				</div>
 			{/if}
@@ -119,26 +119,26 @@
 
 			<!-- Activity + Comments -->
 			<div class="space-y-3">
-				<h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Activity</h3>
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500">Activity</h3>
 
 				{#each data.activity as item (item.id)}
 					<div class="flex items-start gap-2 text-sm">
-						<span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-600"></span>
+						<span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-400 dark:bg-surface-600"></span>
 						<div>
-							<span class="font-medium text-slate-300">{item.userName}</span>
-							<span class="text-slate-500">{actionLabel(item.action)}</span>
-							<span class="ml-1 text-xs text-slate-600">{formatDate(item.createdAt)}</span>
+							<span class="font-medium text-surface-700 dark:text-surface-300">{item.userName}</span>
+							<span class="text-surface-500">{actionLabel(item.action)}</span>
+							<span class="ml-1 text-xs text-surface-400 dark:text-surface-600">{formatDate(item.createdAt)}</span>
 						</div>
 					</div>
 				{/each}
 
 				{#each data.comments as comment (comment.id)}
-					<div class="rounded-md border border-slate-800 p-3">
+					<div class="rounded-md border border-surface-300 p-3 dark:border-surface-800">
 						<div class="mb-1 flex items-center gap-2 text-xs">
-							<span class="font-medium text-slate-300">{comment.userName}</span>
-							<span class="text-slate-600">{formatDate(comment.createdAt)}</span>
+							<span class="font-medium text-surface-700 dark:text-surface-300">{comment.userName}</span>
+							<span class="text-surface-400 dark:text-surface-600">{formatDate(comment.createdAt)}</span>
 						</div>
-						<p class="text-sm text-slate-300 whitespace-pre-wrap">{comment.body}</p>
+						<p class="text-sm text-surface-700 whitespace-pre-wrap dark:text-surface-300">{comment.body}</p>
 					</div>
 				{/each}
 
@@ -151,13 +151,13 @@
 						bind:value={commentBody}
 						placeholder="Write a comment..."
 						rows={3}
-						class="w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-indigo-500"
+						class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 					></textarea>
 					<div class="mt-2 flex justify-end">
 						<button
 							type="submit"
 							disabled={submitting || !commentBody.trim()}
-							class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+							class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
 						>
 							{submitting ? 'Posting...' : 'Comment'}
 						</button>
@@ -169,11 +169,11 @@
 		<!-- Sidebar metadata -->
 		<div class="space-y-4">
 			<div>
-				<label class="mb-1 block text-xs text-slate-500">Status</label>
+				<label class="mb-1 block text-xs text-surface-500">Status</label>
 				<select
 					value={data.task.statusId}
 					onchange={(e) => updateField('statusId', e.currentTarget.value)}
-					class="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200"
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
 				>
 					{#each data.statuses as status}
 						<option value={status.id}>{status.name}</option>
@@ -182,11 +182,11 @@
 			</div>
 
 			<div>
-				<label class="mb-1 block text-xs text-slate-500">Priority</label>
+				<label class="mb-1 block text-xs text-surface-500">Priority</label>
 				<select
 					value={data.task.priority}
 					onchange={(e) => updateField('priority', e.currentTarget.value)}
-					class="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200"
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
 				>
 					<option value="urgent">Urgent</option>
 					<option value="high">High</option>
@@ -196,11 +196,11 @@
 			</div>
 
 			<div>
-				<label class="mb-1 block text-xs text-slate-500">Assignee</label>
+				<label class="mb-1 block text-xs text-surface-500">Assignee</label>
 				<select
 					value={data.task.assigneeId ?? ''}
 					onchange={(e) => updateField('assigneeId', e.currentTarget.value || null)}
-					class="w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-slate-200"
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
 				>
 					<option value="">Unassigned</option>
 					{#each data.members as member}
@@ -209,9 +209,9 @@
 				</select>
 			</div>
 
-			<div class="border-t border-slate-800 pt-4">
-				<p class="text-xs text-slate-600">Created {formatDate(data.task.createdAt)}</p>
-				<p class="text-xs text-slate-600">Updated {formatDate(data.task.updatedAt)}</p>
+			<div class="border-t border-surface-300 pt-4 dark:border-surface-800">
+				<p class="text-xs text-surface-400 dark:text-surface-600">Created {formatDate(data.task.createdAt)}</p>
+				<p class="text-xs text-surface-400 dark:text-surface-600">Updated {formatDate(data.task.updatedAt)}</p>
 			</div>
 		</div>
 	</div>
