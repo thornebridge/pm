@@ -43,7 +43,7 @@ export const actions: Actions = {
 		}
 
 		// If invite has a fixed email, enforce it
-		if (invite.email && invite.email !== email) {
+		if (invite.email && invite.email.toLowerCase() !== email) {
 			return fail(400, { error: 'Email does not match invite', name, email });
 		}
 
