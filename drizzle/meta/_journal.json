@@ -50,6 +50,13 @@
       "when": 1740000004000,
       "tag": "0006_add_task_types_and_more",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1740000005000,
+      "tag": "0007_add_shared_views",
+      "breakpoints": true
     }
   ]
 }

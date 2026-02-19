@@ -3,6 +3,7 @@
 	import { showToast } from '$lib/stores/toasts.js';
 	import { invalidateAll } from '$app/navigation';
 	import PriorityIcon from '$lib/components/task/PriorityIcon.svelte';
+	import type { SortConfig, SortColumn, TaskGroup } from '$lib/types/filters.js';
 
 	interface Status {
 		id: string;
@@ -32,89 +33,49 @@
 
 	interface Props {
 		tasks: Task[];
+		groups?: TaskGroup[] | null;
 		statuses: Status[];
 		projectSlug: string;
 		projectId: string;
 		members: Member[];
+		sort?: SortConfig;
+		onsortchange?: (partial: Partial<SortConfig>) => void;
 		selectedIds?: string[];
 		onselect?: (ids: string[]) => void;
 	}
 
-	let { tasks, statuses, projectSlug, projectId, members, selectedIds = $bindable([]), onselect }: Props = $props();
+	let {
+		tasks,
+		groups = null,
+		statuses,
+		projectSlug,
+		projectId,
+		members,
+		sort,
+		onsortchange,
+		selectedIds = $bindable([]),
+		onselect
+	}: Props = $props();
 
-	let sortColumn = $state<'number' | 'priority' | 'title' | 'status' | 'assignee' | 'dueDate' | 'points'>('number');
-	let sortAsc = $state(true);
-	let groupByStatus = $state(false);
 	let editingCell = $state<{ taskId: string; field: string } | null>(null);
 	let editValue = $state('');
 
 	const statusMap = $derived(new Map(statuses.map((s) => [s.id, s])));
 	const memberMap = $derived(new Map(members.map((m) => [m.id, m])));
 
-	const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-
-	function compareTasks(a: Task, b: Task): number {
-		let result = 0;
-		switch (sortColumn) {
-			case 'number':
-				result = a.number - b.number;
-				break;
-			case 'priority':
-				result = priorityOrder[a.priority] - priorityOrder[b.priority];
-				break;
-			case 'title':
-				result = a.title.localeCompare(b.title);
-				break;
-			case 'status': {
-				const aPos = statusMap.get(a.statusId)?.position ?? 0;
-				const bPos = statusMap.get(b.statusId)?.position ?? 0;
-				result = aPos - bPos;
-				break;
+	function toggleSort(column: SortColumn) {
+		if (onsortchange) {
+			if (sort?.column === column) {
+				onsortchange({ direction: sort.direction === 'asc' ? 'desc' : 'asc' });
+			} else {
+				onsortchange({ column, direction: 'asc' });
 			}
-			case 'assignee': {
-				const aName = memberMap.get(a.assigneeId ?? '')?.name ?? '';
-				const bName = memberMap.get(b.assigneeId ?? '')?.name ?? '';
-				result = aName.localeCompare(bName);
-				break;
-			}
-			case 'dueDate':
-				result = (a.dueDate ?? Infinity) - (b.dueDate ?? Infinity);
-				break;
-			case 'points':
-				result = (a.estimatePoints ?? 0) - (b.estimatePoints ?? 0);
-				break;
-		}
-		return sortAsc ? result : -result;
-	}
-
-	const sortedTasks = $derived([...tasks].sort(compareTasks));
-
-	const groupedTasks = $derived.by(() => {
-		if (!groupByStatus) return null;
-		const groups = new Map<string, Task[]>();
-		for (const status of statuses.sort((a, b) => a.position - b.position)) {
-			groups.set(status.id, []);
-		}
-		for (const task of sortedTasks) {
-			const arr = groups.get(task.statusId) || [];
-			arr.push(task);
-			groups.set(task.statusId, arr);
-		}
-		return groups;
-	});
-
-	function toggleSort(column: typeof sortColumn) {
-		if (sortColumn === column) {
-			sortAsc = !sortAsc;
-		} else {
-			sortColumn = column;
-			sortAsc = true;
 		}
 	}
 
-	function sortIndicator(column: typeof sortColumn) {
-		if (sortColumn !== column) return '';
-		return sortAsc ? ' \u2191' : ' \u2193';
+	function sortIndicator(column: SortColumn) {
+		if (!sort || sort.column !== column) return '';
+		return sort.direction === 'asc' ? ' \u2191' : ' \u2193';
 	}
 
 	function startEditTitle(task: Task) {
@@ -171,14 +132,14 @@
 		}
 	}
 
-	const allSortedIds = $derived(sortedTasks.map((t) => t.id));
-	const allSelected = $derived(allSortedIds.length > 0 && allSortedIds.every((id) => selectedIds.includes(id)));
+	const allTaskIds = $derived(tasks.map((t) => t.id));
+	const allSelected = $derived(allTaskIds.length > 0 && allTaskIds.every((id) => selectedIds.includes(id)));
 
 	function toggleAll() {
 		if (allSelected) {
 			selectedIds = [];
 		} else {
-			selectedIds = [...allSortedIds];
+			selectedIds = [...allTaskIds];
 		}
 	}
 
@@ -197,18 +158,6 @@
 </script>
 
 <div class="px-6 pb-4">
-	<!-- Toolbar -->
-	<div class="mb-3 flex items-center gap-3">
-		<label class="flex items-center gap-2 text-xs text-surface-600 dark:text-surface-400">
-			<input
-				type="checkbox"
-				bind:checked={groupByStatus}
-				class="rounded border-surface-400 text-brand-600 focus:ring-brand-500 dark:border-surface-600"
-			/>
-			Group by status
-		</label>
-	</div>
-
 	<!-- Table -->
 	<div class="overflow-x-auto rounded-lg border border-surface-300 dark:border-surface-800">
 		<table class="w-full text-sm">
@@ -240,38 +189,37 @@
 					<th class="w-28 cursor-pointer px-3 py-2 select-none" onclick={() => toggleSort('dueDate')}>
 						Due{sortIndicator('dueDate')}
 					</th>
-					<th class="w-16 cursor-pointer px-3 py-2 select-none" onclick={() => toggleSort('points')}>
-						Pts{sortIndicator('points')}
+					<th class="w-16 px-3 py-2 select-none">
+						Pts
 					</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#if groupedTasks}
-					{#each [...groupedTasks.entries()] as [statusId, groupTasks] (statusId)}
-						{@const status = statusMap.get(statusId)}
-						{#if status}
+				{#if groups}
+					{#each groups as group (group.key)}
+						<tr>
+							<td colspan="8" class="border-b border-surface-200 bg-surface-100/70 px-3 py-1.5 dark:border-surface-800/50 dark:bg-surface-800/40">
+								<span class="flex items-center gap-2 text-xs font-semibold text-surface-700 dark:text-surface-300">
+									{#if group.color}
+										<span class="h-2.5 w-2.5 rounded-full" style="background-color: {group.color}"></span>
+									{/if}
+									{group.label}
+									<span class="font-normal text-surface-500">({group.tasks.length})</span>
+								</span>
+							</td>
+						</tr>
+						{#each group.tasks as task (task.id)}
+							{@render taskRow(task)}
+						{:else}
 							<tr>
-								<td colspan="8" class="border-b border-surface-200 bg-surface-100/70 px-3 py-1.5 dark:border-surface-800/50 dark:bg-surface-800/40">
-									<span class="flex items-center gap-2 text-xs font-semibold text-surface-700 dark:text-surface-300">
-										<span class="h-2.5 w-2.5 rounded-full" style="background-color: {status.color}"></span>
-										{status.name}
-										<span class="font-normal text-surface-500">({groupTasks.length})</span>
-									</span>
+								<td colspan="8" class="border-b border-surface-200 px-3 py-2 text-center text-xs text-surface-400 dark:border-surface-800/50">
+									No tasks
 								</td>
 							</tr>
-							{#each groupTasks as task (task.id)}
-								{@render taskRow(task)}
-							{:else}
-								<tr>
-									<td colspan="8" class="border-b border-surface-200 px-3 py-2 text-center text-xs text-surface-400 dark:border-surface-800/50">
-										No tasks
-									</td>
-								</tr>
-							{/each}
-						{/if}
+						{/each}
 					{/each}
 				{:else}
-					{#each sortedTasks as task (task.id)}
+					{#each tasks as task (task.id)}
 						{@render taskRow(task)}
 					{:else}
 						<tr>

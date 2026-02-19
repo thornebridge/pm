@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { savedViews } from '$lib/server/db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
@@ -12,7 +12,12 @@ export const GET: RequestHandler = async (event) => {
 	const views = db
 		.select()
 		.from(savedViews)
-		.where(and(eq(savedViews.projectId, event.params.projectId), eq(savedViews.userId, user.id)))
+		.where(
+			or(
+				and(eq(savedViews.projectId, event.params.projectId), eq(savedViews.userId, user.id)),
+				and(eq(savedViews.projectId, event.params.projectId), eq(savedViews.shared, true))
+			)
+		)
 		.orderBy(savedViews.createdAt)
 		.all();
 
@@ -21,23 +26,59 @@ export const GET: RequestHandler = async (event) => {
 
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	const { name, filters } = await event.request.json();
+	const { name, filters, shared } = await event.request.json();
 
 	if (!name?.trim()) {
 		return json({ error: 'Name is required' }, { status: 400 });
 	}
 
+	const now = Date.now();
 	const view = {
 		id: nanoid(12),
 		projectId: event.params.projectId,
 		userId: user.id,
 		name: name.trim(),
 		filters: JSON.stringify(filters || {}),
-		createdAt: Date.now()
+		shared: shared === true,
+		createdAt: now,
+		updatedAt: now
 	};
 
 	db.insert(savedViews).values(view).run();
 	return json(view, { status: 201 });
+};
+
+export const PATCH: RequestHandler = async (event) => {
+	const user = requireAuth(event);
+	const { id, name, filters, shared } = await event.request.json();
+
+	if (!id) {
+		return json({ error: 'View ID is required' }, { status: 400 });
+	}
+
+	// Only the owner can update
+	const existing = db
+		.select()
+		.from(savedViews)
+		.where(and(eq(savedViews.id, id), eq(savedViews.userId, user.id)))
+		.get();
+
+	if (!existing) {
+		return json({ error: 'View not found' }, { status: 404 });
+	}
+
+	const updates: Record<string, unknown> = { updatedAt: Date.now() };
+	if (name !== undefined) updates.name = name.trim();
+	if (filters !== undefined) updates.filters = JSON.stringify(filters);
+	if (shared !== undefined) updates.shared = shared === true;
+
+	db.update(savedViews)
+		.set(updates)
+		.where(eq(savedViews.id, id))
+		.run();
+
+	const updated = db.select().from(savedViews).where(eq(savedViews.id, id)).get();
+	return json(updated);
 };
 
 export const DELETE: RequestHandler = async (event) => {

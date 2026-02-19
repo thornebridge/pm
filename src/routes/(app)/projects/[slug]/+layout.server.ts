@@ -1,10 +1,10 @@
 import { error } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
-import { projects, taskStatuses, taskLabels, tasks, users, taskLabelAssignments, checklistItems, comments } from '$lib/server/db/schema.js';
-import { eq, asc, inArray, sql, isNull } from 'drizzle-orm';
+import { projects, taskStatuses, taskLabels, tasks, users, taskLabelAssignments, checklistItems, comments, savedViews } from '$lib/server/db/schema.js';
+import { eq, and, or, asc, inArray, sql, isNull } from 'drizzle-orm';
 
-export const load: LayoutServerLoad = async ({ params }) => {
+export const load: LayoutServerLoad = async ({ params, parent }) => {
 	const project = db.select().from(projects).where(eq(projects.slug, params.slug)).get();
 
 	if (!project) {
@@ -131,5 +131,22 @@ export const load: LayoutServerLoad = async ({ params }) => {
 		subtaskDone: subtaskMap.get(t.id)?.done || 0
 	}));
 
-	return { project, statuses, labels, tasks: tasksWithExtras, members };
+	// Saved views — user's own + shared
+	const parentData = await parent();
+	const userId = parentData.user?.id;
+	const views = userId
+		? db
+				.select()
+				.from(savedViews)
+				.where(
+					or(
+						and(eq(savedViews.projectId, project.id), eq(savedViews.userId, userId)),
+						and(eq(savedViews.projectId, project.id), eq(savedViews.shared, true))
+					)
+				)
+				.orderBy(asc(savedViews.createdAt))
+				.all()
+		: [];
+
+	return { project, statuses, labels, tasks: tasksWithExtras, members, views };
 };

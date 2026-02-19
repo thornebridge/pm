@@ -1,7 +1,12 @@
 <script lang="ts">
 	import CalendarGrid from '$lib/components/calendar/CalendarGrid.svelte';
+	import { getFilters } from '$lib/stores/filters.svelte.js';
+	import { applyFilters } from '$lib/utils/taskFilters.js';
+	import type { EnrichedTask } from '$lib/types/filters.js';
 
 	let { data } = $props();
+
+	const filteredTasks = $derived(applyFilters(data.tasks as EnrichedTask[], getFilters()));
 </script>
 
 <svelte:head>
@@ -14,7 +19,7 @@
 	</div>
 
 	<CalendarGrid
-		tasks={data.tasks}
+		tasks={filteredTasks}
 		projectSlug={data.project.slug}
 	/>
 </div>

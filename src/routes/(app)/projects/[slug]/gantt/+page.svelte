@@ -1,7 +1,12 @@
 <script lang="ts">
 	import GanttChart from '$lib/components/gantt/GanttChart.svelte';
+	import { getFilters } from '$lib/stores/filters.svelte.js';
+	import { applyFilters } from '$lib/utils/taskFilters.js';
+	import type { EnrichedTask } from '$lib/types/filters.js';
 
 	let { data } = $props();
+
+	const filteredTasks = $derived(applyFilters(data.tasks as EnrichedTask[], getFilters()));
 </script>
 
 <svelte:head>
@@ -14,7 +19,7 @@
 	</div>
 
 	<GanttChart
-		tasks={data.tasks}
+		tasks={filteredTasks}
 		statuses={data.statuses}
 		projectSlug={data.project.slug}
 	/>

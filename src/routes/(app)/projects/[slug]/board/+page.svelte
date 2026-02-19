@@ -5,6 +5,9 @@
 	import { api } from '$lib/utils/api.js';
 	import { invalidateAll } from '$app/navigation';
 	import { showToast } from '$lib/stores/toasts.js';
+	import { getFilters, getSort } from '$lib/stores/filters.svelte.js';
+	import { applyFilters, applySorting } from '$lib/utils/taskFilters.js';
+	import type { EnrichedTask } from '$lib/types/filters.js';
 
 	let { data } = $props();
 
@@ -24,6 +27,14 @@
 
 	// J/K navigation
 	let focusedTaskId = $state<string | null>(null);
+
+	// Apply filters from shared store (board groups by status inherently)
+	const filteredTasks = $derived.by(() => {
+		const filters = getFilters();
+		const sort = getSort();
+		const filtered = applyFilters(data.tasks as EnrichedTask[], filters);
+		return applySorting(filtered, sort, data.statuses);
+	});
 
 	async function openTaskPanel(task: { id: string; number: number }) {
 		panelLoading = true;
@@ -97,8 +108,8 @@
 		const sorted = [...data.statuses].sort((a, b) => a.position - b.position);
 		const result: Array<{ id: string; number: number }> = [];
 		for (const status of sorted) {
-			const statusTasks = data.tasks
-				.filter((t) => t.statusId === status.id && !t.parentId)
+			const statusTasks = filteredTasks
+				.filter((t) => t.statusId === status.id)
 				.sort((a, b) => a.position - b.position);
 			result.push(...statusTasks);
 		}
@@ -156,7 +167,7 @@
 
 	<KanbanBoard
 		statuses={data.statuses}
-		tasks={data.tasks}
+		tasks={filteredTasks}
 		projectId={data.project.id}
 		projectSlug={data.project.slug}
 		ontaskclick={(task) => openTaskPanel(task)}

@@ -376,8 +376,10 @@ export const savedViews = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
-		filters: text('filters').notNull(), // JSON string: { status, priority, assignee, search, sort, dir }
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		filters: text('filters').notNull(), // JSON string: SavedViewData
+		shared: integer('shared', { mode: 'boolean' }).notNull().default(false),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_views_project_user').on(table.projectId, table.userId)]
 );
