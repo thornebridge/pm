@@ -1,11 +1,15 @@
 <script lang="ts">
 	import PriorityIcon from '$lib/components/task/PriorityIcon.svelte';
+	import TaskTypeIcon from '$lib/components/task/TaskTypeIcon.svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import MarkdownPreview from '$lib/components/markdown/MarkdownPreview.svelte';
 	import MentionInput from '$lib/components/editor/MentionInput.svelte';
 	import { api } from '$lib/utils/api.js';
 	import { invalidateAll } from '$app/navigation';
 	import { showToast } from '$lib/stores/toasts.js';
+	import { pushScope, popScope } from '$lib/utils/keyboard.js';
+	import { onMount, onDestroy } from 'svelte';
 
 	let { data } = $props();
 
@@ -24,6 +28,10 @@
 	let newChecklistItem = $state('');
 	let addingChecklist = $state(false);
 
+	// Subtask state
+	let newSubtaskTitle = $state('');
+	let addingSubtask = $state(false);
+
 	// Watch state
 	let watching = $state(data.isWatching);
 	$effect(() => { watching = data.isWatching; });
@@ -33,6 +41,33 @@
 
 	const statusMap = $derived(new Map(data.statuses.map((s) => [s.id, s])));
 	const currentStatus = $derived(statusMap.get(data.task.statusId));
+	const memberMap = $derived(new Map(data.members.map((m) => [m.id, m.name])));
+
+	// Contextual keyboard scope
+	let scope: ReturnType<typeof pushScope> | null = null;
+	onMount(() => {
+		const sortedStatuses = [...data.statuses].sort((a, b) => a.position - b.position);
+		const priorities: Array<'urgent' | 'high' | 'medium' | 'low'> = ['urgent', 'high', 'medium', 'low'];
+		scope = pushScope(
+			{
+				'1': () => sortedStatuses[0] && updateField('statusId', sortedStatuses[0].id),
+				'2': () => sortedStatuses[1] && updateField('statusId', sortedStatuses[1].id),
+				'3': () => sortedStatuses[2] && updateField('statusId', sortedStatuses[2].id),
+				'4': () => sortedStatuses[3] && updateField('statusId', sortedStatuses[3].id),
+				'e': () => (editingDescription = true),
+				't': () => (editingTitle = true)
+			},
+			{
+				'1': () => updateField('priority', priorities[0]),
+				'2': () => updateField('priority', priorities[1]),
+				'3': () => updateField('priority', priorities[2]),
+				'4': () => updateField('priority', priorities[3])
+			}
+		);
+	});
+	onDestroy(() => {
+		if (scope) popScope(scope);
+	});
 
 	async function updateField(field: string, value: unknown) {
 		try {
@@ -144,6 +179,23 @@
 		}
 	}
 
+	async function addSubtask() {
+		if (!newSubtaskTitle.trim()) return;
+		addingSubtask = true;
+		try {
+			await api(`/api/projects/${data.task.projectId}/tasks`, {
+				method: 'POST',
+				body: JSON.stringify({ title: newSubtaskTitle, parentId: data.task.id })
+			});
+			newSubtaskTitle = '';
+			await invalidateAll();
+		} catch {
+			showToast('Failed to add subtask', 'error');
+		} finally {
+			addingSubtask = false;
+		}
+	}
+
 	async function toggleWatch() {
 		try {
 			await api(`/api/projects/${data.task.projectId}/tasks/${data.task.id}/watchers`, {
@@ -187,6 +239,13 @@
 		};
 		return labels[action] || action;
 	}
+
+	function handleCommentKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+			e.preventDefault();
+			addComment();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -194,6 +253,17 @@
 </svelte:head>
 
 <div class="mx-auto max-w-4xl p-6">
+	<!-- Parent breadcrumb -->
+	{#if data.parentTask}
+		<div class="mb-2 text-xs text-surface-500">
+			<a href="/projects/{data.project.slug}/task/{data.parentTask.number}" class="hover:text-brand-600">
+				#{data.parentTask.number} {data.parentTask.title}
+			</a>
+			<span class="mx-1">&rsaquo;</span>
+			<span>Subtask</span>
+		</div>
+	{/if}
+
 	<div class="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
 		<!-- Main content -->
 		<div>
@@ -208,7 +278,10 @@
 						autofocus
 					/>
 				{:else}
-					<button onclick={() => (editingTitle = true)} class="text-left text-lg font-semibold text-surface-900 hover:text-brand-600 dark:text-surface-100 dark:hover:text-white">
+					<button onclick={() => (editingTitle = true)} class="flex items-center gap-2 text-left text-lg font-semibold text-surface-900 hover:text-brand-600 dark:text-surface-100 dark:hover:text-white">
+						{#if data.task.type && data.task.type !== 'task'}
+							<TaskTypeIcon type={data.task.type} />
+						{/if}
 						<span class="mr-2 text-surface-500">#{data.task.number}</span>
 						{data.task.title}
 					</button>
@@ -259,6 +332,62 @@
 					{#each data.labels as label}
 						<Badge color={label.color}>{label.name}</Badge>
 					{/each}
+				</div>
+			{/if}
+
+			<!-- Subtasks (#7) -->
+			{#if !data.task.parentId}
+				<div class="mb-6">
+					<div class="mb-2 flex items-center justify-between">
+						<h3 class="text-xs font-semibold uppercase tracking-wide text-surface-500">Subtasks</h3>
+						{#if data.subtasks.length > 0}
+							{@const doneSub = data.subtasks.filter((s) => { const st = statusMap.get(s.statusId); return st?.isClosed; }).length}
+							<span class="text-xs text-surface-400">{doneSub}/{data.subtasks.length}</span>
+						{/if}
+					</div>
+					{#if data.subtasks.length > 0}
+						{@const doneSub = data.subtasks.filter((s) => { const st = statusMap.get(s.statusId); return st?.isClosed; }).length}
+						<div class="mb-2 h-1 overflow-hidden rounded-full bg-surface-200 dark:bg-surface-800">
+							<div class="h-full rounded-full bg-brand-500 transition-all" style="width: {data.subtasks.length ? (doneSub / data.subtasks.length * 100) : 0}%"></div>
+						</div>
+						<div class="space-y-1">
+							{#each data.subtasks as sub (sub.id)}
+								{@const subStatus = statusMap.get(sub.statusId)}
+								<a
+									href="/projects/{data.project.slug}/task/{sub.number}"
+									class="flex items-center gap-2 rounded-md border border-surface-300 px-3 py-1.5 text-sm transition hover:border-surface-400 dark:border-surface-800 dark:hover:border-surface-700"
+								>
+									{#if subStatus}
+										<span class="h-2 w-2 rounded-full" style="background-color: {subStatus.color}"></span>
+									{/if}
+									{#if sub.type && sub.type !== 'task'}
+										<TaskTypeIcon type={sub.type} />
+									{/if}
+									<PriorityIcon priority={sub.priority} />
+									<span class="text-xs text-surface-400">#{sub.number}</span>
+									<span class="flex-1 truncate {subStatus?.isClosed ? 'text-surface-400 line-through' : 'text-surface-900 dark:text-surface-200'}">{sub.title}</span>
+									{#if sub.assigneeId && memberMap.get(sub.assigneeId)}
+										<Avatar name={memberMap.get(sub.assigneeId) || ''} size="xs" />
+									{/if}
+								</a>
+							{/each}
+						</div>
+					{/if}
+					<form
+						onsubmit={(e) => { e.preventDefault(); addSubtask(); }}
+						class="mt-2 flex gap-2"
+					>
+						<input
+							bind:value={newSubtaskTitle}
+							placeholder="Add subtask..."
+							class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						/>
+						<button
+							type="submit"
+							disabled={addingSubtask || !newSubtaskTitle.trim()}
+							class="rounded-md bg-brand-600 px-2 py-1 text-xs font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+						>Add</button>
+					</form>
 				</div>
 			{/if}
 
@@ -319,7 +448,7 @@
 
 				{#each data.activity as item (item.id)}
 					<div class="flex items-start gap-2 text-sm">
-						<span class="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-400 dark:bg-surface-600"></span>
+						<Avatar name={item.userName} size="xs" />
 						<div>
 							<span class="font-medium text-surface-700 dark:text-surface-300">{item.userName}</span>
 							<span class="text-surface-500">{actionLabel(item.action)}</span>
@@ -332,11 +461,9 @@
 					<div class="rounded-md border border-surface-300 p-3 dark:border-surface-800">
 						<div class="mb-1 flex items-center justify-between">
 							<div class="flex items-center gap-2 text-xs">
+								<Avatar name={comment.userName} size="xs" />
 								<span class="font-medium text-surface-700 dark:text-surface-300">{comment.userName}</span>
 								<span class="text-surface-400 dark:text-surface-600">{formatDate(comment.createdAt)}</span>
-								{#if comment.updatedAt > comment.createdAt}
-									<span class="text-surface-400 dark:text-surface-600">(edited)</span>
-								{/if}
 							</div>
 							{#if data.user && comment.userId === data.user.id}
 								<div class="flex gap-1">
@@ -381,7 +508,7 @@
 					<MentionInput
 						bind:value={commentBody}
 						users={data.members}
-						placeholder="Write a comment (markdown supported, @mention users)..."
+						placeholder="Write a comment (markdown supported, @mention users)... Ctrl+Enter to submit"
 						rows={3}
 					/>
 					<div class="mt-2 flex justify-end">
@@ -417,6 +544,21 @@
 					<span class="text-[10px] opacity-60">({data.watchers.length})</span>
 				{/if}
 			</button>
+
+			<div>
+				<label for="task-type" class="mb-1 block text-xs text-surface-500">Type</label>
+				<select
+					id="task-type"
+					value={data.task.type || 'task'}
+					onchange={(e) => updateField('type', e.currentTarget.value)}
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+				>
+					<option value="task">Task</option>
+					<option value="bug">Bug</option>
+					<option value="feature">Feature</option>
+					<option value="improvement">Improvement</option>
+				</select>
+			</div>
 
 			<div>
 				<label for="task-status" class="mb-1 block text-xs text-surface-500">Status</label>

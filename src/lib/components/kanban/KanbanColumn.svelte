@@ -11,10 +11,18 @@
 		id: string;
 		number: number;
 		title: string;
+		type?: 'task' | 'bug' | 'feature' | 'improvement';
 		priority: 'urgent' | 'high' | 'medium' | 'low';
 		statusId: string;
 		assigneeId?: string | null;
+		assigneeName?: string | null;
+		dueDate?: number | null;
 		labels?: Array<{ name: string; color: string }>;
+		checklistTotal?: number;
+		checklistDone?: number;
+		commentCount?: number;
+		subtaskTotal?: number;
+		subtaskDone?: number;
 		position: number;
 	}
 
@@ -25,9 +33,10 @@
 		ondrop: (e: DragEvent, statusId: string) => void;
 		ondragstart: (e: DragEvent, task: Task) => void;
 		ontaskclick?: (task: Task) => void;
+		focusedTaskId?: string | null;
 	}
 
-	let { status, tasks, projectSlug, ondrop, ondragstart, ontaskclick }: Props = $props();
+	let { status, tasks, projectSlug, ondrop, ondragstart, ontaskclick, focusedTaskId }: Props = $props();
 	let dragover = $state(false);
 
 	function handleDragOver(e: DragEvent) {
@@ -47,7 +56,7 @@
 </script>
 
 <div
-	class="flex w-72 shrink-0 flex-col rounded-lg {dragover ? 'bg-surface-200/60 dark:bg-surface-800/60' : ''}"
+	class="flex w-72 shrink-0 flex-col rounded-lg transition-all duration-150 {dragover ? 'bg-surface-200/60 ring-2 ring-brand-500/20 dark:bg-surface-800/60' : ''}"
 	ondragover={handleDragOver}
 	ondragleave={handleDragLeave}
 	ondrop={handleDrop}
@@ -66,7 +75,13 @@
 				{projectSlug}
 				ondragstart={(e) => ondragstart(e, task)}
 				onclick={ontaskclick ? () => ontaskclick(task) : undefined}
+				focused={focusedTaskId === task.id}
 			/>
 		{/each}
+		{#if tasks.length === 0}
+			<div class="rounded-md border border-dashed border-surface-300 px-3 py-6 text-center text-xs text-surface-400 dark:border-surface-700">
+				Drag tasks here
+			</div>
+		{/if}
 	</div>
 </div>

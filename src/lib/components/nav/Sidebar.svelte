@@ -1,6 +1,7 @@
 <script lang="ts">
 	import FolderTree from './FolderTree.svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import { theme, toggleTheme } from '$lib/stores/theme.js';
 
 	interface Props {
@@ -85,7 +86,10 @@
 
 	<div class="border-t border-surface-300 px-4 py-3 dark:border-surface-800">
 		<div class="flex items-center justify-between">
-			<a href="/settings" onclick={onclose} class="text-sm text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100">
+			<a href="/settings" onclick={onclose} class="flex items-center gap-2 text-sm text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100">
+				{#if user}
+					<Avatar name={user.name} size="sm" />
+				{/if}
 				{user?.name}
 			</a>
 			<div class="flex items-center gap-1">

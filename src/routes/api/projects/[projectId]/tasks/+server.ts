@@ -8,9 +8,10 @@ import {
 	activityLog,
 	taskLabelAssignments,
 	taskLabels,
-	users
+	users,
+	projects
 } from '$lib/server/db/schema.js';
-import { eq, and, desc, asc, sql, like, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, like, inArray, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastTaskCreated } from '$lib/server/ws/handlers.js';
 import { fireWebhooks } from '$lib/server/webhooks/fire.js';
@@ -24,6 +25,8 @@ export const GET: RequestHandler = async (event) => {
 	const priority = url.searchParams.get('priority');
 	const assigneeId = url.searchParams.get('assignee');
 	const search = url.searchParams.get('q');
+	const type = url.searchParams.get('type');
+	const parentId = url.searchParams.get('parentId');
 	const sortBy = url.searchParams.get('sort') || 'position';
 	const sortDir = url.searchParams.get('dir') || 'asc';
 
@@ -33,6 +36,14 @@ export const GET: RequestHandler = async (event) => {
 	if (priority) conditions.push(eq(tasks.priority, priority as 'urgent' | 'high' | 'medium' | 'low'));
 	if (assigneeId) conditions.push(eq(tasks.assigneeId, assigneeId));
 	if (search) conditions.push(like(tasks.title, `%${search}%`));
+	if (type) conditions.push(eq(tasks.type, type as 'task' | 'bug' | 'feature' | 'improvement'));
+
+	// Filter by parentId: if 'none' => top-level only, if a specific ID => children of that task
+	if (parentId === 'none') {
+		conditions.push(isNull(tasks.parentId));
+	} else if (parentId) {
+		conditions.push(eq(tasks.parentId, parentId));
+	}
 
 	const orderCol =
 		sortBy === 'created' ? tasks.createdAt :
@@ -85,11 +96,20 @@ export const GET: RequestHandler = async (event) => {
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const projectId = event.params.projectId;
-	const { title, description, statusId, priority, assigneeId, dueDate, labelIds } =
+	const { title, description, statusId, priority, assigneeId, dueDate, labelIds, type, parentId } =
 		await event.request.json();
 
 	if (!title?.trim()) {
 		return json({ error: 'Title is required' }, { status: 400 });
+	}
+
+	// Resolve assignee: use provided or project default
+	let resolvedAssigneeId = assigneeId || null;
+	if (!resolvedAssigneeId) {
+		const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
+		if (project?.defaultAssigneeId) {
+			resolvedAssigneeId = project.defaultAssigneeId;
+		}
 	}
 
 	// Auto-increment number per project
@@ -138,9 +158,11 @@ export const POST: RequestHandler = async (event) => {
 		number,
 		title: title.trim(),
 		description: description?.trim() || null,
+		type: type || 'task',
 		statusId: resolvedStatusId,
 		priority: priority || 'medium',
-		assigneeId: assigneeId || null,
+		assigneeId: resolvedAssigneeId,
+		parentId: parentId || null,
 		createdBy: user.id,
 		dueDate: dueDate || null,
 		position,

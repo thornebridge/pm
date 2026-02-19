@@ -1,15 +1,32 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { fade } from 'svelte/transition';
 	import { connectWs, disconnectWs } from '$lib/stores/websocket.js';
-	import { handleGlobalKeydown, registerShortcut, unregisterShortcut, registerMetaShortcut, unregisterMetaShortcut, SHORTCUT_HELP } from '$lib/utils/keyboard.js';
+	import { handleGlobalKeydown, registerShortcut, unregisterShortcut, registerMetaShortcut, unregisterMetaShortcut, SHORTCUT_GROUPS } from '$lib/utils/keyboard.js';
 	import Sidebar from '$lib/components/nav/Sidebar.svelte';
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
+	import QuickCreateTask from '$lib/components/task/QuickCreateTask.svelte';
 
 	let { data, children } = $props();
 	let sidebarOpen = $state(false);
 	let showShortcuts = $state(false);
 	let showSearch = $state(false);
+	let showQuickCreate = $state(false);
+
+	// Derive current project slug from URL
+	const currentProjectSlug = $derived.by(() => {
+		const match = page.url.pathname.match(/^\/projects\/([^/]+)/);
+		return match ? match[1] : null;
+	});
+
+	// Derive current project ID for quick create
+	const currentProjectId = $derived.by(() => {
+		if (!currentProjectSlug) return undefined;
+		const p = data.sidebarProjects.find((p) => p.slug === currentProjectSlug);
+		return p?.id;
+	});
 
 	onMount(() => {
 		connectWs();
@@ -19,11 +36,14 @@
 		registerShortcut('m', () => goto('/my-tasks'));
 		registerShortcut('a', () => goto('/activity'));
 		registerShortcut('/', () => (showSearch = true));
+		registerShortcut('n', () => (showQuickCreate = true));
 		registerShortcut('escape', () => {
 			showShortcuts = false;
 			showSearch = false;
+			showQuickCreate = false;
 		});
 		registerMetaShortcut('k', () => (showSearch = true));
+		registerMetaShortcut('n', () => (showQuickCreate = true));
 	});
 	onDestroy(() => {
 		disconnectWs();
@@ -33,8 +53,10 @@
 		unregisterShortcut('m');
 		unregisterShortcut('a');
 		unregisterShortcut('/');
+		unregisterShortcut('n');
 		unregisterShortcut('escape');
 		unregisterMetaShortcut('k');
+		unregisterMetaShortcut('n');
 	});
 </script>
 
@@ -44,7 +66,9 @@
 	<!-- Mobile overlay -->
 	{#if sidebarOpen}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="fixed inset-0 z-40 bg-black/30 dark:bg-black/50 md:hidden" onclick={() => (sidebarOpen = false)} onkeydown={() => {}}></div>
+		<div class="fixed inset-0 z-40 md:hidden" onclick={() => (sidebarOpen = false)} onkeydown={() => {}} transition:fade={{ duration: 150 }}>
+			<div class="absolute inset-0 bg-black/30 dark:bg-black/50"></div>
+		</div>
 	{/if}
 
 	<Sidebar
@@ -73,23 +97,44 @@
 </div>
 
 <!-- Search palette -->
-<SearchPalette open={showSearch} onclose={() => (showSearch = false)} />
+<SearchPalette
+	open={showSearch}
+	onclose={() => (showSearch = false)}
+	projectSlug={currentProjectSlug}
+	isAdmin={data.user?.role === 'admin'}
+/>
+
+<!-- Quick create task -->
+<QuickCreateTask
+	open={showQuickCreate}
+	onclose={() => (showQuickCreate = false)}
+	projects={data.sidebarProjects}
+	currentProjectId={currentProjectId}
+/>
 
 <!-- Keyboard shortcuts help modal -->
 {#if showShortcuts}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 dark:bg-black/60"
+		class="fixed inset-0 z-[100] flex items-center justify-center"
 		onclick={() => (showShortcuts = false)}
 		onkeydown={(e) => { if (e.key === 'Escape') showShortcuts = false; }}
 	>
-		<div class="w-80 rounded-lg border border-surface-300 bg-surface-50 p-4 shadow-xl dark:border-surface-700 dark:bg-surface-900">
+		<div class="absolute inset-0 bg-black/40 dark:bg-black/60" transition:fade={{ duration: 150 }}></div>
+		<div class="relative w-96 rounded-lg border border-surface-300 bg-surface-50 p-4 shadow-xl dark:border-surface-700 dark:bg-surface-900">
 			<h3 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Keyboard Shortcuts</h3>
-			<div class="space-y-2">
-				{#each SHORTCUT_HELP as shortcut}
-					<div class="flex items-center justify-between">
-						<span class="text-sm text-surface-600 dark:text-surface-400">{shortcut.description}</span>
-						<kbd class="rounded border border-surface-300 bg-surface-200 px-1.5 py-0.5 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300">{shortcut.key}</kbd>
+			<div class="space-y-4">
+				{#each SHORTCUT_GROUPS as group}
+					<div>
+						<h4 class="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-surface-500">{group.group}</h4>
+						<div class="space-y-1.5">
+							{#each group.shortcuts as shortcut}
+								<div class="flex items-center justify-between">
+									<span class="text-sm text-surface-600 dark:text-surface-400">{shortcut.description}</span>
+									<kbd class="rounded border border-surface-300 bg-surface-200 px-1.5 py-0.5 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300">{shortcut.key}</kbd>
+								</div>
+							{/each}
+						</div>
 					</div>
 				{/each}
 			</div>

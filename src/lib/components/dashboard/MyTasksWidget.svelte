@@ -1,11 +1,12 @@
 <script lang="ts">
 	import PriorityIcon from '$lib/components/task/PriorityIcon.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 
 	interface Task {
 		id: string;
 		number: number;
 		title: string;
-		priority: string;
+		priority: 'urgent' | 'high' | 'medium' | 'low';
 		dueDate: number | null;
 		statusName: string;
 		statusColor: string;
@@ -31,9 +32,9 @@
 	</div>
 
 	{#if openTasks.length === 0}
-		<p class="rounded-lg border border-surface-300 bg-surface-50 p-4 text-sm text-surface-500 dark:border-surface-800 dark:bg-surface-900">
-			No tasks assigned to you.
-		</p>
+		<div class="rounded-lg border border-surface-300 bg-surface-50 dark:border-surface-800 dark:bg-surface-900">
+			<EmptyState icon="\u2705" title="All clear!" description="No tasks assigned to you. Enjoy the peace." compact />
+		</div>
 	{:else}
 		<div class="space-y-1">
 			{#each openTasks as task (task.id)}

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import PriorityIcon from '$lib/components/task/PriorityIcon.svelte';
+	import TaskTypeIcon from '$lib/components/task/TaskTypeIcon.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import BulkActions from '$lib/components/task/BulkActions.svelte';
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
@@ -11,8 +13,10 @@
 	let search = $state('');
 	let filterStatus = $state('');
 	let filterPriority = $state('');
+	let filterType = $state('');
 	let sortBy = $state<'number' | 'priority' | 'created'>('number');
 	let selectedIds = $state<string[]>([]);
+	let focusedIndex = $state(-1);
 
 	// Saved views
 	interface SavedView {
@@ -39,7 +43,7 @@
 				method: 'POST',
 				body: JSON.stringify({
 					name: viewName,
-					filters: { search, filterStatus, filterPriority, sortBy }
+					filters: { search, filterStatus, filterPriority, filterType, sortBy }
 				})
 			});
 			savedViews = [...savedViews, view];
@@ -56,6 +60,7 @@
 		search = f.search || '';
 		filterStatus = f.filterStatus || '';
 		filterPriority = f.filterPriority || '';
+		filterType = f.filterType || '';
 		sortBy = f.sortBy || 'number';
 	}
 
@@ -72,7 +77,8 @@
 	const statusMap = $derived(new Map(data.statuses.map((s) => [s.id, s])));
 
 	const filteredTasks = $derived(() => {
-		let result = data.tasks;
+		// Filter out subtasks
+		let result = data.tasks.filter((t) => !t.parentId);
 
 		if (search) {
 			const q = search.toLowerCase();
@@ -83,6 +89,9 @@
 		}
 		if (filterPriority) {
 			result = result.filter((t) => t.priority === filterPriority);
+		}
+		if (filterType) {
+			result = result.filter((t) => t.type === filterType);
 		}
 
 		const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
@@ -116,11 +125,31 @@
 			selectedIds = [...selectedIds, id];
 		}
 	}
+
+	// J/K navigation
+	function handleListKeydown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement;
+		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
+		const tasks = filteredTasks();
+		if (e.key === 'j') {
+			e.preventDefault();
+			focusedIndex = Math.min(focusedIndex + 1, tasks.length - 1);
+		} else if (e.key === 'k') {
+			e.preventDefault();
+			focusedIndex = Math.max(focusedIndex - 1, 0);
+		} else if (e.key === 'Enter' && focusedIndex >= 0 && tasks[focusedIndex]) {
+			e.preventDefault();
+			window.location.href = `/projects/${data.project.slug}/task/${tasks[focusedIndex].number}`;
+		}
+	}
 </script>
 
 <svelte:head>
 	<title>{data.project.name} - List</title>
 </svelte:head>
+
+<svelte:window onkeydown={handleListKeydown} />
 
 <div class="p-6">
 	<!-- Saved views -->
@@ -169,6 +198,16 @@
 			<option value="low">Low</option>
 		</select>
 		<select
+			bind:value={filterType}
+			class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
+		>
+			<option value="">All types</option>
+			<option value="task">Task</option>
+			<option value="bug">Bug</option>
+			<option value="feature">Feature</option>
+			<option value="improvement">Improvement</option>
+		</select>
+		<select
 			bind:value={sortBy}
 			class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
 		>
@@ -211,14 +250,15 @@
 					</th>
 					<th class="px-4 py-2 w-12">#</th>
 					<th class="px-4 py-2 w-8"></th>
+					<th class="px-4 py-2 w-8"></th>
 					<th class="px-4 py-2">Title</th>
 					<th class="px-4 py-2 w-28">Status</th>
 					<th class="px-4 py-2 w-20">Labels</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each filteredTasks() as task (task.id)}
-					<tr class="border-b border-surface-200 hover:bg-surface-100 dark:border-surface-800/50 dark:hover:bg-surface-800/30 {selectedIds.includes(task.id) ? 'bg-brand-50 dark:bg-brand-900/10' : ''}">
+				{#each filteredTasks() as task, i (task.id)}
+					<tr class="border-b border-surface-200 transition-colors hover:bg-surface-100 dark:border-surface-800/50 dark:hover:bg-surface-800/30 {selectedIds.includes(task.id) ? 'bg-brand-50 dark:bg-brand-900/10' : ''} {focusedIndex === i ? 'ring-1 ring-inset ring-brand-500/40' : ''}">
 						<td class="px-3 py-2">
 							<input
 								type="checkbox"
@@ -228,6 +268,11 @@
 							/>
 						</td>
 						<td class="px-4 py-2 text-xs text-surface-500">{task.number}</td>
+						<td class="px-4 py-2">
+							{#if task.type && task.type !== 'task'}
+								<TaskTypeIcon type={task.type} />
+							{/if}
+						</td>
 						<td class="px-4 py-2"><PriorityIcon priority={task.priority} /></td>
 						<td class="px-4 py-2">
 							<a
@@ -256,7 +301,9 @@
 					</tr>
 				{:else}
 					<tr>
-						<td colspan="6" class="px-4 py-8 text-center text-sm text-surface-500">No tasks found</td>
+						<td colspan="7" class="px-4 py-8 text-center">
+							<EmptyState icon="\uD83D\uDD0D" title="No tasks found" description="Try adjusting your filters." compact />
+						</td>
 					</tr>
 				{/each}
 			</tbody>

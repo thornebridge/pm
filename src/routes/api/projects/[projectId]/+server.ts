@@ -19,12 +19,15 @@ export const GET: RequestHandler = async (event) => {
 
 export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
-	const { name, description, color } = await event.request.json();
+	const body = await event.request.json();
 	const updates: Record<string, unknown> = { updatedAt: Date.now() };
 
-	if (name !== undefined) updates.name = name.trim();
-	if (description !== undefined) updates.description = description?.trim() || null;
-	if (color !== undefined) updates.color = color;
+	if (body.name !== undefined) updates.name = body.name.trim();
+	if (body.description !== undefined) updates.description = body.description?.trim() || null;
+	if (body.color !== undefined) updates.color = body.color;
+	if (body.archived !== undefined) updates.archived = body.archived;
+	if (body.readme !== undefined) updates.readme = body.readme?.trim() || null;
+	if (body.defaultAssigneeId !== undefined) updates.defaultAssigneeId = body.defaultAssigneeId || null;
 
 	const result = db
 		.update(projects)

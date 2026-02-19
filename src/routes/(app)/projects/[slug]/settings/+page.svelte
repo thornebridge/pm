@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { api } from '$lib/utils/api.js';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, goto } from '$app/navigation';
 	import { showToast } from '$lib/stores/toasts.js';
+	import MarkdownPreview from '$lib/components/markdown/MarkdownPreview.svelte';
 
 	let { data } = $props();
 
@@ -14,6 +15,15 @@
 	let importFile = $state<File | null>(null);
 	let importing = $state(false);
 	let importResult = $state<{ imported: number; total: number } | null>(null);
+
+	// README state
+	let editingReadme = $state(false);
+	let readmeInput = $state(data.project.readme ?? '');
+	$effect(() => { readmeInput = data.project.readme ?? ''; });
+
+	// Default assignee
+	let defaultAssigneeId = $state(data.project.defaultAssigneeId ?? '');
+	$effect(() => { defaultAssigneeId = data.project.defaultAssigneeId ?? ''; });
 
 	async function addStatus() {
 		if (!newStatusName.trim()) return;
@@ -50,6 +60,47 @@
 		}
 	}
 
+	async function saveReadme() {
+		try {
+			await api(`/api/projects/${data.project.id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ readme: readmeInput || null })
+			});
+			editingReadme = false;
+			await invalidateAll();
+			showToast('README saved');
+		} catch {
+			showToast('Failed to save README', 'error');
+		}
+	}
+
+	async function updateDefaultAssignee() {
+		try {
+			await api(`/api/projects/${data.project.id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ defaultAssigneeId: defaultAssigneeId || null })
+			});
+			await invalidateAll();
+			showToast('Default assignee updated');
+		} catch {
+			showToast('Failed to update', 'error');
+		}
+	}
+
+	async function toggleArchive() {
+		const newState = !data.project.archived;
+		try {
+			await api(`/api/projects/${data.project.id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ archived: newState })
+			});
+			showToast(newState ? 'Project archived' : 'Project unarchived');
+			await invalidateAll();
+		} catch {
+			showToast('Failed to update project', 'error');
+		}
+	}
+
 	async function handleImport() {
 		if (!importFile) return;
 		importing = true;
@@ -58,7 +109,6 @@
 			const formData = new FormData();
 			formData.append('file', importFile);
 
-			// Use fetch directly for FormData (no JSON content-type)
 			const csrfMatch = document.cookie.match(/(?:^|;\s*)pm_csrf=([^;]*)/);
 			const res = await fetch(`/api/projects/${data.project.id}/import`, {
 				method: 'POST',
@@ -88,6 +138,53 @@
 </svelte:head>
 
 <div class="mx-auto max-w-xl p-6">
+	<!-- README -->
+	<section class="mb-8">
+		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Project README</h2>
+		{#if editingReadme}
+			<textarea
+				bind:value={readmeInput}
+				rows={8}
+				placeholder="Write a project overview (markdown supported)..."
+				class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+			></textarea>
+			<div class="mt-2 flex gap-2">
+				<button onclick={saveReadme} class="rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white hover:bg-brand-500">Save</button>
+				<button onclick={() => { editingReadme = false; readmeInput = data.project.readme ?? ''; }} class="text-xs text-surface-600 hover:text-surface-900 dark:text-surface-400">Cancel</button>
+			</div>
+		{:else if data.project.readme}
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div onclick={() => (editingReadme = true)} onkeydown={() => {}} class="cursor-pointer rounded-md bg-surface-100 p-4 hover:ring-1 hover:ring-brand-500/30 dark:bg-surface-800/50">
+				<MarkdownPreview content={data.project.readme} />
+			</div>
+		{:else}
+			<button onclick={() => (editingReadme = true)} class="w-full rounded-md border border-dashed border-surface-300 p-4 text-left text-sm text-surface-500 hover:border-brand-500 hover:text-brand-600 dark:border-surface-700">
+				Add a project README...
+			</button>
+		{/if}
+	</section>
+
+	<!-- Default Assignee -->
+	<section class="mb-8">
+		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Default Assignee</h2>
+		<p class="mb-2 text-xs text-surface-500">Automatically assigned to new tasks when no assignee is specified.</p>
+		<div class="flex items-center gap-2">
+			<select
+				bind:value={defaultAssigneeId}
+				class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+			>
+				<option value="">None</option>
+				{#each data.members as member}
+					<option value={member.id}>{member.name}</option>
+				{/each}
+			</select>
+			<button
+				onclick={updateDefaultAssignee}
+				class="rounded-md bg-surface-200 px-3 py-1.5 text-sm text-surface-700 hover:bg-surface-300 dark:bg-surface-700 dark:text-surface-200 dark:hover:bg-surface-600"
+			>Save</button>
+		</div>
+	</section>
+
 	<!-- Statuses -->
 	<section class="mb-8">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Statuses</h2>
@@ -165,14 +262,14 @@
 	</section>
 
 	<!-- Import -->
-	<section>
+	<section class="mb-8">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Import Tasks</h2>
 		<p class="mb-3 text-xs text-surface-500">
 			Upload a CSV file with columns: <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">title</code> (required),
 			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">description</code>,
-			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">priority</code> (urgent/high/medium/low),
-			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">status</code> (match by name),
-			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">assignee</code> (name or email),
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">priority</code>,
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">status</code>,
+			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">assignee</code>,
 			<code class="rounded bg-surface-200 px-1 dark:bg-surface-800">due_date</code>.
 		</p>
 		<div class="flex items-center gap-2">
@@ -198,5 +295,28 @@
 				Successfully imported {importResult.imported} of {importResult.total} tasks.
 			</p>
 		{/if}
+	</section>
+
+	<!-- Archive -->
+	<section class="border-t border-surface-300 pt-8 dark:border-surface-800">
+		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Danger Zone</h2>
+		<div class="rounded-md border border-surface-300 p-4 dark:border-surface-800">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-sm font-medium text-surface-900 dark:text-surface-100">
+						{data.project.archived ? 'Unarchive project' : 'Archive project'}
+					</p>
+					<p class="text-xs text-surface-500">
+						{data.project.archived ? 'Restore this project to the sidebar and active projects list.' : 'Hide this project from the sidebar. It can be restored later.'}
+					</p>
+				</div>
+				<button
+					onclick={toggleArchive}
+					class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-600 hover:border-surface-400 hover:text-surface-900 dark:border-surface-700 dark:text-surface-400 dark:hover:text-surface-100"
+				>
+					{data.project.archived ? 'Unarchive' : 'Archive'}
+				</button>
+			</div>
+		</div>
 	</section>
 </div>

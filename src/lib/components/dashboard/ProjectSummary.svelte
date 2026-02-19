@@ -1,4 +1,6 @@
 <script lang="ts">
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+
 	interface Project {
 		id: string;
 		name: string;
@@ -29,9 +31,9 @@
 	<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Projects</h2>
 
 	{#if projects.length === 0}
-		<p class="rounded-lg border border-surface-300 bg-surface-50 p-4 text-sm text-surface-500 dark:border-surface-800 dark:bg-surface-900">
-			No projects yet.
-		</p>
+		<div class="rounded-lg border border-surface-300 bg-surface-50 dark:border-surface-800 dark:bg-surface-900">
+			<EmptyState icon="\uD83D\uDCC1" title="No projects yet" description="Create your first project to start organizing work." actionHref="/projects/new" actionLabel="New project" compact />
+		</div>
 	{:else}
 		<div class="grid gap-2 sm:grid-cols-2">
 			{#each projects as project (project.id)}

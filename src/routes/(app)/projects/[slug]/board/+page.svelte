@@ -12,6 +12,7 @@
 	let title = $state('');
 	let description = $state('');
 	let priority = $state<'urgent' | 'high' | 'medium' | 'low'>('medium');
+	let type = $state<'task' | 'bug' | 'feature' | 'improvement'>('task');
 	let assigneeId = $state('');
 	let dueDate = $state('');
 	let selectedLabelIds = $state<string[]>([]);
@@ -20,6 +21,9 @@
 	// Inline task detail panel
 	let panelTask = $state<any>(null);
 	let panelLoading = $state(false);
+
+	// J/K navigation
+	let focusedTaskId = $state<string | null>(null);
 
 	async function openTaskPanel(task: { id: string; number: number }) {
 		panelLoading = true;
@@ -54,6 +58,7 @@
 					title,
 					description: description || undefined,
 					priority,
+					type,
 					assigneeId: assigneeId || undefined,
 					dueDate: dueDate ? new Date(dueDate).getTime() : undefined,
 					labelIds: selectedLabelIds.length > 0 ? selectedLabelIds : undefined
@@ -73,6 +78,7 @@
 		title = '';
 		description = '';
 		priority = 'medium';
+		type = 'task';
 		assigneeId = '';
 		dueDate = '';
 		selectedLabelIds = [];
@@ -86,13 +92,47 @@
 		}
 	}
 
+	// Get flat list of tasks for J/K navigation
+	function getAllBoardTasks() {
+		const sorted = [...data.statuses].sort((a, b) => a.position - b.position);
+		const result: Array<{ id: string; number: number }> = [];
+		for (const status of sorted) {
+			const statusTasks = data.tasks
+				.filter((t) => t.statusId === status.id && !t.parentId)
+				.sort((a, b) => a.position - b.position);
+			result.push(...statusTasks);
+		}
+		return result;
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
+		const target = e.target as HTMLElement;
+		if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
 		if (e.key === 'c' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-			const target = e.target as HTMLElement;
-			if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 			if (panelTask) return;
 			e.preventDefault();
 			showCreate = true;
+			return;
+		}
+
+		const allTasks = getAllBoardTasks();
+		if (allTasks.length === 0) return;
+
+		const currentIdx = focusedTaskId ? allTasks.findIndex((t) => t.id === focusedTaskId) : -1;
+
+		if (e.key === 'j') {
+			e.preventDefault();
+			const next = Math.min(currentIdx + 1, allTasks.length - 1);
+			focusedTaskId = allTasks[next].id;
+		} else if (e.key === 'k') {
+			e.preventDefault();
+			const prev = Math.max(currentIdx - 1, 0);
+			focusedTaskId = allTasks[prev].id;
+		} else if (e.key === 'Enter' && focusedTaskId) {
+			e.preventDefault();
+			const task = allTasks.find((t) => t.id === focusedTaskId);
+			if (task) openTaskPanel(task);
 		}
 	}
 </script>
@@ -120,6 +160,7 @@
 		projectId={data.project.id}
 		projectSlug={data.project.slug}
 		ontaskclick={(task) => openTaskPanel(task)}
+		{focusedTaskId}
 	/>
 </div>
 
@@ -147,6 +188,19 @@
 
 		<div class="grid grid-cols-2 gap-3">
 			<div>
+				<label for="create-type" class="mb-1 block text-xs text-surface-600 dark:text-surface-400">Type</label>
+				<select
+					id="create-type"
+					bind:value={type}
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+				>
+					<option value="task">Task</option>
+					<option value="bug">Bug</option>
+					<option value="feature">Feature</option>
+					<option value="improvement">Improvement</option>
+				</select>
+			</div>
+			<div>
 				<label for="create-priority" class="mb-1 block text-xs text-surface-600 dark:text-surface-400">Priority</label>
 				<select
 					id="create-priority"
@@ -159,6 +213,9 @@
 					<option value="low">Low</option>
 				</select>
 			</div>
+		</div>
+
+		<div class="grid grid-cols-2 gap-3">
 			<div>
 				<label for="create-assignee" class="mb-1 block text-xs text-surface-600 dark:text-surface-400">Assignee</label>
 				<select
@@ -172,16 +229,15 @@
 					{/each}
 				</select>
 			</div>
-		</div>
-
-		<div>
-			<label for="create-due" class="mb-1 block text-xs text-surface-600 dark:text-surface-400">Due date</label>
-			<input
-				id="create-due"
-				type="date"
-				bind:value={dueDate}
-				class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-			/>
+			<div>
+				<label for="create-due" class="mb-1 block text-xs text-surface-600 dark:text-surface-400">Due date</label>
+				<input
+					id="create-due"
+					type="date"
+					bind:value={dueDate}
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+				/>
+			</div>
 		</div>
 
 		{#if data.labels.length > 0}

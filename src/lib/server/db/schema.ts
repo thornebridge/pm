@@ -59,6 +59,9 @@ export const projects = sqliteTable('projects', {
 	description: text('description'),
 	color: text('color').notNull().default('#2d4f3e'),
 	folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+	archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+	readme: text('readme'),
+	defaultAssigneeId: text('default_assignee_id').references(() => users.id, { onDelete: 'set null' }),
 	createdBy: text('created_by')
 		.notNull()
 		.references(() => users.id),
@@ -118,10 +121,12 @@ export const tasks = sqliteTable(
 		statusId: text('status_id')
 			.notNull()
 			.references(() => taskStatuses.id),
+		type: text('type', { enum: ['task', 'bug', 'feature', 'improvement'] }).notNull().default('task'),
 		priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] })
 			.notNull()
 			.default('medium'),
 		assigneeId: text('assignee_id').references(() => users.id),
+		parentId: text('parent_id'),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
@@ -137,7 +142,8 @@ export const tasks = sqliteTable(
 		index('idx_tasks_board').on(table.projectId, table.statusId, table.position),
 		uniqueIndex('idx_tasks_number').on(table.projectId, table.number),
 		index('idx_tasks_assignee').on(table.assigneeId),
-		index('idx_tasks_sprint').on(table.sprintId)
+		index('idx_tasks_sprint').on(table.sprintId),
+		index('idx_tasks_parent').on(table.parentId)
 	]
 );
 
@@ -351,6 +357,7 @@ export const taskTemplates = sqliteTable('task_templates', {
 	name: text('name').notNull(),
 	title: text('title').notNull(),
 	description: text('description'),
+	type: text('type', { enum: ['task', 'bug', 'feature', 'improvement'] }).default('task'),
 	priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] }).default('medium'),
 	labelIds: text('label_ids'),
 	createdAt: integer('created_at', { mode: 'number' }).notNull()

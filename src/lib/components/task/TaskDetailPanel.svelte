@@ -1,15 +1,21 @@
 <script lang="ts">
+	import { fly, fade } from 'svelte/transition';
 	import PriorityIcon from './PriorityIcon.svelte';
+	import TaskTypeIcon from './TaskTypeIcon.svelte';
+	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import Badge from '$lib/components/ui/Badge.svelte';
 	import MarkdownPreview from '$lib/components/markdown/MarkdownPreview.svelte';
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
+	import { pushScope, popScope } from '$lib/utils/keyboard.js';
+	import { onDestroy } from 'svelte';
 
 	interface TaskDetail {
 		id: string;
 		number: number;
 		title: string;
 		description: string | null;
+		type?: 'task' | 'bug' | 'feature' | 'improvement';
 		priority: 'urgent' | 'high' | 'medium' | 'low';
 		statusId: string;
 		assigneeId: string | null;
@@ -56,6 +62,9 @@
 	let commentBody = $state('');
 	let submitting = $state(false);
 
+	// Contextual keyboard scope
+	let scope: ReturnType<typeof pushScope> | null = null;
+
 	$effect(() => {
 		if (task) {
 			titleInput = task.title;
@@ -63,11 +72,42 @@
 			editingTitle = false;
 			editingDescription = false;
 			commentBody = '';
+
+			// Push contextual shortcuts
+			if (scope) popScope(scope);
+			const sortedStatuses = [...statuses].sort((a, b) => a.position - b.position);
+			const priorities: Array<'urgent' | 'high' | 'medium' | 'low'> = ['urgent', 'high', 'medium', 'low'];
+			scope = pushScope(
+				{
+					'1': () => sortedStatuses[0] && updateField('statusId', sortedStatuses[0].id),
+					'2': () => sortedStatuses[1] && updateField('statusId', sortedStatuses[1].id),
+					'3': () => sortedStatuses[2] && updateField('statusId', sortedStatuses[2].id),
+					'4': () => sortedStatuses[3] && updateField('statusId', sortedStatuses[3].id),
+					'e': () => (editingDescription = true),
+					't': () => (editingTitle = true)
+				},
+				{
+					'1': () => updateField('priority', priorities[0]),
+					'2': () => updateField('priority', priorities[1]),
+					'3': () => updateField('priority', priorities[2]),
+					'4': () => updateField('priority', priorities[3])
+				}
+			);
+		} else {
+			if (scope) {
+				popScope(scope);
+				scope = null;
+			}
 		}
+	});
+
+	onDestroy(() => {
+		if (scope) popScope(scope);
 	});
 
 	const statusMap = $derived(new Map(statuses.map((s) => [s.id, s])));
 	const currentStatus = $derived(task ? statusMap.get(task.statusId) : null);
+	const memberMap = $derived(new Map(members.map((m) => [m.id, m.name])));
 
 	async function updateField(field: string, value: unknown) {
 		if (!task) return;
@@ -160,23 +200,35 @@
 	function handleBackdrop(e: MouseEvent) {
 		if (e.target === e.currentTarget) onclose();
 	}
+
+	function handleCommentKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+			e.preventDefault();
+			addComment();
+		}
+	}
 </script>
 
 {#if task}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 z-50 flex justify-end bg-black/30 dark:bg-black/50"
+		class="fixed inset-0 z-50 flex justify-end"
 		onkeydown={handleKeydown}
 		onclick={handleBackdrop}
 	>
+		<div class="absolute inset-0 bg-black/30 dark:bg-black/50" transition:fade={{ duration: 150 }}></div>
 		<div
-			class="flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-surface-300 bg-surface-50 shadow-2xl dark:border-surface-700 dark:bg-surface-900"
+			class="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-surface-300 bg-surface-50 shadow-2xl dark:border-surface-700 dark:bg-surface-900"
 			role="dialog"
 			aria-modal="true"
+			transition:fly={{ x: 300, duration: 200 }}
 		>
 			<!-- Header -->
 			<div class="flex items-center justify-between border-b border-surface-300 px-4 py-3 dark:border-surface-800">
 				<div class="flex items-center gap-2">
+					{#if task.type && task.type !== 'task'}
+						<TaskTypeIcon type={task.type} />
+					{/if}
 					{#if currentStatus}
 						<span class="h-2.5 w-2.5 rounded-full" style="background-color: {currentStatus.color}"></span>
 						<span class="text-xs font-medium text-surface-600 dark:text-surface-400">{currentStatus.name}</span>
@@ -272,6 +324,21 @@
 						</div>
 					</div>
 
+					<!-- Type selector -->
+					<div class="mb-4">
+						<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Type</label>
+						<select
+							value={task.type || 'task'}
+							onchange={(e) => updateField('type', e.currentTarget.value)}
+							class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+						>
+							<option value="task">Task</option>
+							<option value="bug">Bug</option>
+							<option value="feature">Feature</option>
+							<option value="improvement">Improvement</option>
+						</select>
+					</div>
+
 					<!-- Labels -->
 					{#if task.labels.length > 0}
 						<div class="mb-4 flex flex-wrap gap-1">
@@ -340,7 +407,7 @@
 						<div class="space-y-2">
 							{#each task.activity as item (item.id)}
 								<div class="flex items-start gap-2 text-xs">
-									<span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-surface-400 dark:bg-surface-600"></span>
+									<Avatar name={item.userName} size="xs" />
 									<div>
 										<span class="font-medium text-surface-700 dark:text-surface-300">{item.userName}</span>
 										<span class="text-surface-500">{actionLabel(item.action)}</span>
@@ -352,6 +419,7 @@
 							{#each task.comments as comment (comment.id)}
 								<div class="rounded-md border border-surface-300 p-2.5 dark:border-surface-800">
 									<div class="mb-1 flex items-center gap-2 text-[10px]">
+										<Avatar name={comment.userName} size="xs" />
 										<span class="font-medium text-surface-700 dark:text-surface-300">{comment.userName}</span>
 										<span class="text-surface-400">{formatDate(comment.createdAt)}</span>
 									</div>
@@ -366,7 +434,8 @@
 						<form onsubmit={(e) => { e.preventDefault(); addComment(); }} class="mt-3">
 							<textarea
 								bind:value={commentBody}
-								placeholder="Write a comment..."
+								onkeydown={handleCommentKeydown}
+								placeholder="Write a comment... (Ctrl+Enter to submit)"
 								rows={2}
 								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-xs text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 							></textarea>

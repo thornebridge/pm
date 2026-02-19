@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS `saved_views` (
 	`filters` text NOT NULL,
 	`created_at` integer NOT NULL
 );
-
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS `idx_views_project_user` ON `saved_views` (`project_id`, `user_id`);
-
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS `webhooks` (
 	`id` text PRIMARY KEY NOT NULL,
 	`url` text NOT NULL,

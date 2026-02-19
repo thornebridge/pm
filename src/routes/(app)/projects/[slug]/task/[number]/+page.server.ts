@@ -13,7 +13,7 @@ import {
 	checklistItems,
 	taskWatchers
 } from '$lib/server/db/schema.js';
-import { eq, and, asc } from 'drizzle-orm';
+import { eq, and, asc, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { user } = await parent();
@@ -86,5 +86,48 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 
 	const isWatching = user ? watcherRows.some((w) => w.userId === user.id) : false;
 
-	return { task, labels, activity, comments: taskComments, statuses, checklist, watchers: watcherRows, isWatching };
+	// Subtasks
+	const subtasks = db
+		.select({
+			id: tasks.id,
+			number: tasks.number,
+			title: tasks.title,
+			statusId: tasks.statusId,
+			priority: tasks.priority,
+			type: tasks.type,
+			assigneeId: tasks.assigneeId
+		})
+		.from(tasks)
+		.where(eq(tasks.parentId, task.id))
+		.orderBy(asc(tasks.createdAt))
+		.all();
+
+	// Parent info (if this is a subtask)
+	let parentTask = null;
+	if (task.parentId) {
+		parentTask = db
+			.select({ id: tasks.id, number: tasks.number, title: tasks.title })
+			.from(tasks)
+			.where(eq(tasks.id, task.parentId))
+			.get() || null;
+	}
+
+	const members = db
+		.select({ id: users.id, name: users.name })
+		.from(users)
+		.all();
+
+	return {
+		task,
+		labels,
+		activity,
+		comments: taskComments,
+		statuses,
+		checklist,
+		watchers: watcherRows,
+		isWatching,
+		subtasks,
+		parentTask,
+		members
+	};
 };

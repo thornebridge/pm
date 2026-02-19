@@ -12,9 +12,10 @@
 		placeholder?: string;
 		rows?: number;
 		onchange?: (value: string) => void;
+		onsubmit?: () => void;
 	}
 
-	let { value = $bindable(), users, placeholder = '', rows = 3, onchange }: Props = $props();
+	let { value = $bindable(), users, placeholder = '', rows = 3, onchange, onsubmit }: Props = $props();
 
 	let showDropdown = $state(false);
 	let mentionQuery = $state('');
@@ -88,6 +89,9 @@
 				showDropdown = false;
 				e.stopPropagation();
 			}
+		} else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && onsubmit) {
+			e.preventDefault();
+			onsubmit();
 		}
 	}
 </script>

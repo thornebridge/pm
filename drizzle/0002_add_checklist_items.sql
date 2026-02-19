@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS `checklist_items` (
 	`position` integer NOT NULL DEFAULT 0,
 	`created_at` integer NOT NULL
 );
-
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS `idx_checklist_task` ON `checklist_items` (`task_id`, `position`);

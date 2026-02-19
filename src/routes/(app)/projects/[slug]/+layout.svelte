@@ -13,6 +13,13 @@
 </script>
 
 <div class="flex h-full flex-col">
+	<!-- Archived banner -->
+	{#if data.project.archived}
+		<div class="bg-amber-50 border-b border-amber-200 px-6 py-2 text-xs text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400">
+			This project is archived. Go to <a href="/projects/{slug}/settings" class="font-medium underline hover:no-underline">Settings</a> to unarchive it.
+		</div>
+	{/if}
+
 	<!-- Project header -->
 	<div class="flex items-center gap-4 border-b border-surface-300 px-6 py-3 dark:border-surface-800">
 		<div class="flex items-center gap-2">

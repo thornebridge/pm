@@ -15,11 +15,20 @@
 		id: string;
 		number: number;
 		title: string;
+		type?: 'task' | 'bug' | 'feature' | 'improvement';
 		priority: 'urgent' | 'high' | 'medium' | 'low';
 		statusId: string;
 		assigneeId?: string | null;
+		assigneeName?: string | null;
+		dueDate?: number | null;
 		labels?: Array<{ name: string; color: string }>;
+		checklistTotal?: number;
+		checklistDone?: number;
+		commentCount?: number;
+		subtaskTotal?: number;
+		subtaskDone?: number;
 		position: number;
+		parentId?: string | null;
 	}
 
 	interface Props {
@@ -28,15 +37,17 @@
 		projectId: string;
 		projectSlug: string;
 		ontaskclick?: (task: Task) => void;
+		focusedTaskId?: string | null;
 	}
 
-	let { statuses, tasks, projectId, projectSlug, ontaskclick }: Props = $props();
+	let { statuses, tasks, projectId, projectSlug, ontaskclick, focusedTaskId }: Props = $props();
 
 	let draggedTask: Task | null = $state(null);
 	let localTasks = $state<Task[]>([]);
 
 	$effect(() => {
-		localTasks = [...tasks];
+		// Filter out subtasks from board
+		localTasks = tasks.filter((t) => !t.parentId);
 	});
 
 	function tasksByStatus(statusId: string) {
@@ -51,10 +62,18 @@
 			e.dataTransfer.effectAllowed = 'move';
 			e.dataTransfer.setData('text/plain', task.id);
 		}
+		// Add drag visual
+		const el = (e.target as HTMLElement);
+		el.classList.add('opacity-50', 'rotate-1', 'scale-[1.02]');
 	}
 
 	async function handleDrop(e: DragEvent, targetStatusId: string) {
 		if (!draggedTask) return;
+
+		// Remove drag visual from all cards
+		document.querySelectorAll('.opacity-50.rotate-1').forEach((el) => {
+			el.classList.remove('opacity-50', 'rotate-1', 'scale-[1.02]');
+		});
 
 		const task = draggedTask;
 		draggedTask = null;
@@ -90,6 +109,7 @@
 			ondrop={handleDrop}
 			ondragstart={handleDragStart}
 			{ontaskclick}
+			{focusedTaskId}
 		/>
 	{/each}
 </div>

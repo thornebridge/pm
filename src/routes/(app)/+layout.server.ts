@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
 import { folders, projects } from '$lib/server/db/schema.js';
-import { desc } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) {
@@ -16,15 +16,19 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			name: projects.name,
 			slug: projects.slug,
 			color: projects.color,
-			folderId: projects.folderId
+			folderId: projects.folderId,
+			archived: projects.archived
 		})
 		.from(projects)
 		.orderBy(desc(projects.updatedAt))
 		.all();
 
+	// Sidebar only shows non-archived projects
+	const sidebarProjects = allProjects.filter((p) => !p.archived);
+
 	return {
 		user: locals.user,
 		folders: allFolders,
-		sidebarProjects: allProjects
+		sidebarProjects
 	};
 };

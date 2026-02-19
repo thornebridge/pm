@@ -8,9 +8,11 @@ import {
 	taskLabelAssignments,
 	taskLabels,
 	comments,
-	users
+	users,
+	taskStatuses,
+	checklistItems
 } from '$lib/server/db/schema.js';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastTaskUpdated, broadcastTaskDeleted } from '$lib/server/ws/handlers.js';
 import { notifyTaskAssigned, notifyStatusChanged } from '$lib/server/notifications/triggers.js';
@@ -62,7 +64,33 @@ export const GET: RequestHandler = async (event) => {
 		.orderBy(asc(comments.createdAt))
 		.all();
 
-	return json({ ...task, labels, activity, comments: taskComments });
+	const checklist = db
+		.select()
+		.from(checklistItems)
+		.where(eq(checklistItems.taskId, task.id))
+		.orderBy(asc(checklistItems.position))
+		.all();
+
+	// Subtask counts
+	const subtaskSummary = db
+		.select({
+			total: sql<number>`count(*)`,
+			done: sql<number>`sum(case when ${taskStatuses.isClosed} = 1 then 1 else 0 end)`
+		})
+		.from(tasks)
+		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
+		.where(eq(tasks.parentId, task.id))
+		.get();
+
+	return json({
+		...task,
+		labels,
+		activity,
+		comments: taskComments,
+		checklist,
+		subtaskTotal: subtaskSummary?.total || 0,
+		subtaskDone: subtaskSummary?.done || 0
+	});
 };
 
 export const PATCH: RequestHandler = async (event) => {
@@ -113,6 +141,12 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 	if (body.position !== undefined) {
 		updates.position = body.position;
+	}
+	if (body.type !== undefined) {
+		updates.type = body.type;
+	}
+	if (body.parentId !== undefined) {
+		updates.parentId = body.parentId || null;
 	}
 
 	db.update(tasks).set(updates).where(eq(tasks.id, taskId)).run();
