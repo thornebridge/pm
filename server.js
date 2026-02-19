@@ -3,6 +3,8 @@ import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { randomBytes } from 'node:crypto';
 import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -61,6 +63,11 @@ setInterval(() => {
 
 const snapshotDb = new Database(process.env.DATABASE_URL || './data/pm.db');
 snapshotDb.pragma('journal_mode = WAL');
+snapshotDb.pragma('foreign_keys = ON');
+
+// Run migrations before preparing any statements to ensure all tables exist
+migrate(drizzle(snapshotDb), { migrationsFolder: './drizzle' });
+console.log('[migrations] Database migrations applied');
 
 function generateSnapshots() {
 	const today = new Date();
