@@ -14,6 +14,7 @@ import {
 	users
 } from '$lib/server/db/schema.js';
 import { eq, count, desc, sql } from 'drizzle-orm';
+import { createRevenueJournalEntry } from '$lib/server/financials/crm-sync.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -89,7 +90,7 @@ export const GET: RequestHandler = async (event) => {
 };
 
 export const PATCH: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { opportunityId } = event.params;
 
 	const existing = db
@@ -121,6 +122,7 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	// Handle stage change
+	let stageIsWon = false;
 	if ('stageId' in body && body.stageId !== existing.stageId) {
 		updates.stageId = body.stageId;
 
@@ -134,6 +136,10 @@ export const PATCH: RequestHandler = async (event) => {
 			updates.actualCloseDate = Date.now();
 		} else if (!newStage?.isClosed && existing.actualCloseDate) {
 			updates.actualCloseDate = null;
+		}
+
+		if (newStage?.isWon) {
+			stageIsWon = true;
 		}
 
 		// Recalculate position in new stage
@@ -155,6 +161,23 @@ export const PATCH: RequestHandler = async (event) => {
 		.set(updates)
 		.where(eq(crmOpportunities.id, opportunityId))
 		.run();
+
+	// Auto-sync to Financials when opportunity is won
+	if (stageIsWon && existing.value) {
+		const company = db
+			.select({ name: crmCompanies.name })
+			.from(crmCompanies)
+			.where(eq(crmCompanies.id, existing.companyId))
+			.get();
+
+		createRevenueJournalEntry({
+			opportunityId,
+			companyId: existing.companyId,
+			amount: existing.value,
+			description: `Won: ${existing.title}${company ? ` (${company.name})` : ''}`,
+			userId: user.id
+		});
+	}
 
 	const updated = db
 		.select()

@@ -897,3 +897,189 @@ export const orgSettings = sqliteTable('org_settings', {
 	platformName: text('platform_name').notNull().default('PM'),
 	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 });
+
+// ─── Financials ─────────────────────────────────────────────────────────────
+
+export const finAccounts = sqliteTable(
+	'fin_accounts',
+	{
+		id: text('id').primaryKey(),
+		accountNumber: integer('account_number').notNull().unique(),
+		name: text('name').notNull(),
+		accountType: text('account_type', {
+			enum: ['asset', 'liability', 'equity', 'revenue', 'expense']
+		}).notNull(),
+		subtype: text('subtype'),
+		description: text('description'),
+		parentId: text('parent_id'),
+		normalBalance: text('normal_balance', { enum: ['debit', 'credit'] }).notNull(),
+		currency: text('currency').notNull().default('USD'),
+		active: integer('active', { mode: 'boolean' }).notNull().default(true),
+		isSystem: integer('is_system', { mode: 'boolean' }).notNull().default(false),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_fin_accounts_type_active').on(t.accountType, t.active),
+		index('idx_fin_accounts_parent').on(t.parentId)
+	]
+);
+
+export const finBankAccountMeta = sqliteTable(
+	'fin_bank_account_meta',
+	{
+		id: text('id').primaryKey(),
+		accountId: text('account_id')
+			.notNull()
+			.unique()
+			.references(() => finAccounts.id, { onDelete: 'cascade' }),
+		institutionName: text('institution_name'),
+		accountNumberLast4: text('account_number_last4'),
+		routingNumber: text('routing_number'),
+		accountSubtype: text('account_subtype', {
+			enum: ['checking', 'savings', 'credit_card', 'money_market', 'petty_cash', 'paypal', 'other']
+		}).notNull(),
+		openingBalance: integer('opening_balance').notNull().default(0),
+		openingBalanceDate: integer('opening_balance_date', { mode: 'number' }),
+		lastReconciledDate: integer('last_reconciled_date', { mode: 'number' }),
+		lastReconciledBalance: integer('last_reconciled_balance'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	}
+);
+
+export const finJournalEntries = sqliteTable(
+	'fin_journal_entries',
+	{
+		id: text('id').primaryKey(),
+		entryNumber: integer('entry_number').notNull(),
+		date: integer('date', { mode: 'number' }).notNull(),
+		description: text('description').notNull(),
+		memo: text('memo'),
+		referenceNumber: text('reference_number'),
+		status: text('status', { enum: ['draft', 'posted', 'voided'] }).notNull().default('draft'),
+		source: text('source', {
+			enum: ['manual', 'crm_sync', 'recurring', 'import', 'opening_balance', 'void_reversal']
+		}).notNull().default('manual'),
+		crmOpportunityId: text('crm_opportunity_id').references(() => crmOpportunities.id, { onDelete: 'set null' }),
+		crmProposalId: text('crm_proposal_id').references(() => crmProposals.id, { onDelete: 'set null' }),
+		crmCompanyId: text('crm_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+		voidedEntryId: text('voided_entry_id'),
+		voidedAt: integer('voided_at', { mode: 'number' }),
+		voidReason: text('void_reason'),
+		recurringRuleId: text('recurring_rule_id'),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_fin_je_date').on(t.date),
+		index('idx_fin_je_status_date').on(t.status, t.date),
+		index('idx_fin_je_source').on(t.source),
+		index('idx_fin_je_crm_opp').on(t.crmOpportunityId),
+		index('idx_fin_je_entry_number').on(t.entryNumber)
+	]
+);
+
+export const finJournalLines = sqliteTable(
+	'fin_journal_lines',
+	{
+		id: text('id').primaryKey(),
+		journalEntryId: text('journal_entry_id')
+			.notNull()
+			.references(() => finJournalEntries.id, { onDelete: 'cascade' }),
+		accountId: text('account_id')
+			.notNull()
+			.references(() => finAccounts.id),
+		debit: integer('debit').notNull().default(0),
+		credit: integer('credit').notNull().default(0),
+		memo: text('memo'),
+		position: integer('position').notNull().default(0),
+		reconciled: integer('reconciled', { mode: 'boolean' }).notNull().default(false),
+		reconciledAt: integer('reconciled_at', { mode: 'number' }),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_fin_jl_entry_pos').on(t.journalEntryId, t.position),
+		index('idx_fin_jl_account_entry').on(t.accountId, t.journalEntryId),
+		index('idx_fin_jl_account_reconciled').on(t.accountId, t.reconciled)
+	]
+);
+
+export const finRecurringRules = sqliteTable(
+	'fin_recurring_rules',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		description: text('description'),
+		frequency: text('frequency', {
+			enum: ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']
+		}).notNull(),
+		startDate: integer('start_date', { mode: 'number' }).notNull(),
+		endDate: integer('end_date', { mode: 'number' }),
+		nextOccurrence: integer('next_occurrence', { mode: 'number' }).notNull(),
+		autoPost: integer('auto_post', { mode: 'boolean' }).notNull().default(false),
+		status: text('status', { enum: ['active', 'paused', 'cancelled'] }).notNull().default('active'),
+		templateDescription: text('template_description').notNull(),
+		templateLines: text('template_lines').notNull(), // JSON: [{ accountId, debit, credit, memo }]
+		lastGeneratedAt: integer('last_generated_at', { mode: 'number' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_fin_rr_status_next').on(t.status, t.nextOccurrence),
+		index('idx_fin_rr_next').on(t.nextOccurrence)
+	]
+);
+
+export const finBudgets = sqliteTable(
+	'fin_budgets',
+	{
+		id: text('id').primaryKey(),
+		accountId: text('account_id')
+			.notNull()
+			.references(() => finAccounts.id, { onDelete: 'cascade' }),
+		periodType: text('period_type', { enum: ['monthly', 'quarterly', 'yearly'] }).notNull(),
+		periodStart: integer('period_start', { mode: 'number' }).notNull(),
+		periodEnd: integer('period_end', { mode: 'number' }).notNull(),
+		amount: integer('amount').notNull(),
+		notes: text('notes'),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_fin_budgets_account_period').on(t.accountId, t.periodStart),
+		uniqueIndex('idx_fin_budgets_unique').on(t.accountId, t.periodType, t.periodStart)
+	]
+);
+
+export const finReconciliations = sqliteTable(
+	'fin_reconciliations',
+	{
+		id: text('id').primaryKey(),
+		bankAccountId: text('bank_account_id')
+			.notNull()
+			.references(() => finAccounts.id),
+		statementDate: integer('statement_date', { mode: 'number' }).notNull(),
+		statementBalance: integer('statement_balance').notNull(),
+		reconciledBalance: integer('reconciled_balance'),
+		status: text('status', { enum: ['in_progress', 'completed'] }).notNull().default('in_progress'),
+		completedAt: integer('completed_at', { mode: 'number' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	}
+);
