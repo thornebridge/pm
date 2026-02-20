@@ -47,7 +47,10 @@
 </script>
 
 <section>
-	<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Recent Activity</h2>
+	<div class="mb-3 flex items-center justify-between">
+		<h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Recent Activity</h2>
+		<a href="/activity" class="text-xs text-surface-500 hover:text-surface-900 dark:hover:text-surface-100">View all</a>
+	</div>
 
 	{#if activity.length === 0}
 		<div class="rounded-lg border border-surface-300 bg-surface-50 dark:border-surface-800 dark:bg-surface-900">

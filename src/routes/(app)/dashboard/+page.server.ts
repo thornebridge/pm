@@ -39,7 +39,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.orderBy(desc(projects.updatedAt))
 		.all();
 
-	// Recent activity (last 20 entries)
+	// Recent activity (last 10 entries for dashboard)
 	const recentActivity = db
 		.select({
 			id: activityLog.id,
@@ -58,7 +58,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.innerJoin(users, eq(activityLog.userId, users.id))
 		.orderBy(desc(activityLog.createdAt))
-		.limit(20)
+		.limit(10)
 		.all();
 
 	// Overdue tasks assigned to me (open only)
