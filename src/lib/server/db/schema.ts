@@ -8,6 +8,7 @@ export const users = sqliteTable('users', {
 	name: text('name').notNull(),
 	passwordHash: text('password_hash').notNull(),
 	role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
+	activeThemeId: text('active_theme_id'),
 	createdAt: integer('created_at', { mode: 'number' }).notNull(),
 	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 });
@@ -738,3 +739,30 @@ export const crmProposals = sqliteTable(
 	},
 	(t) => [index('idx_crm_proposals_opp').on(t.opportunityId)]
 );
+
+// ─── User Themes ─────────────────────────────────────────────────────────────
+
+export const userThemes = sqliteTable(
+	'user_themes',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		description: text('description'),
+		source: text('source').notNull(),
+		variables: text('variables').notNull(),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_user_themes_user').on(t.userId)]
+);
+
+// ─── Organization Settings ───────────────────────────────────────────────────
+
+export const orgSettings = sqliteTable('org_settings', {
+	id: text('id').primaryKey(), // always 'default'
+	platformName: text('platform_name').notNull().default('PM'),
+	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+});

@@ -36,7 +36,7 @@
 				method: 'DELETE'
 			});
 			showToast('Sprint deleted');
-			goto(`/projects/${data.project.slug}/board`);
+			goto(`/projects/${data.project.slug}/sprints`, { replaceState: true });
 		} catch {
 			showToast('Failed to delete sprint', 'error');
 		} finally {
@@ -124,5 +124,6 @@
 		tasks={data.tasks}
 		projectId={data.project.id}
 		projectSlug={data.project.slug}
+		sprintId={data.sprint.id}
 	/>
 </div>

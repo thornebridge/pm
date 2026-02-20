@@ -2,7 +2,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
 import { sprints, tasks, taskStatuses, taskLabels, taskLabelAssignments } from '$lib/server/db/schema.js';
 import { eq, and, isNull, inArray } from 'drizzle-orm';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { project } = await parent();
@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		.get();
 
 	if (!sprint) {
-		throw error(404, 'Sprint not found');
+		throw redirect(302, `/projects/${project.slug}/sprints`);
 	}
 
 	const sprintTasks = db

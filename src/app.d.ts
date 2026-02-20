@@ -8,6 +8,7 @@ declare global {
 				role: 'admin' | 'member';
 			} | null;
 			sessionId: string | null;
+			themeMode: 'dark' | 'light';
 		}
 	}
 }

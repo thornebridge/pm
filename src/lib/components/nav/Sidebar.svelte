@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import FolderTree from './FolderTree.svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
@@ -11,9 +12,17 @@
 		onclose: () => void;
 		collapsed?: boolean;
 		ontogglecollapse?: () => void;
+		platformName?: string;
 	}
 
-	let { user, folders, projects, open, onclose, collapsed = false, ontogglecollapse }: Props = $props();
+	let { user, folders, projects, open, onclose, collapsed = false, ontogglecollapse, platformName = 'PM' }: Props = $props();
+
+	const operationsLinks = [
+		{ href: '/dashboard', label: 'Dashboard', icon: 'M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z' },
+		{ href: '/my-tasks', label: 'My Tasks', icon: 'M9 2a1 1 0 000 2h2a1 1 0 100-2H9z M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z' },
+		{ href: '/projects', label: 'Projects', icon: 'M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z' },
+		{ href: '/activity', label: 'Activity', icon: 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z' }
+	];
 
 	const crmLinks = [
 		{ href: '/crm/dashboard', label: 'Dashboard', icon: 'M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z' },
@@ -26,15 +35,32 @@
 		{ href: '/crm/proposals', label: 'Proposals', icon: 'M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zm14 4H2v6a2 2 0 002 2h12a2 2 0 002-2V8zm-6 3a1 1 0 100 2h3a1 1 0 100-2h-3z' }
 	];
 
+	// Persisted section collapse state
+	let sections = $state<Record<string, boolean>>(
+		browser ? JSON.parse(localStorage.getItem('pm-sidebar-sections') || '{}') : {}
+	);
+
+	function toggleSection(key: string) {
+		sections[key] = !sections[key];
+		localStorage.setItem('pm-sidebar-sections', JSON.stringify(sections));
+	}
+
+	function isActive(href: string): boolean {
+		return page.url.pathname === href || page.url.pathname.startsWith(href + '/');
+	}
+
 	function isCrmActive(href: string): boolean {
 		return page.url.pathname.startsWith(href);
 	}
+
+	const hasWorkspace = $derived(folders.length > 0 || projects.length > 0);
+	const hasTools = $derived(user?.role === 'admin');
 </script>
 
 <aside class="fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-surface-800 bg-surface-900 transition-all md:static md:translate-x-0 {open ? 'translate-x-0 w-60' : '-translate-x-full w-60'} {collapsed ? 'md:w-14' : 'md:w-60'}">
 	<div class="flex h-12 items-center justify-between px-4">
 		{#if !collapsed}
-			<span class="text-sm font-semibold text-surface-100">PM</span>
+			<span class="text-sm font-semibold text-surface-100">{platformName}</span>
 		{/if}
 		<button onclick={onclose} class="text-surface-500 hover:text-surface-300 md:hidden">&times;</button>
 		{#if ontogglecollapse}
@@ -50,69 +76,60 @@
 		{/if}
 	</div>
 
-	<nav class="flex-1 space-y-1 overflow-y-auto px-2 py-2">
-		<a
-			href="/dashboard"
-			onclick={onclose}
-			class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
-			title={collapsed ? 'Dashboard' : undefined}
-		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-				<path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-			</svg>
-			{#if !collapsed}<span>Dashboard</span>{/if}
-		</a>
-		<a
-			href="/my-tasks"
-			onclick={onclose}
-			class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
-			title={collapsed ? 'My Tasks' : undefined}
-		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-				<path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-				<path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-			</svg>
-			{#if !collapsed}<span>My Tasks</span>{/if}
-		</a>
-		<a
-			href="/projects"
-			onclick={onclose}
-			class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
-			title={collapsed ? 'Projects' : undefined}
-		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-				<path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
-			</svg>
-			{#if !collapsed}<span>Projects</span>{/if}
-		</a>
-		<a
-			href="/activity"
-			onclick={onclose}
-			class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
-			title={collapsed ? 'Activity' : undefined}
-		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-				<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
-			</svg>
-			{#if !collapsed}<span>Activity</span>{/if}
-		</a>
-		<!-- Sales / CRM section -->
+	<nav class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
+		<!-- Operations section -->
 		{#if !collapsed}
-			<div class="pt-3 pb-1 px-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Sales</span>
-			</div>
-			{#each crmLinks as link (link.href)}
+			<button
+				onclick={() => toggleSection('operations')}
+				class="group flex w-full items-center gap-1 px-2 pt-1 pb-1"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.operations ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
+					<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+				</svg>
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Operations</span>
+			</button>
+		{/if}
+		{#if !sections.operations}
+			{#each operationsLinks as link (link.href)}
 				<a
 					href={link.href}
 					onclick={onclose}
-					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
+					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'} {collapsed ? 'justify-center' : ''}"
+					title={collapsed ? link.label : undefined}
 				>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
 						<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
 					</svg>
-					<span>{link.label}</span>
+					{#if !collapsed}<span>{link.label}</span>{/if}
 				</a>
 			{/each}
+		{/if}
+
+		<!-- Sales / CRM section -->
+		{#if !collapsed}
+			<button
+				onclick={() => toggleSection('sales')}
+				class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.sales ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
+					<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+				</svg>
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Sales</span>
+			</button>
+			{#if !sections.sales}
+				{#each crmLinks as link (link.href)}
+					<a
+						href={link.href}
+						onclick={onclose}
+						class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
+						</svg>
+						<span>{link.label}</span>
+					</a>
+				{/each}
+			{/if}
 		{:else}
 			<div class="mt-3 flex flex-col items-center">
 				<a
@@ -128,38 +145,63 @@
 			</div>
 		{/if}
 
-		{#if user?.role === 'admin'}
-			<a
-				href="/admin"
-				onclick={onclose}
-				class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
-				title={collapsed ? 'Admin' : undefined}
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
-				</svg>
-				{#if !collapsed}<span>Admin</span>{/if}
-			</a>
+		<!-- Tools section (admin only) -->
+		{#if hasTools}
+			{#if !collapsed}
+				<button
+					onclick={() => toggleSection('tools')}
+					class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.tools ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+					</svg>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Tools</span>
+				</button>
+			{/if}
+			{#if !sections.tools}
+				<a
+					href="/admin"
+					onclick={onclose}
+					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
+					title={collapsed ? 'Admin' : undefined}
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+					</svg>
+					{#if !collapsed}<span>Admin</span>{/if}
+				</a>
+			{/if}
 		{/if}
 
-		{#if !collapsed && (folders.length > 0 || projects.length > 0)}
-			<div class="pt-3 pb-1 px-2">
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Workspace</span>
-			</div>
-			<FolderTree {folders} {projects} onnavigate={onclose} />
-		{/if}
-
-		{#if collapsed && projects.length > 0}
-			<div class="mt-3 flex flex-col items-center gap-1.5">
-				{#each projects as project (project.id)}
-					<a
-						href="/projects/{project.slug}/home"
-						title={project.name}
-						class="h-2.5 w-2.5 rounded-full transition-transform hover:scale-150"
-						style="background-color: {project.color}"
-					></a>
-				{/each}
-			</div>
+		<!-- Workspace section -->
+		{#if hasWorkspace}
+			{#if !collapsed}
+				<button
+					onclick={() => toggleSection('workspace')}
+					class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.workspace ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+					</svg>
+					<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Workspace</span>
+				</button>
+				{#if !sections.workspace}
+					<FolderTree {folders} {projects} onnavigate={onclose} />
+				{/if}
+			{:else}
+				{#if projects.length > 0}
+					<div class="mt-3 flex flex-col items-center gap-1.5">
+						{#each projects as project (project.id)}
+							<a
+								href="/projects/{project.slug}/home"
+								title={project.name}
+								class="h-2.5 w-2.5 rounded-full transition-transform hover:scale-150"
+								style="background-color: {project.color}"
+							></a>
+						{/each}
+					</div>
+				{/if}
+			{/if}
 		{/if}
 	</nav>
 

@@ -2,6 +2,7 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
+	import { setActiveTheme } from '$lib/stores/theme.js';
 
 	let { data } = $props();
 
@@ -28,6 +29,25 @@
 	let digestHour = $state(8);
 	let savingNotifs = $state(false);
 
+	// Theme state
+	let themes = $state<Array<{ id: string; name: string; description: string | null; variables: Record<string, string>; builtin: boolean }>>([]);
+	let themesLoaded = $state(false);
+	let importSource = $state('');
+	let importing = $state(false);
+	let importError = $state('');
+
+	// Determine active theme ID from current data
+	const activeThemeId = $derived.by(() => {
+		// If no themeVariables override, it's Forest (default)
+		if (!data.themeVariables) return 'forest';
+		// Match against loaded themes
+		const match = themes.find((t) => {
+			const vars = t.variables;
+			return vars && data.themeVariables && vars['--color-brand-500'] === data.themeVariables['--color-brand-500'];
+		});
+		return match?.id ?? 'forest';
+	});
+
 	const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 	$effect(() => {
@@ -48,6 +68,13 @@
 			digestHour = prefs.digestHour ?? 8;
 			notifLoaded = true;
 		}).catch(() => { notifLoaded = true; });
+	});
+
+	// Load themes
+	$effect(() => {
+		api<Array<{ id: string; name: string; description: string | null; variables: Record<string, string>; builtin: boolean }>>('/api/themes')
+			.then((t) => { themes = t; themesLoaded = true; })
+			.catch(() => { themesLoaded = true; });
 	});
 
 	async function saveNotifs() {
@@ -113,6 +140,70 @@
 		}
 	}
 
+	async function activateTheme(themeId: string) {
+		try {
+			await setActiveTheme(themeId);
+			showToast('Theme applied');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to apply theme', 'error');
+		}
+	}
+
+	async function importTheme() {
+		if (!importSource.trim()) return;
+		importing = true;
+		importError = '';
+		try {
+			const result = await api<{ id: string; name: string }>('/api/themes', {
+				method: 'POST',
+				body: JSON.stringify({ source: importSource })
+			});
+			showToast(`Theme "${result.name}" imported`);
+			importSource = '';
+			// Reload themes and activate the new one
+			const updated = await api<typeof themes>('/api/themes');
+			themes = updated;
+			await setActiveTheme(result.id);
+		} catch (err) {
+			if (err instanceof Error) {
+				importError = err.message;
+			}
+			showToast('Failed to import theme', 'error');
+		} finally {
+			importing = false;
+		}
+	}
+
+	async function exportTheme(themeId: string) {
+		try {
+			const result = await api<{ source: string }>(`/api/themes/${themeId}`);
+			await navigator.clipboard.writeText(result.source);
+			showToast('Theme copied to clipboard');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to export theme', 'error');
+		}
+	}
+
+	async function deleteTheme(themeId: string) {
+		try {
+			await api(`/api/themes/${themeId}`, { method: 'DELETE' });
+			themes = themes.filter((t) => t.id !== themeId);
+			await invalidateAll();
+			showToast('Theme deleted');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to delete theme', 'error');
+		}
+	}
+
+	function getSwatches(variables: Record<string, string>): string[] {
+		return [
+			variables['--color-brand-500'] || '#888',
+			variables['--color-brand-700'] || '#666',
+			variables['--color-surface-800'] || '#444',
+			variables['--color-surface-900'] || '#222'
+		];
+	}
+
 	async function logout() {
 		await fetch('/api/auth/logout', { method: 'POST' });
 		goto('/login');
@@ -125,6 +216,74 @@
 
 <div class="mx-auto max-w-md p-6">
 	<h1 class="mb-6 text-lg font-semibold text-surface-900 dark:text-surface-100">Settings</h1>
+
+	<!-- Appearance -->
+	<section class="mb-6">
+		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Appearance</h2>
+		{#if themesLoaded}
+			<div class="grid grid-cols-3 gap-2">
+				{#each themes as theme (theme.id)}
+					<button
+						onclick={() => activateTheme(theme.id)}
+						class="relative rounded-lg border p-2.5 text-left transition-colors {activeThemeId === theme.id ? 'border-brand-500 ring-1 ring-brand-500' : 'border-surface-300 hover:border-surface-400 dark:border-surface-700 dark:hover:border-surface-600'}"
+					>
+						<div class="mb-1.5 flex gap-1">
+							{#each getSwatches(theme.variables) as color}
+								<div class="h-3 w-3 rounded-full" style="background-color: {color}"></div>
+							{/each}
+						</div>
+						<span class="block text-xs font-medium text-surface-800 dark:text-surface-200">{theme.name}</span>
+						{#if !theme.builtin}
+							<div class="mt-1 flex gap-1">
+								<button
+									onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
+									class="text-[10px] text-surface-400 hover:text-surface-200"
+									title="Copy to clipboard"
+								>Export</button>
+								<button
+									onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
+									class="text-[10px] text-surface-400 hover:text-red-400"
+									title="Delete theme"
+								>Delete</button>
+							</div>
+						{:else}
+							<button
+								onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
+								class="mt-1 text-[10px] text-surface-400 hover:text-surface-200"
+								title="Copy to clipboard"
+							>Export</button>
+						{/if}
+					</button>
+				{/each}
+			</div>
+
+			<!-- Import theme -->
+			<div class="mt-4">
+				<label for="import-theme" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Import .pmtheme</label>
+				<textarea
+					id="import-theme"
+					bind:value={importSource}
+					placeholder="Paste .pmtheme markdown here..."
+					rows={4}
+					class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 font-mono text-xs text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+				></textarea>
+				{#if importError}
+					<p class="mt-1 text-xs text-red-500">{importError}</p>
+				{/if}
+				<div class="mt-2 flex justify-end">
+					<button
+						onclick={importTheme}
+						disabled={importing || !importSource.trim()}
+						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+					>
+						{importing ? 'Importing...' : 'Import'}
+					</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-sm text-surface-400">Loading themes...</p>
+		{/if}
+	</section>
 
 	<!-- Profile -->
 	<section class="mb-6">

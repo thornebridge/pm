@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { fade, scale } from 'svelte/transition';
-	import { theme, toggleTheme } from '$lib/stores/theme.js';
+	import { themeMode, toggleTheme } from '$lib/stores/theme.js';
 
 	interface Props {
 		open: boolean;
@@ -42,7 +42,7 @@
 			{ id: 'nav-my-tasks', label: 'Go to My Tasks', group: 'Navigation', shortcut: 'M', action: () => navigate('/my-tasks') },
 			{ id: 'nav-activity', label: 'Go to Activity', group: 'Navigation', shortcut: 'A', action: () => navigate('/activity') },
 			// Actions
-			{ id: 'action-theme', label: `Toggle Theme (${$theme === 'light' ? 'to dark' : 'to light'})`, group: 'Actions', action: () => { toggleTheme(); onclose(); } }
+			{ id: 'action-theme', label: `Toggle Theme (${$themeMode === 'light' ? 'to dark' : 'to light'})`, group: 'Actions', action: () => { toggleTheme(); onclose(); } }
 		];
 
 		if (isAdmin) {

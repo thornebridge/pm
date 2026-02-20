@@ -97,7 +97,7 @@ export const GET: RequestHandler = async (event) => {
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const projectId = event.params.projectId;
-	const { title, description, statusId, priority, assigneeId, dueDate, labelIds, type, parentId, recurrence } =
+	const { title, description, statusId, priority, assigneeId, dueDate, labelIds, type, parentId, recurrence, sprintId } =
 		await event.request.json();
 
 	if (!title?.trim()) {
@@ -164,6 +164,7 @@ export const POST: RequestHandler = async (event) => {
 		priority: priority || 'medium',
 		assigneeId: resolvedAssigneeId,
 		parentId: parentId || null,
+		sprintId: sprintId || null,
 		createdBy: user.id,
 		dueDate: dueDate || null,
 		recurrence: recurrence ? JSON.stringify(recurrence) : null,

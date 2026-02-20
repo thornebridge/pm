@@ -6,11 +6,12 @@
 	interface Props {
 		projectId: string;
 		statusId?: string;
+		sprintId?: string;
 		placeholder?: string;
 		class?: string;
 	}
 
-	let { projectId, statusId, placeholder = 'New task...', class: className = '' }: Props = $props();
+	let { projectId, statusId, sprintId, placeholder = 'New task...', class: className = '' }: Props = $props();
 
 	let value = $state('');
 	let submitting = $state(false);
@@ -23,6 +24,7 @@
 		try {
 			const body: Record<string, unknown> = { title };
 			if (statusId) body.statusId = statusId;
+			if (sprintId) body.sprintId = sprintId;
 			await api(`/api/projects/${projectId}/tasks`, {
 				method: 'POST',
 				body: JSON.stringify(body)

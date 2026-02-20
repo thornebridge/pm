@@ -36,6 +36,28 @@
 		return p?.id;
 	});
 
+	// Build theme CSS override string from server-loaded variables
+	const themeCss = $derived.by(() => {
+		if (!data.themeVariables) return '';
+		const entries = Object.entries(data.themeVariables)
+			.map(([k, v]) => `${k}: ${v};`)
+			.join(' ');
+		return `@theme { ${entries} }`;
+	});
+
+	// Manage dark/light class on <html> element
+	$effect(() => {
+		if (!browser) return;
+		const html = document.documentElement;
+		if (data.themeMode === 'light') {
+			html.classList.remove('dark');
+			html.classList.add('light');
+		} else {
+			html.classList.remove('light');
+			html.classList.add('dark');
+		}
+	});
+
 	onMount(() => {
 		connectWs();
 		registerShortcut('?', () => (showShortcuts = !showShortcuts));
@@ -70,6 +92,12 @@
 
 <svelte:window onkeydown={handleGlobalKeydown} />
 
+<svelte:head>
+	{#if themeCss}
+		{@html `<style>${themeCss}</style>`}
+	{/if}
+</svelte:head>
+
 <div class="flex h-screen overflow-hidden">
 	<!-- Mobile overlay -->
 	{#if sidebarOpen}
@@ -87,6 +115,7 @@
 		onclose={() => (sidebarOpen = false)}
 		collapsed={sidebarCollapsed}
 		ontogglecollapse={toggleSidebarCollapse}
+		platformName={data.platformName}
 	/>
 
 	<!-- Main content -->
@@ -98,7 +127,7 @@
 					<path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" />
 				</svg>
 			</button>
-			<span class="ml-3 text-sm font-semibold text-surface-900 dark:text-surface-100">PM</span>
+			<span class="ml-3 text-sm font-semibold text-surface-900 dark:text-surface-100">{data.platformName}</span>
 		</header>
 		<main class="flex-1 overflow-auto">
 			{@render children()}

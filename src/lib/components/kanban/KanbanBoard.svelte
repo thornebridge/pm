@@ -36,11 +36,12 @@
 		tasks: Task[];
 		projectId: string;
 		projectSlug: string;
+		sprintId?: string;
 		ontaskclick?: (task: Task) => void;
 		focusedTaskId?: string | null;
 	}
 
-	let { statuses, tasks, projectId, projectSlug, ontaskclick, focusedTaskId }: Props = $props();
+	let { statuses, tasks, projectId, projectSlug, sprintId, ontaskclick, focusedTaskId }: Props = $props();
 
 	let draggedTask: Task | null = $state(null);
 	let localTasks = $state<Task[]>([]);
@@ -107,6 +108,7 @@
 			tasks={tasksByStatus(status.id)}
 			{projectId}
 			{projectSlug}
+			{sprintId}
 			ondrop={handleDrop}
 			ondragstart={handleDragStart}
 			{ontaskclick}

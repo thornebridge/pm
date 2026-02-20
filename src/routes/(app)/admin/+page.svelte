@@ -7,7 +7,34 @@
 
 	let { data } = $props();
 
-	let tab = $state<'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('invites');
+	let tab = $state<'org' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
+
+	// Org settings state
+	let orgPlatformName = $state('');
+	let orgLoaded = $state(false);
+	let savingOrg = $state(false);
+
+	$effect(() => {
+		api<{ platformName: string }>('/api/admin/org')
+			.then((org) => { orgPlatformName = org.platformName; orgLoaded = true; })
+			.catch(() => { orgLoaded = true; });
+	});
+
+	async function saveOrgSettings() {
+		savingOrg = true;
+		try {
+			await api('/api/admin/org', {
+				method: 'PUT',
+				body: JSON.stringify({ platformName: orgPlatformName })
+			});
+			await invalidateAll();
+			showToast('Organization settings saved');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
+		} finally {
+			savingOrg = false;
+		}
+	}
 
 	// Invite state
 	let email = $state('');
@@ -195,7 +222,7 @@
 
 	<!-- Tabs -->
 	<div class="mb-6 flex gap-1 overflow-x-auto border-b border-surface-300 dark:border-surface-800">
-		{#each [['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
+		{#each [['org', 'Organization'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
 			<button
 				onclick={() => (tab = key as typeof tab)}
 				class="whitespace-nowrap px-3 py-2 text-sm font-medium transition {tab === key ? 'border-b-2 border-brand-500 text-brand-600 dark:text-brand-400' : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100'}"
@@ -205,7 +232,35 @@
 		{/each}
 	</div>
 
-	{#if tab === 'invites'}
+	{#if tab === 'org'}
+		{#if orgLoaded}
+			<div class="space-y-4">
+				<div>
+					<label for="platform-name" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Platform Name</label>
+					<input
+						id="platform-name"
+						bind:value={orgPlatformName}
+						maxlength={30}
+						placeholder="PM"
+						class="w-full max-w-xs rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+					/>
+					<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Displayed in the sidebar and mobile header. Max 30 characters.</p>
+				</div>
+				<div>
+					<button
+						onclick={saveOrgSettings}
+						disabled={savingOrg}
+						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+					>
+						{savingOrg ? 'Saving...' : 'Save'}
+					</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-sm text-surface-400">Loading...</p>
+		{/if}
+
+	{:else if tab === 'invites'}
 		<form
 			onsubmit={(e) => { e.preventDefault(); createInvite(); }}
 			class="mb-6 flex items-end gap-2"

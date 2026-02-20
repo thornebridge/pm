@@ -4,6 +4,10 @@ import { seed } from '$lib/server/db/seed.js';
 import { checkRateLimit } from '$lib/server/security/rateLimit.js';
 import { generateCsrfToken, validateCsrf } from '$lib/server/security/csrf.js';
 import { startAutomationPoller } from '$lib/server/automations/polling.js';
+import { db } from '$lib/server/db/index.js';
+import { users, userThemes } from '$lib/server/db/schema.js';
+import { eq, and } from 'drizzle-orm';
+import { getBuiltinTheme } from '$lib/server/theme/builtins.js';
 
 // Run seed on first request
 let seeded = false;
@@ -31,6 +35,33 @@ export const handle: Handle = async ({ event, resolve }) => {
 	} else {
 		event.locals.user = null;
 		event.locals.sessionId = null;
+	}
+
+	// Determine theme mode for SSR
+	event.locals.themeMode = 'dark';
+	if (event.locals.user) {
+		const userRow = db
+			.select({ activeThemeId: users.activeThemeId })
+			.from(users)
+			.where(eq(users.id, event.locals.user.id))
+			.get();
+
+		if (userRow?.activeThemeId) {
+			const builtin = getBuiltinTheme(userRow.activeThemeId);
+			if (builtin) {
+				event.locals.themeMode = builtin.mode;
+			} else {
+				const custom = db
+					.select({ source: userThemes.source })
+					.from(userThemes)
+					.where(and(eq(userThemes.id, userRow.activeThemeId), eq(userThemes.userId, event.locals.user.id)))
+					.get();
+				if (custom) {
+					const modeMatch = custom.source.match(/mode:\s*(dark|light)/);
+					event.locals.themeMode = (modeMatch?.[1] as 'dark' | 'light') || 'dark';
+				}
+			}
+		}
 	}
 
 	// Rate limiting on API routes
@@ -81,5 +112,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 		generateCsrfToken(event.cookies);
 	}
 
-	return resolve(event);
+	return resolve(event, {
+		transformPageChunk: ({ html }) => {
+			return html.replace('%pm.theme_class%', event.locals.themeMode);
+		}
+	});
 };
