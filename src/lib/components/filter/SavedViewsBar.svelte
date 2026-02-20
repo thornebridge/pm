@@ -15,6 +15,9 @@
 		filters: string;
 		userId: string;
 		shared: boolean;
+		projectId: string;
+		createdAt: number;
+		updatedAt: number;
 	}
 
 	interface Props {

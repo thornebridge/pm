@@ -8,7 +8,7 @@
 		id: string;
 		number: number;
 		title: string;
-		priority: string;
+		priority: 'urgent' | 'high' | 'medium' | 'low';
 		estimatePoints: number | null;
 		labels?: Array<{ name: string; color: string }>;
 	}

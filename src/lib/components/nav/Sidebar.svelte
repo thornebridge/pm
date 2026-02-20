@@ -2,6 +2,7 @@
 	import FolderTree from './FolderTree.svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
+	import { page } from '$app/state';
 	interface Props {
 		user: { name: string; role: string } | null;
 		folders: Array<{ id: string; name: string; slug: string; parentId: string | null; color: string | null; position: number }>;
@@ -13,6 +14,21 @@
 	}
 
 	let { user, folders, projects, open, onclose, collapsed = false, ontogglecollapse }: Props = $props();
+
+	const crmLinks = [
+		{ href: '/crm/dashboard', label: 'Dashboard', icon: 'M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z' },
+		{ href: '/crm/pipeline', label: 'Pipeline', icon: 'M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z' },
+		{ href: '/crm/opportunities', label: 'Opportunities', icon: 'M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z' },
+		{ href: '/crm/companies', label: 'Companies', icon: 'M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z' },
+		{ href: '/crm/contacts', label: 'Contacts', icon: 'M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z' },
+		{ href: '/crm/activities', label: 'Activities', icon: 'M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z' },
+		{ href: '/crm/tasks', label: 'Tasks', icon: 'M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z' },
+		{ href: '/crm/proposals', label: 'Proposals', icon: 'M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zm14 4H2v6a2 2 0 002 2h12a2 2 0 002-2V8zm-6 3a1 1 0 100 2h3a1 1 0 100-2h-3z' }
+	];
+
+	function isCrmActive(href: string): boolean {
+		return page.url.pathname.startsWith(href);
+	}
 </script>
 
 <aside class="fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-surface-800 bg-surface-900 transition-all md:static md:translate-x-0 {open ? 'translate-x-0 w-60' : '-translate-x-full w-60'} {collapsed ? 'md:w-14' : 'md:w-60'}">
@@ -80,6 +96,38 @@
 			</svg>
 			{#if !collapsed}<span>Activity</span>{/if}
 		</a>
+		<!-- Sales / CRM section -->
+		{#if !collapsed}
+			<div class="pt-3 pb-1 px-2">
+				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Sales</span>
+			</div>
+			{#each crmLinks as link (link.href)}
+				<a
+					href={link.href}
+					onclick={onclose}
+					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
+					</svg>
+					<span>{link.label}</span>
+				</a>
+			{/each}
+		{:else}
+			<div class="mt-3 flex flex-col items-center">
+				<a
+					href="/crm/pipeline"
+					title="Sales"
+					class="flex items-center justify-center rounded-md p-2 {page.url.pathname.startsWith('/crm') ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
+				>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd" />
+						<path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
+					</svg>
+				</a>
+			</div>
+		{/if}
+
 		{#if user?.role === 'admin'}
 			<a
 				href="/admin"

@@ -28,7 +28,7 @@
 	async function handleSave(ruleData: {
 		id?: string;
 		name: string;
-		description: string;
+		description: string | null;
 		trigger: { event: string; config?: Record<string, unknown> };
 		conditions: Array<{ field: string; operator: string; value?: string | string[] }>;
 		actions: Array<Record<string, unknown>>;

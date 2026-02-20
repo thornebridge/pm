@@ -23,6 +23,7 @@
 		dueDate: number | null;
 		startDate: number | null;
 		estimatePoints: number | null;
+		recurrence?: string | null;
 		createdAt: number;
 		updatedAt: number;
 		projectId: string;

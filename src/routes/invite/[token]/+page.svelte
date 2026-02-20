@@ -39,7 +39,7 @@
 						name="name"
 						type="text"
 						required
-						value={form?.name ?? ''}
+						value={(form as Record<string, string> | null)?.name ?? ''}
 						class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 					/>
 				</div>
@@ -51,7 +51,7 @@
 						name="email"
 						type="email"
 						required
-						value={form?.email ?? data.email ?? ''}
+						value={(form as Record<string, string> | null)?.email ?? data.email ?? ''}
 						readonly={!!data.email}
 						class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 read-only:opacity-60 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 					/>

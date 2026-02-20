@@ -10,6 +10,10 @@
 		runCount: number;
 		lastRun: number | null;
 		errorCount: number;
+		projectId: string;
+		createdBy: string;
+		createdAt: number;
+		updatedAt: number;
 	}
 
 	interface Props {

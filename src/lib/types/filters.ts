@@ -53,8 +53,8 @@ export interface EnrichedTask {
 	title: string;
 	description: string | null;
 	statusId: string;
-	type: string;
-	priority: string;
+	type: 'task' | 'bug' | 'feature' | 'improvement';
+	priority: 'urgent' | 'high' | 'medium' | 'low';
 	assigneeId: string | null;
 	assigneeName: string | null;
 	parentId: string | null;

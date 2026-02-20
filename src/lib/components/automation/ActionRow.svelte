@@ -112,7 +112,7 @@
 		<textarea
 			class="{inputClass} w-full"
 			rows="2"
-			value={action.body ?? ''}
+			value={String(action.body ?? '')}
 			oninput={(e) => onchange({ ...action, body: e.currentTarget.value })}
 			placeholder="Comment body... Use {'{{'}task.title{'}}'}  templates"
 		></textarea>

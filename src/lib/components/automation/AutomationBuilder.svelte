@@ -8,11 +8,16 @@
 	interface AutomationData {
 		id?: string;
 		name: string;
-		description: string;
+		description: string | null;
 		trigger: { event: string; config?: Record<string, unknown> };
 		conditions: Array<{ field: string; operator: string; value?: string | string[] }>;
 		actions: Array<Record<string, unknown>>;
 		enabled: boolean;
+		projectId?: string;
+		createdBy?: string;
+		createdAt?: number;
+		updatedAt?: number;
+		[key: string]: unknown;
 	}
 
 	interface Props {
@@ -41,9 +46,13 @@
 			description = initial.description || '';
 			trigger = { ...initial.trigger };
 			conditions = initial.conditions
-				? (Array.isArray(initial.conditions) && initial.conditions[0]?.conditions
-					? (initial.conditions as Array<{ conditions: Array<{ field: string; operator: string; value?: string | string[] }> }>)[0].conditions.map((c: { field: string; operator: string; value?: string | string[] }) => ({ ...c }))
-					: (initial.conditions as Array<{ field: string; operator: string; value?: string | string[] }>).map((c: { field: string; operator: string; value?: string | string[] }) => ({ ...c })))
+				? (() => {
+					const raw = initial.conditions as Array<Record<string, unknown>>;
+					if (raw.length > 0 && 'conditions' in raw[0]) {
+						return (raw[0].conditions as Array<{ field: string; operator: string; value?: string | string[] }>).map(c => ({ ...c }));
+					}
+					return (raw as unknown as Array<{ field: string; operator: string; value?: string | string[] }>).map(c => ({ ...c }));
+				})()
 				: [];
 			actions = initial.actions.map((a: Record<string, unknown>) => ({ ...a }));
 			enabled = initial.enabled !== false;

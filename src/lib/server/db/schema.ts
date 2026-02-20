@@ -530,3 +530,211 @@ export const dueDateRemindersSent = sqliteTable(
 		index('idx_reminders_task').on(table.taskId)
 	]
 );
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+
+export const crmCompanies = sqliteTable(
+	'crm_companies',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		website: text('website'),
+		industry: text('industry'),
+		size: text('size', { enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'] }),
+		phone: text('phone'),
+		address: text('address'),
+		city: text('city'),
+		state: text('state'),
+		country: text('country').default('US'),
+		notes: text('notes'),
+		ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_companies_owner').on(t.ownerId)]
+);
+
+export const crmContacts = sqliteTable(
+	'crm_contacts',
+	{
+		id: text('id').primaryKey(),
+		companyId: text('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+		firstName: text('first_name').notNull(),
+		lastName: text('last_name').notNull(),
+		email: text('email'),
+		phone: text('phone'),
+		title: text('title'),
+		isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
+		source: text('source', {
+			enum: ['referral', 'inbound', 'outbound', 'website', 'event', 'other']
+		}),
+		notes: text('notes'),
+		ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_contacts_company').on(t.companyId),
+		index('idx_crm_contacts_owner').on(t.ownerId),
+		index('idx_crm_contacts_email').on(t.email)
+	]
+);
+
+export const crmPipelineStages = sqliteTable(
+	'crm_pipeline_stages',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		color: text('color').notNull(),
+		position: integer('position').notNull(),
+		isClosed: integer('is_closed', { mode: 'boolean' }).notNull().default(false),
+		isWon: integer('is_won', { mode: 'boolean' }).notNull().default(false),
+		probability: integer('probability').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_stages_position').on(t.position)]
+);
+
+export const crmOpportunities = sqliteTable(
+	'crm_opportunities',
+	{
+		id: text('id').primaryKey(),
+		title: text('title').notNull(),
+		companyId: text('company_id')
+			.notNull()
+			.references(() => crmCompanies.id, { onDelete: 'cascade' }),
+		contactId: text('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+		stageId: text('stage_id')
+			.notNull()
+			.references(() => crmPipelineStages.id),
+		value: integer('value'),
+		currency: text('currency').notNull().default('USD'),
+		probability: integer('probability'),
+		expectedCloseDate: integer('expected_close_date', { mode: 'number' }),
+		actualCloseDate: integer('actual_close_date', { mode: 'number' }),
+		priority: text('priority', { enum: ['hot', 'warm', 'cold'] }).notNull().default('warm'),
+		source: text('source', {
+			enum: ['referral', 'inbound', 'outbound', 'website', 'event', 'partner', 'other']
+		}),
+		description: text('description'),
+		lostReason: text('lost_reason'),
+		position: real('position').notNull(),
+		ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_opps_company').on(t.companyId),
+		index('idx_crm_opps_stage').on(t.stageId, t.position),
+		index('idx_crm_opps_owner').on(t.ownerId),
+		index('idx_crm_opps_close').on(t.expectedCloseDate)
+	]
+);
+
+export const crmOpportunityContacts = sqliteTable(
+	'crm_opportunity_contacts',
+	{
+		opportunityId: text('opportunity_id')
+			.notNull()
+			.references(() => crmOpportunities.id, { onDelete: 'cascade' }),
+		contactId: text('contact_id')
+			.notNull()
+			.references(() => crmContacts.id, { onDelete: 'cascade' }),
+		role: text('role')
+	},
+	(t) => [primaryKey({ columns: [t.opportunityId, t.contactId] })]
+);
+
+export const crmActivities = sqliteTable(
+	'crm_activities',
+	{
+		id: text('id').primaryKey(),
+		type: text('type', { enum: ['call', 'email', 'meeting', 'note'] }).notNull(),
+		subject: text('subject').notNull(),
+		description: text('description'),
+		companyId: text('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+		contactId: text('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, {
+			onDelete: 'set null'
+		}),
+		scheduledAt: integer('scheduled_at', { mode: 'number' }),
+		completedAt: integer('completed_at', { mode: 'number' }),
+		durationMinutes: integer('duration_minutes'),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_act_company').on(t.companyId),
+		index('idx_crm_act_contact').on(t.contactId),
+		index('idx_crm_act_opp').on(t.opportunityId),
+		index('idx_crm_act_user_date').on(t.userId, t.createdAt)
+	]
+);
+
+export const crmTasks = sqliteTable(
+	'crm_tasks',
+	{
+		id: text('id').primaryKey(),
+		title: text('title').notNull(),
+		description: text('description'),
+		dueDate: integer('due_date', { mode: 'number' }),
+		completedAt: integer('completed_at', { mode: 'number' }),
+		priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] })
+			.notNull()
+			.default('medium'),
+		companyId: text('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+		contactId: text('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, {
+			onDelete: 'set null'
+		}),
+		assigneeId: text('assignee_id').references(() => users.id, { onDelete: 'set null' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_tasks_assignee').on(t.assigneeId, t.completedAt),
+		index('idx_crm_tasks_due').on(t.dueDate)
+	]
+);
+
+export const crmProposals = sqliteTable(
+	'crm_proposals',
+	{
+		id: text('id').primaryKey(),
+		opportunityId: text('opportunity_id')
+			.notNull()
+			.references(() => crmOpportunities.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		description: text('description'),
+		amount: integer('amount'),
+		status: text('status', {
+			enum: ['draft', 'sent', 'viewed', 'accepted', 'rejected', 'expired']
+		})
+			.notNull()
+			.default('draft'),
+		sentAt: integer('sent_at', { mode: 'number' }),
+		expiresAt: integer('expires_at', { mode: 'number' }),
+		respondedAt: integer('responded_at', { mode: 'number' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_proposals_opp').on(t.opportunityId)]
+);
