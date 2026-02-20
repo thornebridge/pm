@@ -100,7 +100,7 @@
 	}
 </script>
 
-<div class="flex gap-4 overflow-x-auto px-6 pb-4">
+<div class="flex flex-1 min-h-0 gap-4 overflow-x-auto px-6 pb-4">
 	{#each statuses.sort((a, b) => a.position - b.position) as status (status.id)}
 		<KanbanColumn
 			{status}

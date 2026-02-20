@@ -58,7 +58,7 @@
 </script>
 
 <div
-	class="flex w-72 shrink-0 flex-col rounded-lg transition-all duration-150 {dragover ? 'bg-surface-200/60 ring-2 ring-brand-500/20 dark:bg-surface-800/60' : ''}"
+	class="flex h-full w-72 shrink-0 flex-col rounded-lg transition-all duration-150 {dragover ? 'bg-surface-200/60 ring-2 ring-brand-500/20 dark:bg-surface-800/60' : ''}"
 	ondragover={handleDragOver}
 	ondragleave={handleDragLeave}
 	ondrop={handleDrop}
@@ -70,7 +70,7 @@
 		<span class="text-xs text-surface-400 dark:text-surface-600">{tasks.length}</span>
 	</div>
 
-	<div class="flex flex-col gap-1.5">
+	<div class="flex flex-1 flex-col gap-1.5 overflow-y-auto">
 		{#each tasks as task (task.id)}
 			<TaskCard
 				{task}

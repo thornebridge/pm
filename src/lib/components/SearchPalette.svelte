@@ -51,13 +51,12 @@
 
 		if (projectSlug) {
 			cmds.push(
+				{ id: 'proj-home', label: 'Go to Home', group: 'Project', action: () => navigate(`/projects/${projectSlug}/home`) },
 				{ id: 'proj-board', label: 'Go to Board', group: 'Project', action: () => navigate(`/projects/${projectSlug}/board`) },
 				{ id: 'proj-list', label: 'Go to List', group: 'Project', action: () => navigate(`/projects/${projectSlug}/list`) },
-				{ id: 'proj-table', label: 'Go to Table', group: 'Project', action: () => navigate(`/projects/${projectSlug}/table`) },
 				{ id: 'proj-gantt', label: 'Go to Gantt', group: 'Project', action: () => navigate(`/projects/${projectSlug}/gantt`) },
 				{ id: 'proj-calendar', label: 'Go to Calendar', group: 'Project', action: () => navigate(`/projects/${projectSlug}/calendar`) },
 				{ id: 'proj-sprints', label: 'Go to Sprints', group: 'Project', action: () => navigate(`/projects/${projectSlug}/sprints`) },
-				{ id: 'proj-analytics', label: 'Go to Analytics', group: 'Project', action: () => navigate(`/projects/${projectSlug}/analytics`) },
 				{ id: 'proj-settings', label: 'Go to Settings', group: 'Project', action: () => navigate(`/projects/${projectSlug}/settings`) }
 			);
 		}
@@ -89,7 +88,7 @@
 	}
 
 	const flatResults = $derived<FlatItem[]>([
-		...results.projects.map((p) => ({ url: `/projects/${p.slug}/board`, type: 'project' as const })),
+		...results.projects.map((p) => ({ url: `/projects/${p.slug}/home`, type: 'project' as const })),
 		...results.tasks.map((t) => ({ url: `/projects/${t.projectSlug}/task/${t.number}`, type: 'task' as const })),
 		...results.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const }))
 	]);
@@ -233,7 +232,7 @@
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Projects</span>
 							{#each results.projects as project, i}
 								<button
-									onclick={() => navigate(`/projects/${project.slug}/board`)}
+									onclick={() => navigate(`/projects/${project.slug}/home`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(projectsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
 								>
 									{project.name}

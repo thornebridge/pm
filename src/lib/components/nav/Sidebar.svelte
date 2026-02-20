@@ -100,6 +100,19 @@
 			</div>
 			<FolderTree {folders} {projects} onnavigate={onclose} />
 		{/if}
+
+		{#if collapsed && projects.length > 0}
+			<div class="mt-3 flex flex-col items-center gap-1.5">
+				{#each projects as project (project.id)}
+					<a
+						href="/projects/{project.slug}/home"
+						title={project.name}
+						class="h-2.5 w-2.5 rounded-full transition-transform hover:scale-150"
+						style="background-color: {project.color}"
+					></a>
+				{/each}
+			</div>
+		{/if}
 	</nav>
 
 	<div class="border-t border-surface-800 px-4 py-3">

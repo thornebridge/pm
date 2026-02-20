@@ -72,7 +72,7 @@
 
 {#each childProjects as project (project.id)}
 	<a
-		href="/projects/{project.slug}/board"
+		href="/projects/{project.slug}/home"
 		onclick={() => onnavigate?.()}
 		class="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800"
 		style="padding-left: {depth * 12 + 8}px"

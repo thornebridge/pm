@@ -4,7 +4,23 @@
 
 	let { data } = $props();
 
-	const totalTasks = $derived(data.statusDist.reduce((s, d) => s + d.count, 0));
+	interface StatusEntry {
+		name: string;
+		color: string;
+		isClosed: boolean;
+		isFirst: boolean;
+		position: number;
+		count: number;
+	}
+
+	const totalTasks = $derived(data.statusDist.reduce((s: number, d: StatusEntry) => s + d.count, 0));
+	const completedTasks = $derived(data.statusDist.filter((s: StatusEntry) => s.isClosed).reduce((s: number, d: StatusEntry) => s + d.count, 0));
+	const inProgressTasks = $derived(
+		data.statusDist
+			.filter((s: StatusEntry) => !s.isClosed && !s.isFirst)
+			.reduce((s: number, d: StatusEntry) => s + d.count, 0)
+	);
+	const completionPct = $derived(totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0);
 
 	const priorityColors: Record<string, string> = {
 		urgent: '#ef4444',
@@ -12,14 +28,64 @@
 		medium: '#eab308',
 		low: '#6b7280'
 	};
+
+	function formatRelative(ts: number): string {
+		const diff = Date.now() - ts;
+		const mins = Math.floor(diff / 60000);
+		if (mins < 1) return 'just now';
+		if (mins < 60) return `${mins}m ago`;
+		const hrs = Math.floor(mins / 60);
+		if (hrs < 24) return `${hrs}h ago`;
+		const days = Math.floor(hrs / 24);
+		return `${days}d ago`;
+	}
 </script>
 
 <svelte:head>
-	<title>{data.project.name} - Analytics</title>
+	<title>{data.project.name} - Home</title>
 </svelte:head>
 
 <div class="p-6">
-	<h2 class="mb-6 text-xs font-semibold uppercase tracking-wide text-surface-500">Analytics</h2>
+	<!-- Summary metrics -->
+	<div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+		<div class="rounded-lg border border-surface-300 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-900">
+			<div class="text-[10px] font-medium uppercase tracking-wide text-surface-500">Total tasks</div>
+			<div class="mt-1 text-2xl font-bold text-surface-900 dark:text-surface-100">{totalTasks}</div>
+		</div>
+		<div class="rounded-lg border border-surface-300 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-900">
+			<div class="text-[10px] font-medium uppercase tracking-wide text-surface-500">Completed</div>
+			<div class="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{completedTasks}</div>
+			<div class="text-[10px] text-surface-500">{completionPct}%</div>
+		</div>
+		<div class="rounded-lg border border-surface-300 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-900">
+			<div class="text-[10px] font-medium uppercase tracking-wide text-surface-500">In progress</div>
+			<div class="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">{inProgressTasks}</div>
+		</div>
+		<div class="rounded-lg border border-surface-300 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-900">
+			<div class="text-[10px] font-medium uppercase tracking-wide text-surface-500">Overdue</div>
+			<div class="mt-1 text-2xl font-bold {data.overdueCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-surface-900 dark:text-surface-100'}">{data.overdueCount}</div>
+		</div>
+	</div>
+
+	<!-- Recently Updated -->
+	{#if data.recentTasks.length > 0}
+		<div class="mb-6 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
+			<h3 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Recently Updated</h3>
+			<div class="space-y-1.5">
+				{#each data.recentTasks as task}
+					<a
+						href="/projects/{data.project.slug}/task/{task.number}"
+						class="flex items-center gap-3 rounded-md px-2 py-1.5 transition hover:bg-surface-200 dark:hover:bg-surface-800"
+					>
+						<span class="h-2 w-2 shrink-0 rounded-full" style="background-color: {task.statusColor}"></span>
+						<span class="text-xs text-surface-500">#{task.number}</span>
+						<span class="flex-1 truncate text-sm text-surface-900 dark:text-surface-200">{task.title}</span>
+						<span class="text-[10px] text-surface-400">{formatRelative(task.updatedAt)}</span>
+					</a>
+				{/each}
+			</div>
+		</div>
+	{/if}
 
 	<div class="grid gap-6 lg:grid-cols-2">
 		<!-- Status Distribution (Donut) -->
@@ -31,7 +97,7 @@
 				<div class="flex items-center gap-4">
 					<svg viewBox="0 0 100 100" class="h-28 w-28">
 						{#each data.statusDist as status, i}
-							{@const offset = data.statusDist.slice(0, i).reduce((s, d) => s + (d.count / totalTasks) * 100, 0)}
+							{@const offset = data.statusDist.slice(0, i).reduce((s: number, d: StatusEntry) => s + (d.count / totalTasks) * 100, 0)}
 							{@const pct = (status.count / totalTasks) * 100}
 							<circle
 								cx="50" cy="50" r="40"
@@ -87,7 +153,7 @@
 			{#if data.workload.length === 0}
 				<p class="text-xs text-surface-500">No tasks assigned yet.</p>
 			{:else}
-				{@const maxCount = Math.max(...data.workload.map((w) => w.count))}
+				{@const maxCount = Math.max(...data.workload.map((w: { name: string; count: number }) => w.count))}
 				<div class="space-y-2">
 					{#each data.workload as person}
 						{@const pct = (person.count / maxCount) * 100}
@@ -111,7 +177,7 @@
 			{#if data.dailyActivity.length === 0}
 				<p class="text-xs text-surface-500">No activity in the last 30 days.</p>
 			{:else}
-				{@const maxActivity = Math.max(...data.dailyActivity.map((d) => d.count))}
+				{@const maxActivity = Math.max(...data.dailyActivity.map((d: { date: string; count: number }) => d.count))}
 				<div class="flex items-end gap-0.5" style="height: 80px">
 					{#each data.dailyActivity as day}
 						{@const h = (day.count / maxActivity) * 100}

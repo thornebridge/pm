@@ -44,6 +44,7 @@
 		onsortchange?: (partial: Partial<SortConfig>) => void;
 		selectedIds?: string[];
 		onselect?: (ids: string[]) => void;
+		focusedIndex?: number;
 	}
 
 	let {
@@ -56,7 +57,8 @@
 		sort,
 		onsortchange,
 		selectedIds = $bindable([]),
-		onselect
+		onselect,
+		focusedIndex = -1
 	}: Props = $props();
 
 	let editingCell = $state<{ taskId: string; field: string } | null>(null);
@@ -198,6 +200,7 @@
 			</thead>
 			<tbody>
 				{#if groups}
+					{@const flatOffset = { current: 0 }}
 					{#each groups as group (group.key)}
 						<tr>
 							<td colspan="8" class="border-b border-surface-200 bg-surface-100/70 px-3 py-1.5 dark:border-surface-800/50 dark:bg-surface-800/40">
@@ -211,7 +214,7 @@
 							</td>
 						</tr>
 						{#each group.tasks as task (task.id)}
-							{@render taskRow(task)}
+							{@render taskRow(task, flatOffset.current++)}
 						{:else}
 							<tr>
 								<td colspan="8" class="border-b border-surface-200 px-3 py-2 text-center text-xs text-surface-400 dark:border-surface-800/50">
@@ -221,8 +224,8 @@
 						{/each}
 					{/each}
 				{:else}
-					{#each tasks as task (task.id)}
-						{@render taskRow(task)}
+					{#each tasks as task, i (task.id)}
+						{@render taskRow(task, i)}
 					{:else}
 						<tr>
 							<td colspan="8" class="px-3 py-8 text-center text-sm text-surface-500">No tasks found</td>
@@ -242,10 +245,10 @@
 	</div>
 </div>
 
-{#snippet taskRow(task: Task)}
+{#snippet taskRow(task: Task, index: number)}
 	{@const status = statusMap.get(task.statusId)}
 	{@const assignee = memberMap.get(task.assigneeId ?? '')}
-	<tr class="border-b border-surface-200 transition hover:bg-surface-100 dark:border-surface-800/50 dark:hover:bg-surface-800/30 {selectedIds.includes(task.id) ? 'bg-brand-50 dark:bg-brand-900/10' : ''}">
+	<tr class="border-b border-surface-200 transition hover:bg-surface-100 dark:border-surface-800/50 dark:hover:bg-surface-800/30 {selectedIds.includes(task.id) ? 'bg-brand-50 dark:bg-brand-900/10' : ''} {focusedIndex === index ? 'ring-1 ring-inset ring-brand-500/40' : ''}">
 		<td class="px-2 py-2">
 			<input
 				type="checkbox"

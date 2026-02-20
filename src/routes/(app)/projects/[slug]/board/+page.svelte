@@ -154,7 +154,7 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="pt-4">
+<div class="flex h-full flex-col pt-4">
 	<div class="mb-4 flex items-center justify-between px-6">
 		<h2 class="text-xs font-semibold uppercase tracking-wide text-surface-500">Board</h2>
 		<button

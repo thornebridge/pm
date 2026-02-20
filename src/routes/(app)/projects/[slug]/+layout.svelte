@@ -14,7 +14,6 @@
 	const filterViews = $derived(new Set([
 		`/projects/${slug}/board`,
 		`/projects/${slug}/list`,
-		`/projects/${slug}/table`,
 		`/projects/${slug}/calendar`,
 		`/projects/${slug}/gantt`
 	]));
@@ -24,13 +23,12 @@
 	// Tabs with preserved URL search params for filter views
 	const tabs = $derived(
 		([
+			['Home', `/projects/${slug}/home`],
 			['Board', `/projects/${slug}/board`],
 			['List', `/projects/${slug}/list`],
-			['Table', `/projects/${slug}/table`],
 			['Gantt', `/projects/${slug}/gantt`],
 			['Calendar', `/projects/${slug}/calendar`],
 			['Sprints', `/projects/${slug}/sprints`],
-			['Analytics', `/projects/${slug}/analytics`],
 			['Automations', `/projects/${slug}/automations`],
 			['Settings', `/projects/${slug}/settings`]
 		] as const).map(([label, href]) => {
