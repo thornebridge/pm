@@ -1,7 +1,7 @@
 import type { LayoutServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
-import { crmPipelineStages, crmCompanies, users } from '$lib/server/db/schema.js';
-import { asc } from 'drizzle-orm';
+import { crmPipelineStages, crmCompanies, crmProducts, users } from '$lib/server/db/schema.js';
+import { asc, eq } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async ({ parent }) => {
 	await parent();
@@ -23,5 +23,12 @@ export const load: LayoutServerLoad = async ({ parent }) => {
 		.orderBy(asc(crmCompanies.name))
 		.all();
 
-	return { stages, members, crmCompanies: companies };
+	const products = db
+		.select({ id: crmProducts.id, name: crmProducts.name, sku: crmProducts.sku })
+		.from(crmProducts)
+		.where(eq(crmProducts.status, 'active'))
+		.orderBy(asc(crmProducts.name))
+		.all();
+
+	return { stages, members, crmCompanies: companies, crmProducts: products };
 };

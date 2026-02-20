@@ -7,12 +7,14 @@ import {
 	crmContacts,
 	crmPipelineStages,
 	crmOpportunityContacts,
+	crmOpportunityItems,
+	crmProducts,
 	crmActivities,
 	crmProposals,
 	crmTasks,
 	users
 } from '$lib/server/db/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const opp = db
@@ -103,6 +105,32 @@ export const load: PageServerLoad = async ({ params }) => {
 				.all()
 		: [];
 
+	// Get opportunity line items with product info
+	const opportunityItems = db
+		.select({
+			id: crmOpportunityItems.id,
+			opportunityId: crmOpportunityItems.opportunityId,
+			productId: crmOpportunityItems.productId,
+			priceTierId: crmOpportunityItems.priceTierId,
+			description: crmOpportunityItems.description,
+			quantity: crmOpportunityItems.quantity,
+			unitAmount: crmOpportunityItems.unitAmount,
+			discountPercent: crmOpportunityItems.discountPercent,
+			discountAmount: crmOpportunityItems.discountAmount,
+			setupFee: crmOpportunityItems.setupFee,
+			billingModel: crmOpportunityItems.billingModel,
+			billingInterval: crmOpportunityItems.billingInterval,
+			position: crmOpportunityItems.position,
+			createdAt: crmOpportunityItems.createdAt,
+			productName: crmProducts.name,
+			productSku: crmProducts.sku
+		})
+		.from(crmOpportunityItems)
+		.innerJoin(crmProducts, eq(crmOpportunityItems.productId, crmProducts.id))
+		.where(eq(crmOpportunityItems.opportunityId, params.opportunityId))
+		.orderBy(asc(crmOpportunityItems.position))
+		.all();
+
 	return {
 		opportunity: opp,
 		stage,
@@ -113,6 +141,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		activities,
 		proposals,
 		tasks,
-		companyContacts
+		companyContacts,
+		opportunityItems
 	};
 };

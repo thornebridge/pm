@@ -38,11 +38,18 @@
 
 	// Build theme CSS override string from server-loaded variables
 	const themeCss = $derived.by(() => {
-		if (!data.themeVariables) return '';
-		const entries = Object.entries(data.themeVariables)
-			.map(([k, v]) => `${k}: ${v};`)
-			.join(' ');
-		return `@theme { ${entries} }`;
+		if (!data.themeVariables && data.themeMode === 'dark') return '';
+		const parts: string[] = [];
+		if (data.themeVariables) {
+			const entries = Object.entries(data.themeVariables)
+				.map(([k, v]) => `${k}: ${v};`)
+				.join(' ');
+			parts.push(`:root { ${entries} }`);
+		}
+		if (data.themeMode === 'light') {
+			parts.push('html { color-scheme: light; background-color: var(--color-surface-50); color: var(--color-surface-900); }');
+		}
+		return parts.join('\n');
 	});
 
 	// Manage dark/light class on <html> element

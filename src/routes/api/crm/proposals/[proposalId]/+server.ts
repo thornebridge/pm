@@ -15,7 +15,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const body = await event.request.json();
 	const updates: Record<string, unknown> = { updatedAt: Date.now() };
 
-	// Handle status transitions
+	// Handle status transitions (always allowed)
 	if ('status' in body) {
 		const newStatus = body.status;
 		updates.status = newStatus;
@@ -28,9 +28,15 @@ export const PATCH: RequestHandler = async (event) => {
 		}
 	}
 
+	// Field edits only allowed on draft proposals
 	const fields = ['title', 'description', 'amount', 'expiresAt'];
 	for (const f of fields) {
-		if (f in body) updates[f] = body[f];
+		if (f in body) {
+			if (existing.status !== 'draft' && !('status' in body)) {
+				return json({ error: 'Can only edit draft proposals' }, { status: 400 });
+			}
+			updates[f] = body[f];
+		}
 	}
 
 	db.update(crmProposals).set(updates).where(eq(crmProposals.id, proposalId)).run();

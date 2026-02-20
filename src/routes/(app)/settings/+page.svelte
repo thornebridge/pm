@@ -3,6 +3,7 @@
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
 	import { setActiveTheme } from '$lib/stores/theme.js';
+	import Modal from '$lib/components/ui/Modal.svelte';
 
 	let { data } = $props();
 
@@ -35,6 +36,8 @@
 	let importSource = $state('');
 	let importing = $state(false);
 	let importError = $state('');
+	let showImport = $state(false);
+	let showFormatHelp = $state(false);
 
 	// Determine active theme ID from current data
 	const activeThemeId = $derived.by(() => {
@@ -197,10 +200,10 @@
 
 	function getSwatches(variables: Record<string, string>): string[] {
 		return [
-			variables['--color-brand-500'] || '#888',
-			variables['--color-brand-700'] || '#666',
-			variables['--color-surface-800'] || '#444',
-			variables['--color-surface-900'] || '#222'
+			variables['--color-brand-400'] || '#888',
+			variables['--color-brand-500'] || '#777',
+			variables['--color-brand-600'] || '#666',
+			variables['--color-brand-800'] || '#444'
 		];
 	}
 
@@ -221,65 +224,83 @@
 	<section class="mb-6">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Appearance</h2>
 		{#if themesLoaded}
-			<div class="grid grid-cols-3 gap-2">
+			<div class="grid grid-cols-4 gap-2 sm:grid-cols-5">
 				{#each themes as theme (theme.id)}
-					<button
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
 						onclick={() => activateTheme(theme.id)}
-						class="relative rounded-lg border p-2.5 text-left transition-colors {activeThemeId === theme.id ? 'border-brand-500 ring-1 ring-brand-500' : 'border-surface-300 hover:border-surface-400 dark:border-surface-700 dark:hover:border-surface-600'}"
+						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateTheme(theme.id); } }}
+						role="button"
+						tabindex="0"
+						class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors {activeThemeId === theme.id ? 'border-brand-500 ring-1 ring-brand-500' : 'border-surface-300 hover:border-surface-400 dark:border-surface-700 dark:hover:border-surface-600'}"
 					>
-						<div class="mb-1.5 flex gap-1">
+						<!-- Color bar -->
+						<div class="flex h-5">
 							{#each getSwatches(theme.variables) as color}
-								<div class="h-3 w-3 rounded-full" style="background-color: {color}"></div>
+								<div class="flex-1" style="background-color: {color}"></div>
 							{/each}
 						</div>
-						<span class="block text-xs font-medium text-surface-800 dark:text-surface-200">{theme.name}</span>
-						{#if !theme.builtin}
-							<div class="mt-1 flex gap-1">
-								<button
-									onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
-									class="text-[10px] text-surface-400 hover:text-surface-200"
-									title="Copy to clipboard"
-								>Export</button>
-								<button
-									onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
-									class="text-[10px] text-surface-400 hover:text-red-400"
-									title="Delete theme"
-								>Delete</button>
-							</div>
-						{:else}
+						<span class="block truncate px-1 py-1 text-[10px] font-medium text-surface-700 dark:text-surface-300">{theme.name}</span>
+						<!-- Hover actions -->
+						<div class="absolute inset-0 flex items-center justify-center gap-1 bg-surface-900/70 opacity-0 transition-opacity group-hover:opacity-100">
 							<button
 								onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
-								class="mt-1 text-[10px] text-surface-400 hover:text-surface-200"
+								class="rounded bg-surface-800/80 px-1.5 py-0.5 text-[9px] text-surface-200 hover:bg-surface-700"
 								title="Copy to clipboard"
 							>Export</button>
-						{/if}
-					</button>
+							{#if !theme.builtin}
+								<button
+									onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
+									class="rounded bg-red-900/80 px-1.5 py-0.5 text-[9px] text-red-200 hover:bg-red-800"
+									title="Delete theme"
+								>Delete</button>
+							{/if}
+						</div>
+					</div>
 				{/each}
 			</div>
 
-			<!-- Import theme -->
-			<div class="mt-4">
-				<label for="import-theme" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Import .pmtheme</label>
-				<textarea
-					id="import-theme"
-					bind:value={importSource}
-					placeholder="Paste .pmtheme markdown here..."
-					rows={4}
-					class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 font-mono text-xs text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-				></textarea>
-				{#if importError}
-					<p class="mt-1 text-xs text-red-500">{importError}</p>
-				{/if}
-				<div class="mt-2 flex justify-end">
-					<button
-						onclick={importTheme}
-						disabled={importing || !importSource.trim()}
-						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
-					>
-						{importing ? 'Importing...' : 'Import'}
-					</button>
-				</div>
+			<!-- Import toggle + format help -->
+			<div class="mt-4 flex items-center gap-2">
+				<button
+					onclick={() => (showImport = !showImport)}
+					class="flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-300"
+				>
+					<svg class="h-3.5 w-3.5 transition-transform {showImport ? 'rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+					</svg>
+					Import Theme
+				</button>
+				<button
+					onclick={() => (showFormatHelp = true)}
+					class="flex h-4 w-4 items-center justify-center rounded-full border border-surface-600 text-[10px] text-surface-500 hover:border-surface-400 hover:text-surface-300"
+					title="Theme format help"
+				>?</button>
 			</div>
+
+			{#if showImport}
+				<div class="mt-2">
+					<textarea
+						id="import-theme"
+						bind:value={importSource}
+						placeholder="Paste .pmtheme markdown here..."
+						rows={4}
+						class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 font-mono text-xs text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+					></textarea>
+					{#if importError}
+						<p class="mt-1 text-xs text-red-500">{importError}</p>
+					{/if}
+					<div class="mt-2 flex justify-end">
+						<button
+							onclick={importTheme}
+							disabled={importing || !importSource.trim()}
+							class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+						>
+							{importing ? 'Importing...' : 'Import'}
+						</button>
+					</div>
+				</div>
+			{/if}
 		{:else}
 			<p class="text-sm text-surface-400">Loading themes...</p>
 		{/if}
@@ -497,3 +518,64 @@
 		</button>
 	</section>
 </div>
+
+<!-- Format help modal -->
+<Modal open={showFormatHelp} onclose={() => (showFormatHelp = false)} title=".pmtheme Format">
+	<div class="space-y-3 text-sm text-surface-700 dark:text-surface-300">
+		<p>A <code class="rounded bg-surface-200 px-1 py-0.5 text-xs dark:bg-surface-800">.pmtheme</code> file is a Markdown document with a specific structure:</p>
+
+		<div>
+			<p class="mb-1 font-semibold text-surface-900 dark:text-surface-100">Structure</p>
+			<ul class="list-inside list-disc space-y-0.5 text-xs">
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800"># Theme Name</code> — H1 heading becomes the theme name</li>
+				<li>Description text follows the heading</li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">## Colors</code> — section with a <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">pmtheme</code> code block</li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">## Options</code> — optional section for font and mode</li>
+			</ul>
+		</div>
+
+		<div>
+			<p class="mb-1 font-semibold text-surface-900 dark:text-surface-100">Required Color Keys (20)</p>
+			<div class="grid grid-cols-2 gap-x-4 text-xs">
+				<div>
+					<p class="font-medium text-surface-500">Brand (10)</p>
+					<p class="font-mono text-[10px]">brand-50 through brand-900</p>
+				</div>
+				<div>
+					<p class="font-medium text-surface-500">Surface (10)</p>
+					<p class="font-mono text-[10px]">surface-50 through surface-900</p>
+				</div>
+			</div>
+		</div>
+
+		<div>
+			<p class="mb-1 font-semibold text-surface-900 dark:text-surface-100">Optional Fields</p>
+			<ul class="list-inside list-disc space-y-0.5 text-xs">
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">font</code> — CSS font-family value</li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">mode</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">dark</code> (default) or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">light</code></li>
+			</ul>
+		</div>
+
+		<div>
+			<p class="mb-1 font-semibold text-surface-900 dark:text-surface-100">Minimal Example</p>
+			<pre class="overflow-x-auto rounded-md bg-surface-200 p-2 text-[10px] leading-relaxed dark:bg-surface-800"><code># My Theme
+
+A custom theme.
+
+## Colors
+
+```pmtheme
+brand-50: #eef2ff
+brand-100: #e0e7ff
+...
+surface-900: #171717
+```
+
+## Options
+
+```pmtheme
+mode: dark
+```</code></pre>
+		</div>
+	</div>
+</Modal>

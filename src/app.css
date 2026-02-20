@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
 	/* Brand (forest green) */
 	--color-brand-50: #f0f7f3;
@@ -34,6 +36,13 @@ html {
 	color-scheme: dark;
 	scrollbar-width: thin;
 	scrollbar-color: var(--color-surface-700) transparent;
+}
+
+html.light {
+	background-color: var(--color-surface-50);
+	color: var(--color-surface-900);
+	color-scheme: light;
+	scrollbar-color: var(--color-surface-300) transparent;
 }
 
 body {

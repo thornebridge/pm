@@ -1,5 +1,5 @@
 import { db } from './index.js';
-import { users, crmPipelineStages } from './schema.js';
+import { users, crmPipelineStages, crmProducts, crmPriceTiers } from './schema.js';
 import { eq, count } from 'drizzle-orm';
 import { hashPassword } from '../auth/password.js';
 import { nanoid } from 'nanoid';
@@ -8,6 +8,11 @@ import { env } from '$env/dynamic/private';
 export async function seed() {
 	const adminEmail = env.PM_ADMIN_EMAIL;
 	const adminPassword = env.PM_ADMIN_PASSWORD;
+
+	// Always run idempotent seeds regardless of admin state
+	await seedAutomationUser();
+	seedCrmPipelineStages();
+	seedCrmProducts();
 
 	if (!adminEmail || !adminPassword) return;
 
@@ -30,12 +35,6 @@ export async function seed() {
 		.run();
 
 	console.log(`[seed] Created admin user: ${adminEmail}`);
-
-	// Ensure automation system user exists
-	await seedAutomationUser();
-
-	// Seed CRM pipeline stages
-	seedCrmPipelineStages();
 }
 
 const AUTOMATION_USER_ID = '__automation__';
@@ -83,6 +82,97 @@ function seedCrmPipelineStages() {
 	}
 
 	console.log('[seed] Created default CRM pipeline stages');
+}
+
+function seedCrmProducts() {
+	const existing = db.select({ n: count() }).from(crmProducts).get();
+	if (existing && existing.n > 0) return;
+
+	const now = Date.now();
+
+	// Find an admin user to use as createdBy
+	const admin = db.select({ id: users.id }).from(users).limit(1).get();
+	if (!admin) return; // no users yet — skip product seeds
+
+	const products = [
+		{
+			id: nanoid(12),
+			name: 'Web Development',
+			sku: 'SVC-WEBDEV',
+			description: 'Custom web application development services',
+			category: 'Development',
+			type: 'service' as const,
+			tiers: [
+				{ name: 'Hourly Rate', billingModel: 'per_unit' as const, unitAmount: 15000, unitLabel: 'hour', isDefault: true },
+				{ name: 'Monthly Retainer', billingModel: 'recurring' as const, unitAmount: 800000, billingInterval: 'monthly' as const }
+			]
+		},
+		{
+			id: nanoid(12),
+			name: 'SaaS Platform License',
+			sku: 'SUB-SAAS',
+			description: 'Cloud platform subscription with per-seat pricing',
+			category: 'Software',
+			type: 'subscription' as const,
+			tiers: [
+				{ name: 'Starter (Monthly)', billingModel: 'per_unit' as const, unitAmount: 2900, billingInterval: 'monthly' as const, unitLabel: 'seat', isDefault: true },
+				{ name: 'Pro (Annual)', billingModel: 'per_unit' as const, unitAmount: 24900, billingInterval: 'annual' as const, unitLabel: 'seat' },
+				{ name: 'Enterprise (Annual)', billingModel: 'recurring' as const, unitAmount: 500000, billingInterval: 'annual' as const, setupFee: 250000 }
+			]
+		},
+		{
+			id: nanoid(12),
+			name: 'Strategy Consulting',
+			sku: 'SVC-STRAT',
+			description: 'Business strategy and digital transformation consulting',
+			category: 'Consulting',
+			type: 'service' as const,
+			tiers: [
+				{ name: 'Discovery Workshop', billingModel: 'one_time' as const, unitAmount: 500000, isDefault: true },
+				{ name: 'Advisory Retainer', billingModel: 'recurring' as const, unitAmount: 1500000, billingInterval: 'monthly' as const }
+			]
+		}
+	];
+
+	for (const product of products) {
+		const { tiers, ...productData } = product;
+		db.insert(crmProducts)
+			.values({
+				...productData,
+				status: 'active',
+				taxable: true,
+				createdBy: admin.id,
+				createdAt: now,
+				updatedAt: now
+			})
+			.run();
+
+		for (let i = 0; i < tiers.length; i++) {
+			const tier = tiers[i];
+			db.insert(crmPriceTiers)
+				.values({
+					id: nanoid(12),
+					productId: product.id,
+					name: tier.name,
+					billingModel: tier.billingModel,
+					unitAmount: tier.unitAmount,
+					currency: 'USD',
+					billingInterval: tier.billingInterval ?? null,
+					setupFee: tier.setupFee ?? null,
+					trialDays: null,
+					unitLabel: tier.unitLabel ?? null,
+					minQuantity: null,
+					maxQuantity: null,
+					isDefault: tier.isDefault ?? false,
+					position: i,
+					createdAt: now,
+					updatedAt: now
+				})
+				.run();
+		}
+	}
+
+	console.log('[seed] Created example CRM products with price tiers');
 }
 
 export { AUTOMATION_USER_ID };

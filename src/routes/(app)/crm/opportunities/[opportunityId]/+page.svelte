@@ -5,11 +5,15 @@
 	import { formatCurrency } from '$lib/utils/currency.js';
 	import StageBar from '$lib/components/crm/StageBar.svelte';
 	import OpportunityForm from '$lib/components/crm/OpportunityForm.svelte';
+	import OpportunityItemsTab from '$lib/components/crm/OpportunityItemsTab.svelte';
+	import ProposalForm from '$lib/components/crm/ProposalForm.svelte';
 
 	let { data } = $props();
 
 	let showEdit = $state(false);
-	let tab = $state<'overview' | 'contacts' | 'activities' | 'proposals' | 'tasks'>('overview');
+	let editProposal = $state<(typeof data.proposals)[0] | undefined>(undefined);
+	let showProposalForm = $state(false);
+	let tab = $state<'overview' | 'products' | 'contacts' | 'activities' | 'proposals' | 'tasks'>('overview');
 
 	async function changeStage(newStageId: string) {
 		try {
@@ -166,6 +170,7 @@
 	<div class="mb-4 flex gap-4 border-b border-surface-300 dark:border-surface-800">
 		{#each [
 			{ key: 'overview', label: 'Overview' },
+			{ key: 'products', label: `Products (${data.opportunityItems.length})` },
 			{ key: 'contacts', label: `Contacts (${data.linkedContacts.length})` },
 			{ key: 'activities', label: `Activities (${data.activities.length})` },
 			{ key: 'proposals', label: `Proposals (${data.proposals.length})` },
@@ -189,6 +194,14 @@
 		{:else}
 			<p class="text-sm text-surface-500">No description.</p>
 		{/if}
+	{/if}
+
+	{#if tab === 'products'}
+		<OpportunityItemsTab
+			opportunityId={data.opportunity.id}
+			items={data.opportunityItems}
+			products={data.crmProducts}
+		/>
 	{/if}
 
 	{#if tab === 'contacts'}
@@ -263,7 +276,10 @@
 		{:else}
 			<div class="space-y-2">
 				{#each data.proposals as proposal (proposal.id)}
-					<div class="flex items-center justify-between rounded-lg border border-surface-300 bg-surface-50 p-3 dark:border-surface-800 dark:bg-surface-900">
+					<button
+						onclick={() => { editProposal = proposal; showProposalForm = true; }}
+						class="flex w-full items-center justify-between rounded-lg border border-surface-300 bg-surface-50 p-3 text-left hover:bg-surface-100 dark:border-surface-800 dark:bg-surface-900 dark:hover:bg-surface-800"
+					>
 						<div>
 							<p class="text-sm font-medium text-surface-900 dark:text-surface-100">{proposal.title}</p>
 							<div class="mt-0.5 flex items-center gap-2">
@@ -274,7 +290,7 @@
 							</div>
 						</div>
 						<span class="text-xs text-surface-500">{new Date(proposal.createdAt).toLocaleDateString()}</span>
-					</div>
+					</button>
 				{/each}
 			</div>
 		{/if}
@@ -308,4 +324,11 @@
 	companies={data.crmCompanies}
 	stages={data.stages}
 	members={data.members}
+/>
+
+<ProposalForm
+	open={showProposalForm}
+	onclose={() => { showProposalForm = false; editProposal = undefined; }}
+	opportunityId={data.opportunity.id}
+	proposal={editProposal}
 />

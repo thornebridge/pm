@@ -31,6 +31,7 @@
 		{ href: '/crm/companies', label: 'Companies', icon: 'M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z' },
 		{ href: '/crm/contacts', label: 'Contacts', icon: 'M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z' },
 		{ href: '/crm/activities', label: 'Activities', icon: 'M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z' },
+		{ href: '/crm/products', label: 'Products', icon: 'M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.884l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.116l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z' },
 		{ href: '/crm/tasks', label: 'Tasks', icon: 'M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z' },
 		{ href: '/crm/proposals', label: 'Proposals', icon: 'M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zm14 4H2v6a2 2 0 002 2h12a2 2 0 002-2V8zm-6 3a1 1 0 100 2h3a1 1 0 100-2h-3z' }
 	];
@@ -131,17 +132,19 @@
 				{/each}
 			{/if}
 		{:else}
-			<div class="mt-3 flex flex-col items-center">
-				<a
-					href="/crm/pipeline"
-					title="Sales"
-					class="flex items-center justify-center rounded-md p-2 {page.url.pathname.startsWith('/crm') ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd" />
-						<path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
-					</svg>
-				</a>
+			<div class="mt-3 flex flex-col items-center gap-0.5">
+				{#each crmLinks as link (link.href)}
+					<a
+						href={link.href}
+						onclick={onclose}
+						title={link.label}
+						class="flex items-center justify-center rounded-md p-2 {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
+						</svg>
+					</a>
+				{/each}
 			</div>
 		{/if}
 

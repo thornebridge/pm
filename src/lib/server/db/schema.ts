@@ -740,6 +740,137 @@ export const crmProposals = sqliteTable(
 	(t) => [index('idx_crm_proposals_opp').on(t.opportunityId)]
 );
 
+export const crmProducts = sqliteTable(
+	'crm_products',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		sku: text('sku'),
+		description: text('description'),
+		category: text('category'),
+		type: text('type', { enum: ['product', 'service', 'subscription'] }).notNull().default('service'),
+		status: text('status', { enum: ['active', 'archived'] }).notNull().default('active'),
+		taxable: integer('taxable', { mode: 'boolean' }).notNull().default(true),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [uniqueIndex('idx_crm_products_sku').on(t.sku)]
+);
+
+export const crmPriceTiers = sqliteTable(
+	'crm_price_tiers',
+	{
+		id: text('id').primaryKey(),
+		productId: text('product_id')
+			.notNull()
+			.references(() => crmProducts.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		billingModel: text('billing_model', {
+			enum: ['one_time', 'recurring', 'per_unit', 'tiered', 'usage']
+		})
+			.notNull()
+			.default('one_time'),
+		unitAmount: integer('unit_amount'),
+		currency: text('currency').notNull().default('USD'),
+		billingInterval: text('billing_interval', {
+			enum: ['weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']
+		}),
+		setupFee: integer('setup_fee'),
+		trialDays: integer('trial_days'),
+		unitLabel: text('unit_label'),
+		minQuantity: integer('min_quantity'),
+		maxQuantity: integer('max_quantity'),
+		isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+		position: integer('position').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_price_tiers_product').on(t.productId, t.position)]
+);
+
+export const crmPriceBrackets = sqliteTable(
+	'crm_price_brackets',
+	{
+		id: text('id').primaryKey(),
+		priceTierId: text('price_tier_id')
+			.notNull()
+			.references(() => crmPriceTiers.id, { onDelete: 'cascade' }),
+		minUnits: integer('min_units').notNull(),
+		maxUnits: integer('max_units'),
+		unitAmount: integer('unit_amount').notNull(),
+		flatAmount: integer('flat_amount'),
+		position: integer('position').notNull().default(0)
+	},
+	(t) => [index('idx_crm_price_brackets_tier').on(t.priceTierId, t.position)]
+);
+
+export const crmOpportunityItems = sqliteTable(
+	'crm_opportunity_items',
+	{
+		id: text('id').primaryKey(),
+		opportunityId: text('opportunity_id')
+			.notNull()
+			.references(() => crmOpportunities.id, { onDelete: 'cascade' }),
+		productId: text('product_id')
+			.notNull()
+			.references(() => crmProducts.id),
+		priceTierId: text('price_tier_id').references(() => crmPriceTiers.id, { onDelete: 'set null' }),
+		description: text('description'),
+		quantity: real('quantity').notNull().default(1),
+		unitAmount: integer('unit_amount').notNull(),
+		discountPercent: integer('discount_percent'),
+		discountAmount: integer('discount_amount'),
+		setupFee: integer('setup_fee'),
+		billingModel: text('billing_model', {
+			enum: ['one_time', 'recurring', 'per_unit', 'tiered', 'usage']
+		}),
+		billingInterval: text('billing_interval', {
+			enum: ['weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']
+		}),
+		position: integer('position').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_opp_items_opp').on(t.opportunityId, t.position),
+		index('idx_crm_opp_items_product').on(t.productId)
+	]
+);
+
+export const crmProposalItems = sqliteTable(
+	'crm_proposal_items',
+	{
+		id: text('id').primaryKey(),
+		proposalId: text('proposal_id')
+			.notNull()
+			.references(() => crmProposals.id, { onDelete: 'cascade' }),
+		opportunityItemId: text('opportunity_item_id').references(() => crmOpportunityItems.id, {
+			onDelete: 'set null'
+		}),
+		productName: text('product_name').notNull(),
+		productSku: text('product_sku'),
+		description: text('description'),
+		quantity: real('quantity').notNull(),
+		unitAmount: integer('unit_amount').notNull(),
+		discountPercent: integer('discount_percent'),
+		discountAmount: integer('discount_amount'),
+		setupFee: integer('setup_fee'),
+		billingModel: text('billing_model', {
+			enum: ['one_time', 'recurring', 'per_unit', 'tiered', 'usage']
+		}),
+		billingInterval: text('billing_interval', {
+			enum: ['weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']
+		}),
+		lineTotal: integer('line_total').notNull(),
+		position: integer('position').notNull().default(0),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_proposal_items_proposal').on(t.proposalId, t.position)]
+);
+
 // ─── User Themes ─────────────────────────────────────────────────────────────
 
 export const userThemes = sqliteTable(
