@@ -6,6 +6,7 @@ import { taskLabelAssignments, activityLog, tasks } from '$lib/server/db/schema.
 import { and, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { emitAutomationEvent } from '$lib/server/automations/emit.js';
+import { broadcastLabelChanged } from '$lib/server/ws/handlers.js';
 
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -36,6 +37,7 @@ export const POST: RequestHandler = async (event) => {
 		emitAutomationEvent({ event: 'label.added', projectId: event.params.projectId, taskId: event.params.taskId, task: task as unknown as Record<string, unknown>, changes: { labelId }, userId: user.id });
 	}
 
+	broadcastLabelChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };
 
@@ -72,5 +74,6 @@ export const DELETE: RequestHandler = async (event) => {
 		emitAutomationEvent({ event: 'label.removed', projectId: event.params.projectId, taskId: event.params.taskId, task: taskForRemove as unknown as Record<string, unknown>, changes: { labelId }, userId: user.id });
 	}
 
+	broadcastLabelChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };

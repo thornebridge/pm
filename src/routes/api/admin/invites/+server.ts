@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { requireAdmin } from '$lib/server/auth/guard.js';
 import { createInvite, listInvites, deleteInvite } from '$lib/server/auth/invite.js';
 import { sendEmail } from '$lib/server/notifications/email.js';
+import { broadcastAdminChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAdmin(event);
@@ -38,6 +39,7 @@ export const POST: RequestHandler = async (event) => {
 		).catch(() => {});
 	}
 
+	broadcastAdminChanged();
 	return json(invite, { status: 201 });
 };
 
@@ -50,5 +52,6 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	deleteInvite(id);
+	broadcastAdminChanged();
 	return json({ ok: true });
 };

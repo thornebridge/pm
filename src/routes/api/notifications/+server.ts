@@ -4,6 +4,7 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { notifications, users } from '$lib/server/db/schema.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { broadcastNotificationChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -58,6 +59,7 @@ export const PATCH: RequestHandler = async (event) => {
 			.set({ read: true })
 			.where(and(eq(notifications.userId, user.id), eq(notifications.read, false)))
 			.run();
+		broadcastNotificationChanged();
 		return json({ ok: true });
 	}
 
@@ -66,6 +68,7 @@ export const PATCH: RequestHandler = async (event) => {
 			.set({ read: true })
 			.where(and(eq(notifications.id, id), eq(notifications.userId, user.id)))
 			.run();
+		broadcastNotificationChanged();
 		return json({ ok: true });
 	}
 

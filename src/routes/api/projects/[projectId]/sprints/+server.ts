@@ -46,6 +46,9 @@ export const POST: RequestHandler = async (event) => {
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'sprint:created', sprint });
 	}
+	if (globalThis.__wsBroadcastAll) {
+		globalThis.__wsBroadcastAll({ type: 'sprint:created', sprint });
+	}
 
 	return json(sprint, { status: 201 });
 };

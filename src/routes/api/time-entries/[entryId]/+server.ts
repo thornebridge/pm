@@ -2,8 +2,9 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { timeEntries } from '$lib/server/db/schema.js';
+import { timeEntries, tasks } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
+import { broadcastTimeEntryChanged } from '$lib/server/ws/handlers.js';
 
 export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -26,6 +27,8 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	const updated = db.select().from(timeEntries).where(eq(timeEntries.id, entryId)).get();
+	const task = db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, entry.taskId)).get();
+	if (task) broadcastTimeEntryChanged(task.projectId, user.id);
 	return json(updated);
 };
 
@@ -39,6 +42,8 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
+	const taskForDelete = db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, entry.taskId)).get();
 	db.delete(timeEntries).where(eq(timeEntries.id, entryId)).run();
+	if (taskForDelete) broadcastTimeEntryChanged(taskForDelete.projectId, user.id);
 	return json({ ok: true });
 };

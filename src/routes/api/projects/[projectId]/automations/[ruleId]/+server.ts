@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { automationRules, automationExecutions } from '$lib/server/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 import { validateRule } from '$lib/server/automations/validate.js';
+import { broadcastAutomationChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -37,7 +38,7 @@ export const GET: RequestHandler = async (event) => {
 };
 
 export const PATCH: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const ruleId = event.params.ruleId;
 	const body = await event.request.json();
 
@@ -76,6 +77,7 @@ export const PATCH: RequestHandler = async (event) => {
 	db.update(automationRules).set(updates).where(eq(automationRules.id, ruleId)).run();
 
 	const updated = db.select().from(automationRules).where(eq(automationRules.id, ruleId)).get();
+	broadcastAutomationChanged(event.params.projectId, user.id);
 
 	return json({
 		...updated,
@@ -86,7 +88,7 @@ export const PATCH: RequestHandler = async (event) => {
 };
 
 export const DELETE: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const ruleId = event.params.ruleId;
 
 	const existing = db.select().from(automationRules).where(eq(automationRules.id, ruleId)).get();
@@ -95,6 +97,7 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	db.delete(automationRules).where(eq(automationRules.id, ruleId)).run();
+	broadcastAutomationChanged(event.params.projectId, user.id);
 
 	return json({ ok: true });
 };

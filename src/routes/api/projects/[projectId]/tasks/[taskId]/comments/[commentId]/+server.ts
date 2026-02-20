@@ -4,6 +4,7 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { comments } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
+import { broadcastCommentChanged } from '$lib/server/ws/handlers.js';
 
 export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -27,6 +28,7 @@ export const PATCH: RequestHandler = async (event) => {
 		.where(eq(comments.id, event.params.commentId))
 		.run();
 
+	broadcastCommentChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };
 
@@ -45,5 +47,6 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	db.delete(comments).where(eq(comments.id, event.params.commentId)).run();
+	broadcastCommentChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };

@@ -4,6 +4,7 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { tasks } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
+import { fireWebhooks } from '$lib/server/webhooks/fire.js';
 
 export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -40,6 +41,43 @@ export const PATCH: RequestHandler = async (event) => {
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'tasks:bulk_updated', taskIds });
 	}
+	if (globalThis.__wsBroadcastAll) {
+		globalThis.__wsBroadcastAll({ type: 'tasks:bulk_updated', taskIds });
+	}
 
 	return json({ ok: true, updated });
+};
+
+export const DELETE: RequestHandler = async (event) => {
+	requireAuth(event);
+	const { projectId } = event.params;
+	const { taskIds } = await event.request.json();
+
+	if (!Array.isArray(taskIds) || taskIds.length === 0) {
+		return json({ error: 'taskIds is required' }, { status: 400 });
+	}
+
+	const deleted = db.transaction((tx) => {
+		let count = 0;
+		for (const taskId of taskIds) {
+			const r = tx.delete(tasks)
+				.where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
+				.run();
+			count += r.changes;
+		}
+		return count;
+	});
+
+	if (globalThis.__wsBroadcast) {
+		globalThis.__wsBroadcast(projectId, { type: 'tasks:bulk_deleted', taskIds });
+	}
+	if (globalThis.__wsBroadcastAll) {
+		globalThis.__wsBroadcastAll({ type: 'tasks:bulk_deleted', taskIds });
+	}
+
+	for (const taskId of taskIds) {
+		fireWebhooks('task.deleted', { projectId, taskId }).catch(() => {});
+	}
+
+	return json({ ok: true, deleted });
 };

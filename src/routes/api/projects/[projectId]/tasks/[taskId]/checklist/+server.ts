@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { checklistItems } from '$lib/server/db/schema.js';
 import { eq, asc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastChecklistChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -20,7 +21,7 @@ export const GET: RequestHandler = async (event) => {
 };
 
 export const PATCH: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { order } = await event.request.json();
 
 	if (!Array.isArray(order)) {
@@ -34,11 +35,12 @@ export const PATCH: RequestHandler = async (event) => {
 			.run();
 	}
 
+	broadcastChecklistChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };
 
 export const POST: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { title } = await event.request.json();
 
 	if (!title?.trim()) {
@@ -61,5 +63,6 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(checklistItems).values(item).run();
+	broadcastChecklistChanged(event.params.projectId, user.id);
 	return json(item, { status: 201 });
 };

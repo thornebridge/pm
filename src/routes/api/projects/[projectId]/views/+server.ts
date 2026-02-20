@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { savedViews } from '$lib/server/db/schema.js';
 import { eq, and, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastViewChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -45,6 +46,7 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(savedViews).values(view).run();
+	broadcastViewChanged(event.params.projectId, user.id);
 	return json(view, { status: 201 });
 };
 
@@ -78,6 +80,7 @@ export const PATCH: RequestHandler = async (event) => {
 		.run();
 
 	const updated = db.select().from(savedViews).where(eq(savedViews.id, id)).get();
+	broadcastViewChanged(event.params.projectId, user.id);
 	return json(updated);
 };
 
@@ -89,5 +92,6 @@ export const DELETE: RequestHandler = async (event) => {
 		.where(and(eq(savedViews.id, id), eq(savedViews.userId, user.id)))
 		.run();
 
+	broadcastViewChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };

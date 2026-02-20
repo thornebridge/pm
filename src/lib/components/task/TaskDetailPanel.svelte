@@ -212,12 +212,11 @@
 		}
 	}
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onclose();
-	}
-
-	function handleBackdrop(e: MouseEvent) {
-		if (e.target === e.currentTarget) onclose();
+	function handleGlobalKeydown(e: KeyboardEvent) {
+		if (task && e.key === 'Escape' && !editingTitle && !editingDescription) {
+			e.preventDefault();
+			onclose();
+		}
 	}
 
 	function handleCommentKeydown(e: KeyboardEvent) {
@@ -228,14 +227,13 @@
 	}
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 {#if task}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="fixed inset-0 z-50 flex justify-end"
-		onkeydown={handleKeydown}
-		onclick={handleBackdrop}
-	>
-		<div class="absolute inset-0 bg-black/30 dark:bg-black/50" transition:fade={{ duration: 150 }}></div>
+	<div class="fixed inset-0 z-50 flex justify-end">
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="absolute inset-0 bg-black/30 dark:bg-black/50" onclick={onclose} transition:fade={{ duration: 150 }}></div>
 		<div
 			class="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-surface-300 bg-surface-50 shadow-2xl dark:border-surface-700 dark:bg-surface-900"
 			role="dialog"

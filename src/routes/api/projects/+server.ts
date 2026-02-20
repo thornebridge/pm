@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { projects, taskStatuses, taskLabels, taskTemplates } from '$lib/server/db/schema.js';
 import { desc, eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastProjectChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -131,5 +132,6 @@ export const POST: RequestHandler = async (event) => {
 		}
 	}
 
+	broadcastProjectChanged('created');
 	return json(project, { status: 201 });
 };

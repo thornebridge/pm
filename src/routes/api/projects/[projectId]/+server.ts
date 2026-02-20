@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { projects, tasks, taskStatuses, taskLabels, attachments } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { unlink } from 'fs/promises';
+import { broadcastProjectChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -40,6 +41,7 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	const updated = db.select().from(projects).where(eq(projects.id, event.params.projectId)).get();
+	broadcastProjectChanged('updated');
 	return json(updated);
 };
 
@@ -61,5 +63,6 @@ export const DELETE: RequestHandler = async (event) => {
 		unlink(f.path).catch(() => {});
 	}
 
+	broadcastProjectChanged('deleted');
 	return json({ ok: true });
 };

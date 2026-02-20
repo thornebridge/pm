@@ -2,8 +2,9 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { attachments, activityLog } from '$lib/server/db/schema.js';
+import { attachments, activityLog, tasks } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
+import { broadcastAttachmentChanged } from '$lib/server/ws/handlers.js';
 import { nanoid } from 'nanoid';
 import { createReadStream } from 'fs';
 import { unlink, stat } from 'fs/promises';
@@ -75,7 +76,10 @@ export const DELETE: RequestHandler = async (event) => {
 		// File may already be deleted; proceed with DB cleanup
 	}
 
+	const taskForAttachment = db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, attachment.taskId)).get();
 	db.delete(attachments).where(eq(attachments.id, event.params.attachmentId)).run();
+
+	if (taskForAttachment) broadcastAttachmentChanged(taskForAttachment.projectId, user.id);
 
 	db.insert(activityLog)
 		.values({

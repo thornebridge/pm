@@ -8,11 +8,11 @@
 </script>
 
 <svelte:head>
-	<title>Sign in</title>
+	<title>Login</title>
 </svelte:head>
 
-<div class="flex min-h-screen items-center justify-center px-4">
-	<div class="w-full max-w-sm">
+<div class="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
+	<div class="w-full max-w-xs">
 		<form
 			method="POST"
 			use:enhance={() => {
@@ -22,70 +22,68 @@
 					await update();
 				};
 			}}
-			class="space-y-4"
+			class="space-y-3"
 		>
-			<h1 class="text-center text-lg font-medium text-surface-900 dark:text-surface-100">Sign in</h1>
-
 			{#if form?.error}
-				<p class="rounded-md bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">{form.error}</p>
+				<p class="rounded px-3 py-1.5 text-xs text-red-400/70">{form.error}</p>
 			{/if}
 
 			<div>
-				<label for="email" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Email</label>
 				<input
 					id="email"
 					name="email"
 					type="email"
 					autocomplete="email"
 					required
+					placeholder="Email"
 					value={form?.email ?? ''}
-					class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+					class="w-full rounded border border-neutral-800/60 bg-neutral-900 px-3 py-2 text-sm text-neutral-300 outline-none placeholder:text-neutral-700 focus:border-neutral-600"
 				/>
 			</div>
 
 			<div>
-				<label for="password" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Password</label>
 				<input
 					id="password"
 					name="password"
 					type="password"
 					autocomplete="current-password"
 					required
-					class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+					placeholder="Password"
+					class="w-full rounded border border-neutral-800/60 bg-neutral-900 px-3 py-2 text-sm text-neutral-300 outline-none placeholder:text-neutral-700 focus:border-neutral-600"
 				/>
 			</div>
 
 			<button
 				type="submit"
 				disabled={loading}
-				class="w-full rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-brand-500 disabled:opacity-50"
+				class="w-full rounded border border-neutral-800/60 bg-neutral-900 px-3 py-2 text-sm text-neutral-500 transition hover:text-neutral-300 disabled:opacity-40"
 			>
-				{loading ? 'Signing in...' : 'Sign in'}
+				{loading ? '...' : 'Continue'}
 			</button>
 		</form>
 
-		<div class="mt-4 text-center">
+		<div class="mt-6 text-center">
 			{#if !showInvite}
 				<button
 					onclick={() => (showInvite = true)}
-					class="text-sm text-brand-500 hover:text-brand-400"
+					class="text-[11px] text-neutral-800 transition hover:text-neutral-600"
 				>
-					Have an invite code?
+					code
 				</button>
 			{:else}
 				<div class="flex gap-2">
 					<input
 						bind:value={inviteCode}
-						placeholder="Enter invite code"
+						placeholder="Enter code"
 						onkeydown={(e) => { if (e.key === 'Enter' && inviteCode.trim()) goto(`/invite/${inviteCode.trim()}`); }}
-						class="flex-1 rounded-md border border-surface-700 bg-surface-800 px-3 py-2 text-sm text-surface-100 outline-none placeholder:text-surface-500 focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+						class="flex-1 rounded border border-neutral-800/60 bg-neutral-900 px-3 py-2 text-sm text-neutral-300 outline-none placeholder:text-neutral-700 focus:border-neutral-600"
 					/>
 					<button
 						onclick={() => { if (inviteCode.trim()) goto(`/invite/${inviteCode.trim()}`); }}
 						disabled={!inviteCode.trim()}
-						class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-brand-500 disabled:opacity-50"
+						class="rounded border border-neutral-800/60 bg-neutral-900 px-3 py-2 text-sm text-neutral-500 transition hover:text-neutral-300 disabled:opacity-40"
 					>
-						Join
+						Go
 					</button>
 				</div>
 			{/if}

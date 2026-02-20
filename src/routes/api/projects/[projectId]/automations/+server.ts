@@ -6,6 +6,7 @@ import { automationRules, automationExecutions } from '$lib/server/db/schema.js'
 import { eq, desc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { validateRule } from '$lib/server/automations/validate.js';
+import { broadcastAutomationChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -79,6 +80,7 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(automationRules).values(rule).run();
+	broadcastAutomationChanged(event.params.projectId, user.id);
 
 	return json({
 		...rule,

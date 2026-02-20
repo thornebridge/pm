@@ -4,6 +4,7 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { taskWatchers, users } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
+import { broadcastWatcherChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -40,6 +41,7 @@ export const POST: RequestHandler = async (event) => {
 		})
 		.run();
 
+	broadcastWatcherChanged(event.params.projectId, user.id);
 	return json({ watching: true }, { status: 201 });
 };
 
@@ -50,5 +52,6 @@ export const DELETE: RequestHandler = async (event) => {
 		.where(and(eq(taskWatchers.taskId, event.params.taskId), eq(taskWatchers.userId, user.id)))
 		.run();
 
+	broadcastWatcherChanged(event.params.projectId, user.id);
 	return json({ watching: false });
 };

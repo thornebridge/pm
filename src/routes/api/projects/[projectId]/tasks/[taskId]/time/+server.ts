@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { timeEntries, users } from '$lib/server/db/schema.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastTimeEntryChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -48,5 +49,6 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(timeEntries).values(entry).run();
+	broadcastTimeEntryChanged(event.params.projectId, user.id);
 	return json(entry, { status: 201 });
 };

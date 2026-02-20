@@ -161,7 +161,9 @@
 				class="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700"
 			/>
 		</td>
-		<td class="px-4 py-2 text-xs text-surface-500">{task.number}</td>
+		<td class="px-4 py-2 text-xs text-surface-500{task.parentId ? ' pl-8' : ''}">
+			{#if task.parentId}<span class="mr-1 text-surface-400">└</span>{/if}{task.number}
+		</td>
 		<td class="px-4 py-2">
 			{#if task.type && task.type !== 'task'}
 				<TaskTypeIcon type={task.type} />

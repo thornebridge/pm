@@ -17,7 +17,7 @@ import {
 // ─── Filtering ───────────────────────────────────────────────────────────────
 
 export function applyFilters(tasks: EnrichedTask[], config: FilterConfig): EnrichedTask[] {
-	let result = tasks.filter((t) => !t.parentId);
+	let result = [...tasks];
 
 	if (config.status.length > 0) {
 		const set = new Set(config.status);
@@ -109,6 +109,40 @@ export function applySorting(
 	});
 
 	return sorted;
+}
+
+// ─── Subtask Ordering ─────────────────────────────────────────────────────────
+
+export function orderWithSubtasks(tasks: EnrichedTask[]): EnrichedTask[] {
+	const childrenMap = new Map<string, EnrichedTask[]>();
+	const parents: EnrichedTask[] = [];
+	const orphans: EnrichedTask[] = [];
+	const parentIds = new Set(tasks.filter((t) => !t.parentId).map((t) => t.id));
+
+	for (const task of tasks) {
+		if (!task.parentId) {
+			parents.push(task);
+		} else if (parentIds.has(task.parentId)) {
+			const children = childrenMap.get(task.parentId) || [];
+			children.push(task);
+			childrenMap.set(task.parentId, children);
+		} else {
+			orphans.push(task);
+		}
+	}
+
+	const result: EnrichedTask[] = [];
+	for (const parent of parents) {
+		result.push(parent);
+		const children = childrenMap.get(parent.id);
+		if (children) {
+			children.sort((a, b) => a.number - b.number);
+			result.push(...children);
+		}
+	}
+	result.push(...orphans);
+
+	return result;
 }
 
 // ─── Grouping ────────────────────────────────────────────────────────────────
@@ -239,13 +273,14 @@ export function processTaskView(
 	const totalCount = allTasks.filter((t) => !t.parentId).length;
 	const filtered = applyFilters(allTasks, filters);
 	const sorted = applySorting(filtered, sort, context.statuses);
-	const groups = applyGrouping(sorted, groupBy, context);
+	const ordered = orderWithSubtasks(sorted);
+	const groups = applyGrouping(ordered, groupBy, context);
 
 	return {
-		tasks: sorted,
+		tasks: ordered,
 		groups,
 		totalCount,
-		filteredCount: sorted.length
+		filteredCount: filtered.filter((t) => !t.parentId).length
 	};
 }
 

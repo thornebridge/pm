@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { taskStatuses, tasks } from '$lib/server/db/schema.js';
 import { eq, asc, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastStatusChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -20,7 +21,7 @@ export const GET: RequestHandler = async (event) => {
 };
 
 export const POST: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { name, color, position, isClosed } = await event.request.json();
 
 	if (!name?.trim()) {
@@ -38,12 +39,13 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(taskStatuses).values(status).run();
+	broadcastStatusChanged(event.params.projectId, user.id);
 	return json(status, { status: 201 });
 };
 
 // Batch reorder
 export const PUT: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { order } = await event.request.json();
 
 	if (!Array.isArray(order)) {
@@ -57,11 +59,12 @@ export const PUT: RequestHandler = async (event) => {
 			.run();
 	}
 
+	broadcastStatusChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };
 
 export const DELETE: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { id } = await event.request.json();
 
 	if (!id) {
@@ -84,5 +87,6 @@ export const DELETE: RequestHandler = async (event) => {
 		.where(and(eq(taskStatuses.id, id), eq(taskStatuses.projectId, event.params.projectId)))
 		.run();
 
+	broadcastStatusChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };

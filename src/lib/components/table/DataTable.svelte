@@ -21,6 +21,7 @@
 		priority: 'urgent' | 'high' | 'medium' | 'low';
 		statusId: string;
 		assigneeId: string | null;
+		parentId: string | null;
 		dueDate: number | null;
 		estimatePoints: number | null;
 		createdAt: number;
@@ -253,12 +254,12 @@
 				class="h-3.5 w-3.5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-700"
 			/>
 		</td>
-		<td class="px-3 py-2">
+		<td class="px-3 py-2{task.parentId ? ' pl-6' : ''}">
 			<a
 				href="/projects/{projectSlug}/task/{task.number}"
 				class="text-xs text-surface-500 hover:text-brand-600"
 			>
-				{task.number}
+				{#if task.parentId}<span class="mr-1 text-surface-400">└</span>{/if}{task.number}
 			</a>
 		</td>
 		<td class="px-3 py-2">

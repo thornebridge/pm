@@ -4,6 +4,7 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { commentReactions, comments } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
+import { broadcastReactionChanged } from '$lib/server/ws/handlers.js';
 
 const ALLOWED_EMOJIS = ['👍', '👎', '❤️', '🎉', '😄', '👀', '🚀', '💯'];
 
@@ -49,6 +50,7 @@ export const POST: RequestHandler = async (event) => {
 				)
 			)
 			.run();
+		broadcastReactionChanged(event.params.projectId, user.id);
 		return json({ action: 'removed' });
 	} else {
 		// Add
@@ -60,6 +62,7 @@ export const POST: RequestHandler = async (event) => {
 				createdAt: Date.now()
 			})
 			.run();
+		broadcastReactionChanged(event.params.projectId, user.id);
 		return json({ action: 'added' });
 	}
 };

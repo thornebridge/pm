@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { folders } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastFolderChanged } from '$lib/server/ws/handlers.js';
 
 function slugify(text: string): string {
 	return text
@@ -40,6 +41,7 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(folders).values(folder).run();
+	broadcastFolderChanged('created');
 	return json(folder, { status: 201 });
 };
 
@@ -65,6 +67,7 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	const updated = db.select().from(folders).where(eq(folders.id, id)).get();
+	broadcastFolderChanged('updated');
 	return json(updated);
 };
 
@@ -77,5 +80,6 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	db.delete(folders).where(eq(folders.id, id)).run();
+	broadcastFolderChanged('deleted');
 	return json({ ok: true });
 };

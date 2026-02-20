@@ -9,6 +9,7 @@ import { mkdir } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { env } from '$env/dynamic/private';
 import path from 'node:path';
+import { broadcastAttachmentChanged } from '$lib/server/ws/handlers.js';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
@@ -115,5 +116,6 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: timestamp
 	};
 
+	broadcastAttachmentChanged(event.params.projectId, user.id);
 	return json(result, { status: 201 });
 };

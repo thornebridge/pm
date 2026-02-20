@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { taskLabels } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { broadcastLabelChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -19,7 +20,7 @@ export const GET: RequestHandler = async (event) => {
 };
 
 export const POST: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { name, color } = await event.request.json();
 
 	if (!name?.trim()) {
@@ -35,11 +36,12 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(taskLabels).values(label).run();
+	broadcastLabelChanged(event.params.projectId, user.id);
 	return json(label, { status: 201 });
 };
 
 export const DELETE: RequestHandler = async (event) => {
-	requireAuth(event);
+	const user = requireAuth(event);
 	const { id } = await event.request.json();
 
 	if (!id) {
@@ -51,5 +53,6 @@ export const DELETE: RequestHandler = async (event) => {
 		.where(and(eq(taskLabels.id, id), eq(taskLabels.projectId, event.params.projectId)))
 		.run();
 
+	broadcastLabelChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };

@@ -75,6 +75,9 @@ export const PATCH: RequestHandler = async (event) => {
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'sprint:updated', sprint: updated });
 	}
+	if (globalThis.__wsBroadcastAll) {
+		globalThis.__wsBroadcastAll({ type: 'sprint:updated', sprint: updated });
+	}
 
 	return json(updated);
 };
@@ -95,6 +98,9 @@ export const DELETE: RequestHandler = async (event) => {
 
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'sprint:deleted', sprintId });
+	}
+	if (globalThis.__wsBroadcastAll) {
+		globalThis.__wsBroadcastAll({ type: 'sprint:deleted', sprintId });
 	}
 
 	return json({ ok: true });

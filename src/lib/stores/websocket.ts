@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { invalidateAll } from '$app/navigation';
 import { browser } from '$app/environment';
+import { refreshUnreadCount } from './notifications.js';
 
 export const wsConnected = writable(false);
 
@@ -74,13 +75,12 @@ function send(msg: unknown) {
 }
 
 function handleWsEvent(msg: { type: string }) {
-	// For all mutation events, invalidate SvelteKit data
-	switch (msg.type) {
-		case 'task:created':
-		case 'task:updated':
-		case 'task:deleted':
-		case 'comment:added':
-			invalidateAll();
-			break;
+	// Any server event with a type triggers a full data refresh.
+	// This covers tasks, comments, projects, folders, statuses, labels,
+	// checklists, reactions, watchers, dependencies, time entries,
+	// attachments, automations, views, notifications, and admin changes.
+	if (msg.type) {
+		invalidateAll();
+		refreshUnreadCount();
 	}
 }

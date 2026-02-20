@@ -50,6 +50,16 @@ globalThis.__wsBroadcast = (projectId, event, excludeUserId) => {
 	}
 };
 
+// Broadcast to ALL connected clients (workspace-level events like sidebar, dashboard, my-tasks)
+globalThis.__wsBroadcastAll = (event) => {
+	const payload = JSON.stringify(event);
+	for (const ws of clients) {
+		if (ws.readyState === 1) {
+			ws.send(payload);
+		}
+	}
+};
+
 // Heartbeat
 setInterval(() => {
 	for (const ws of clients) {
