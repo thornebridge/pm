@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { startHeartbeat, reportError } from '@thornebridge/watchtower-client';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -119,8 +120,8 @@ function generateSnapshots() {
 }
 
 // Generate snapshots on startup (5s delay for migration settling) + every 4 hours
-setTimeout(() => { try { generateSnapshots(); console.log('[snapshots] Initial generation complete'); } catch(e) { console.error('[snapshots]', e); } }, 5000);
-setInterval(() => { try { generateSnapshots(); console.log('[snapshots] Periodic generation complete'); } catch(e) { console.error('[snapshots]', e); } }, 4 * 60 * 60 * 1000);
+setTimeout(() => { try { generateSnapshots(); console.log('[snapshots] Initial generation complete'); } catch(e) { console.error('[snapshots]', e); if (e instanceof Error) reportError(e, { task: 'snapshots' }); } }, 5000);
+setInterval(() => { try { generateSnapshots(); console.log('[snapshots] Periodic generation complete'); } catch(e) { console.error('[snapshots]', e); if (e instanceof Error) reportError(e, { task: 'snapshots' }); } }, 4 * 60 * 60 * 1000);
 
 // ─── Due Date Reminders & Digest Emails ──────────────────────────────────────
 
@@ -613,17 +614,28 @@ function runRecurringTasksCheck() {
 
 // Run reminders every 30 minutes, digest check every 15 minutes, recurring every 30 minutes
 setTimeout(() => {
-	try { runDueDateReminders(); console.log('[reminders] Initial run complete'); } catch(e) { console.error('[reminders]', e); }
-	try { runDigestEmails(); console.log('[digest] Initial run complete'); } catch(e) { console.error('[digest]', e); }
-	try { runRecurringTasksCheck(); console.log('[recurring] Initial run complete'); } catch(e) { console.error('[recurring]', e); }
+	try { runDueDateReminders(); console.log('[reminders] Initial run complete'); } catch(e) { console.error('[reminders]', e); if (e instanceof Error) reportError(e, { task: 'reminders' }); }
+	try { runDigestEmails(); console.log('[digest] Initial run complete'); } catch(e) { console.error('[digest]', e); if (e instanceof Error) reportError(e, { task: 'digest' }); }
+	try { runRecurringTasksCheck(); console.log('[recurring] Initial run complete'); } catch(e) { console.error('[recurring]', e); if (e instanceof Error) reportError(e, { task: 'recurring' }); }
 }, 10000);
 
-setInterval(() => { try { runDueDateReminders(); } catch(e) { console.error('[reminders]', e); } }, 30 * 60 * 1000);
-setInterval(() => { try { runDigestEmails(); } catch(e) { console.error('[digest]', e); } }, 15 * 60 * 1000);
-setInterval(() => { try { runRecurringTasksCheck(); } catch(e) { console.error('[recurring]', e); } }, 30 * 60 * 1000);
+setInterval(() => { try { runDueDateReminders(); } catch(e) { console.error('[reminders]', e); if (e instanceof Error) reportError(e, { task: 'reminders' }); } }, 30 * 60 * 1000);
+setInterval(() => { try { runDigestEmails(); } catch(e) { console.error('[digest]', e); if (e instanceof Error) reportError(e, { task: 'digest' }); } }, 15 * 60 * 1000);
+setInterval(() => { try { runRecurringTasksCheck(); } catch(e) { console.error('[recurring]', e); if (e instanceof Error) reportError(e, { task: 'recurring' }); } }, 30 * 60 * 1000);
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
 
 server.listen(PORT, HOST, () => {
 	console.log(`Listening on ${HOST}:${PORT}`);
+	startHeartbeat('vps3.pm');
+});
+
+process.on('uncaughtException', (err) => {
+	reportError(err);
+	console.error('[uncaught]', err);
+});
+process.on('unhandledRejection', (reason) => {
+	const err = reason instanceof Error ? reason : new Error(String(reason));
+	reportError(err);
+	console.error('[unhandled]', err);
 });

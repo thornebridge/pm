@@ -1,4 +1,4 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { getSessionCookie, validateSession } from '$lib/server/auth/session.js';
 import { seed } from '$lib/server/db/seed.js';
 import { checkRateLimit } from '$lib/server/security/rateLimit.js';
@@ -8,6 +8,7 @@ import { db } from '$lib/server/db/index.js';
 import { users, userThemes } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { getBuiltinTheme } from '$lib/server/theme/builtins.js';
+import { reportError } from '@thornebridge/watchtower-client';
 
 // Run seed on first request
 let seeded = false;
@@ -117,4 +118,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 			return html.replace('%pm.theme_class%', event.locals.themeMode);
 		}
 	});
+};
+
+export const handleError: HandleServerError = ({ error }) => {
+	if (error instanceof Error) {
+		reportError(error);
+	}
 };

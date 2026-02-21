@@ -14,6 +14,9 @@ importers:
       '@sveltejs/adapter-node':
         specifier: ^5.5.3
         version: 5.5.3(@sveltejs/kit@2.52.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.51.3)(vite@7.3.1(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)))(svelte@5.51.3)(typescript@5.9.3)(vite@7.3.1(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)))
+      '@thornebridge/watchtower-client':
+        specifier: git+https://github.com/thornebridge/watchtower-client.git
+        version: git+https://github.com/thornebridge/watchtower-client.git#3a10a140ad7453495c6bd67b7493b0907e7fbce4
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -953,6 +956,11 @@ packages:
     resolution: {integrity: sha512-da9mFCaHpoOgtQiWtDGIikTrSpUFBtIZCG3jy/u2BGV+l/X1/pbxzmIUxNt6JWm19N3WtGi4KlJdSH/Si83WOA==}
     peerDependencies:
       vite: ^5.2.0 || ^6 || ^7
+
+  '@thornebridge/watchtower-client@git+https://github.com/thornebridge/watchtower-client.git#3a10a140ad7453495c6bd67b7493b0907e7fbce4':
+    resolution: {commit: 3a10a140ad7453495c6bd67b7493b0907e7fbce4, repo: https://github.com/thornebridge/watchtower-client.git, type: git}
+    version: 1.0.0
+    engines: {node: '>=18.0.0'}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -2276,6 +2284,8 @@ snapshots:
       '@tailwindcss/oxide': 4.2.0
       tailwindcss: 4.2.0
       vite: 7.3.1(@types/node@25.2.3)(jiti@2.6.1)(lightningcss@1.31.1)
+
+  '@thornebridge/watchtower-client@git+https://github.com/thornebridge/watchtower-client.git#3a10a140ad7453495c6bd67b7493b0907e7fbce4': {}
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
