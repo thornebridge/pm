@@ -94,8 +94,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 		// CSRF validation for mutations on API routes
 		if (MUTATION_METHODS.has(event.request.method)) {
-			// Skip CSRF for login/register (no session yet) and form actions
-			const skipCsrf = event.url.pathname.startsWith('/api/auth/');
+			// Skip CSRF for login/register (no session yet), webhooks (external), and form actions
+			const skipCsrf = event.url.pathname.startsWith('/api/auth/') || event.url.pathname.startsWith('/api/webhooks/');
 
 			if (!skipCsrf && event.locals.user) {
 				if (!validateCsrf(event.cookies, event.request)) {

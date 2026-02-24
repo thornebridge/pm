@@ -158,6 +158,13 @@
 	currentProjectId={currentProjectId}
 />
 
+<!-- Telnyx dialer widget (dynamically loaded when enabled) -->
+{#if data.telnyxEnabled}
+	{#await import('$lib/components/crm/DialerWidget.svelte') then { default: DialerWidget }}
+		<DialerWidget />
+	{/await}
+{/if}
+
 <!-- Keyboard shortcuts help modal -->
 {#if showShortcuts}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->

@@ -7,16 +7,55 @@
 
 	let { data } = $props();
 
-	let tab = $state<'org' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
+	let tab = $state<'org' | 'telephony' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
 
 	// Org settings state
 	let orgPlatformName = $state('');
 	let orgLoaded = $state(false);
 	let savingOrg = $state(false);
 
+	// Telnyx telephony state
+	let telnyxEnabled = $state(false);
+	let telnyxApiKey = $state('');
+	let telnyxConnectionId = $state('');
+	let telnyxCredentialId = $state('');
+	let telnyxCallerNumbers = $state('');
+	let telnyxRecordCalls = $state(false);
+	let savingTelnyx = $state(false);
+	let testingTelnyx = $state(false);
+	let telnyxTestResult = $state<{ valid: boolean; error?: string } | null>(null);
+	let showApiKey = $state(false);
+
 	$effect(() => {
-		api<{ platformName: string }>('/api/admin/org')
-			.then((org) => { orgPlatformName = org.platformName; orgLoaded = true; })
+		api<{
+			platformName: string;
+			telnyxEnabled: boolean;
+			telnyxApiKey: string | null;
+			telnyxConnectionId: string | null;
+			telnyxCredentialId: string | null;
+			telnyxCallerNumber: string | null; // JSON array stored in DB
+			telnyxRecordCalls: boolean;
+		}>('/api/admin/org')
+			.then((org) => {
+				orgPlatformName = org.platformName;
+				telnyxEnabled = org.telnyxEnabled;
+				telnyxApiKey = org.telnyxApiKey || '';
+				telnyxConnectionId = org.telnyxConnectionId || '';
+				telnyxCredentialId = org.telnyxCredentialId || '';
+				// Parse JSON array to newline-separated for textarea
+				if (org.telnyxCallerNumber) {
+					try {
+						const nums = JSON.parse(org.telnyxCallerNumber);
+						telnyxCallerNumbers = Array.isArray(nums) ? nums.join('\n') : org.telnyxCallerNumber;
+					} catch {
+						telnyxCallerNumbers = org.telnyxCallerNumber;
+					}
+				} else {
+					telnyxCallerNumbers = '';
+				}
+				telnyxRecordCalls = org.telnyxRecordCalls;
+				orgLoaded = true;
+			})
 			.catch(() => { orgLoaded = true; });
 	});
 
@@ -33,6 +72,49 @@
 			showToast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
 		} finally {
 			savingOrg = false;
+		}
+	}
+
+	async function saveTelnyxSettings() {
+		savingTelnyx = true;
+		try {
+			const payload: Record<string, unknown> = {
+				telnyxEnabled,
+				telnyxConnectionId,
+				telnyxCredentialId,
+				telnyxCallerNumbers,
+				telnyxRecordCalls
+			};
+			// Only send API key if user changed it (not the masked version)
+			if (telnyxApiKey && !telnyxApiKey.startsWith('•')) {
+				payload.telnyxApiKey = telnyxApiKey;
+			}
+			await api('/api/admin/org', {
+				method: 'PUT',
+				body: JSON.stringify(payload)
+			});
+			await invalidateAll();
+			showToast('Telephony settings saved');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
+		} finally {
+			savingTelnyx = false;
+		}
+	}
+
+	async function testTelnyxConnection() {
+		testingTelnyx = true;
+		telnyxTestResult = null;
+		try {
+			const apiKeyToTest = telnyxApiKey.startsWith('•') ? '' : telnyxApiKey;
+			telnyxTestResult = await api<{ valid: boolean; error?: string }>('/api/admin/telnyx-test', {
+				method: 'POST',
+				body: JSON.stringify({ apiKey: apiKeyToTest, credentialId: telnyxCredentialId })
+			});
+		} catch {
+			telnyxTestResult = { valid: false, error: 'Connection test failed' };
+		} finally {
+			testingTelnyx = false;
 		}
 	}
 
@@ -222,7 +304,7 @@
 
 	<!-- Tabs -->
 	<div class="mb-6 flex gap-1 overflow-x-auto border-b border-surface-300 dark:border-surface-800">
-		{#each [['org', 'Organization'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
+		{#each [['org', 'Organization'], ['telephony', 'Telephony'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
 			<button
 				onclick={() => (tab = key as typeof tab)}
 				class="whitespace-nowrap px-3 py-2 text-sm font-medium transition {tab === key ? 'border-b-2 border-brand-500 text-brand-600 dark:text-brand-400' : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100'}"
@@ -254,6 +336,107 @@
 					>
 						{savingOrg ? 'Saving...' : 'Save'}
 					</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-sm text-surface-400">Loading...</p>
+		{/if}
+
+	{:else if tab === 'telephony'}
+		{#if orgLoaded}
+			<div class="space-y-5">
+				<div class="flex items-center gap-3">
+					<label class="relative inline-flex cursor-pointer items-center">
+						<input type="checkbox" bind:checked={telnyxEnabled} class="peer sr-only" />
+						<div class="peer h-5 w-9 rounded-full bg-surface-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-brand-600 peer-checked:after:translate-x-full dark:bg-surface-700"></div>
+					</label>
+					<span class="text-sm font-medium text-surface-900 dark:text-surface-100">Enable Telnyx Telephony</span>
+				</div>
+
+				{#if telnyxEnabled}
+					<div>
+						<label for="telnyx-api-key" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">API Key</label>
+						<div class="relative max-w-md">
+							<input
+								id="telnyx-api-key"
+								type={showApiKey ? 'text' : 'password'}
+								bind:value={telnyxApiKey}
+								placeholder="KEY..."
+								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 pr-16 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							/>
+							<button
+								type="button"
+								onclick={() => (showApiKey = !showApiKey)}
+								class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+							>{showApiKey ? 'Hide' : 'Show'}</button>
+						</div>
+						<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Your Telnyx V2 API Key. Found in the Telnyx Portal under Auth.</p>
+					</div>
+
+					<div>
+						<label for="telnyx-connection-id" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Connection ID</label>
+						<input
+							id="telnyx-connection-id"
+							bind:value={telnyxConnectionId}
+							placeholder="e.g. 1234567890"
+							class="w-full max-w-md rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						/>
+						<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Credential Connection ID from Telnyx SIP Connections.</p>
+					</div>
+
+					<div>
+						<label for="telnyx-credential-id" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Credential ID</label>
+						<input
+							id="telnyx-credential-id"
+							bind:value={telnyxCredentialId}
+							placeholder="e.g. 1234567890"
+							class="w-full max-w-md rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						/>
+						<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Telephony Credential ID used for WebRTC JWT token generation.</p>
+					</div>
+
+					<div>
+						<label for="telnyx-callers" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Caller Numbers</label>
+						<textarea
+							id="telnyx-callers"
+							bind:value={telnyxCallerNumbers}
+							placeholder="+15551234567&#10;+15559876543"
+							rows={4}
+							class="w-full max-w-md rounded-md border border-surface-300 bg-surface-50 px-3 py-2 font-mono text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						></textarea>
+						<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">One number per line in E.164 format (+1XXXXXXXXXX). Calls rotate through these numbers.</p>
+					</div>
+
+					<div class="flex items-center gap-3">
+						<label class="relative inline-flex cursor-pointer items-center">
+							<input type="checkbox" bind:checked={telnyxRecordCalls} class="peer sr-only" />
+							<div class="peer h-5 w-9 rounded-full bg-surface-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-brand-600 peer-checked:after:translate-x-full dark:bg-surface-700"></div>
+						</label>
+						<span class="text-sm text-surface-700 dark:text-surface-300">Record calls</span>
+					</div>
+
+					<div class="flex items-center gap-3">
+						<button
+							onclick={testTelnyxConnection}
+							disabled={testingTelnyx || !telnyxCredentialId}
+							class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-700 hover:bg-surface-100 disabled:opacity-50 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800"
+						>{testingTelnyx ? 'Testing...' : 'Test Connection'}</button>
+						{#if telnyxTestResult}
+							{#if telnyxTestResult.valid}
+								<span class="text-sm text-green-600 dark:text-green-400">Connected successfully</span>
+							{:else}
+								<span class="text-sm text-red-500">{telnyxTestResult.error || 'Connection failed'}</span>
+							{/if}
+						{/if}
+					</div>
+				{/if}
+
+				<div>
+					<button
+						onclick={saveTelnyxSettings}
+						disabled={savingTelnyx}
+						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+					>{savingTelnyx ? 'Saving...' : 'Save'}</button>
 				</div>
 			</div>
 		{:else}

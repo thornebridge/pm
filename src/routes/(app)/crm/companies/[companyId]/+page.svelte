@@ -5,6 +5,7 @@
 	import { formatCurrency } from '$lib/utils/currency.js';
 	import CompanyForm from '$lib/components/crm/CompanyForm.svelte';
 	import ContactForm from '$lib/components/crm/ContactForm.svelte';
+	import ClickToCall from '$lib/components/crm/ClickToCall.svelte';
 
 	let { data } = $props();
 
@@ -85,7 +86,12 @@
 		</div>
 		<div>
 			<p class="text-xs text-surface-500">Phone</p>
-			<p class="text-sm text-surface-900 dark:text-surface-100">{data.company.phone || '\u2014'}</p>
+			<ClickToCall
+				phone={data.company.phone || ''}
+				companyId={data.company.id}
+				contactName={data.company.name}
+				telnyxEnabled={data.telnyxEnabled}
+			/>
 		</div>
 		<div>
 			<p class="text-xs text-surface-500">Owner</p>

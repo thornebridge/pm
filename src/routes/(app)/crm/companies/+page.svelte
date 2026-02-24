@@ -1,5 +1,6 @@
 <script lang="ts">
 	import CompanyForm from '$lib/components/crm/CompanyForm.svelte';
+	import ClickToCall from '$lib/components/crm/ClickToCall.svelte';
 
 	let { data } = $props();
 
@@ -109,7 +110,14 @@
 							<td class="px-4 py-2.5 font-medium text-surface-900 dark:text-surface-100">{company.name}</td>
 							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{company.industry || '\u2014'}</td>
 							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{company.size || '\u2014'}</td>
-							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{company.phone || '\u2014'}</td>
+							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400" onclick={(e) => e.stopPropagation()}>
+								<ClickToCall
+									phone={company.phone || ''}
+									companyId={company.id}
+									contactName={company.name}
+									telnyxEnabled={data.telnyxEnabled}
+								/>
+							</td>
 							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{company.ownerName || '\u2014'}</td>
 							<td class="px-4 py-2.5 text-center text-surface-600 dark:text-surface-400">{company.contactCount}</td>
 							<td class="px-4 py-2.5 text-center text-surface-600 dark:text-surface-400">{company.oppCount}</td>

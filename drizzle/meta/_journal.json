@@ -120,6 +120,13 @@
       "when": 1771562748822,
       "tag": "0016_daffy_firelord",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1771895816185,
+      "tag": "0017_legal_northstar",
+      "breakpoints": true
     }
   ]
 }

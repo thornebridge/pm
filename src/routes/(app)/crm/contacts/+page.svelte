@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ContactForm from '$lib/components/crm/ContactForm.svelte';
+	import ClickToCall from '$lib/components/crm/ClickToCall.svelte';
 
 	let { data } = $props();
 
@@ -113,7 +114,15 @@
 								{/if}
 							</td>
 							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{contact.email || '\u2014'}</td>
-							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{contact.phone || '\u2014'}</td>
+							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400" onclick={(e) => e.stopPropagation()}>
+								<ClickToCall
+									phone={contact.phone || ''}
+									contactId={contact.id}
+									companyId={contact.companyId}
+									contactName="{contact.firstName} {contact.lastName}"
+									telnyxEnabled={data.telnyxEnabled}
+								/>
+							</td>
 							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">{contact.title || '\u2014'}</td>
 							<td class="px-4 py-2.5 text-surface-600 dark:text-surface-400">
 								{#if contact.companyName}

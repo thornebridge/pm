@@ -4,6 +4,7 @@
 	import { showToast } from '$lib/stores/toasts.js';
 	import { formatCurrency } from '$lib/utils/currency.js';
 	import ContactForm from '$lib/components/crm/ContactForm.svelte';
+	import ClickToCall from '$lib/components/crm/ClickToCall.svelte';
 
 	let { data } = $props();
 
@@ -83,7 +84,13 @@
 		</div>
 		<div>
 			<p class="text-xs text-surface-500">Phone</p>
-			<p class="text-sm text-surface-900 dark:text-surface-100">{data.contact.phone || '\u2014'}</p>
+			<ClickToCall
+				phone={data.contact.phone || ''}
+				contactId={data.contact.id}
+				companyId={data.contact.companyId}
+				contactName="{data.contact.firstName} {data.contact.lastName}"
+				telnyxEnabled={data.telnyxEnabled}
+			/>
 		</div>
 		<div>
 			<p class="text-xs text-surface-500">Source</p>

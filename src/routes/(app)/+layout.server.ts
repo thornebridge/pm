@@ -68,6 +68,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	// Load org settings
 	const org = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
 	const platformName = org?.platformName || 'PM';
+	const telnyxEnabled = org?.telnyxEnabled ?? false;
 
 	return {
 		user: locals.user,
@@ -75,6 +76,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		sidebarProjects,
 		themeVariables,
 		themeMode,
-		platformName
+		platformName,
+		telnyxEnabled
 	};
 };

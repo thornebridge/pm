@@ -895,8 +895,55 @@ export const userThemes = sqliteTable(
 export const orgSettings = sqliteTable('org_settings', {
 	id: text('id').primaryKey(), // always 'default'
 	platformName: text('platform_name').notNull().default('PM'),
+	// Telnyx telephony integration
+	telnyxEnabled: integer('telnyx_enabled', { mode: 'boolean' }).notNull().default(false),
+	telnyxApiKey: text('telnyx_api_key'),
+	telnyxConnectionId: text('telnyx_connection_id'),
+	telnyxCredentialId: text('telnyx_credential_id'),
+	telnyxCallerNumber: text('telnyx_caller_number'),
+	telnyxRecordCalls: integer('telnyx_record_calls', { mode: 'boolean' }).notNull().default(false),
 	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 });
+
+// ─── Telnyx Call Logs ────────────────────────────────────────────────────────
+
+export const telnyxCallLogs = sqliteTable(
+	'telnyx_call_logs',
+	{
+		id: text('id').primaryKey(),
+		telnyxCallControlId: text('telnyx_call_control_id'),
+		telnyxCallSessionId: text('telnyx_call_session_id'),
+		direction: text('direction', { enum: ['outbound', 'inbound'] }).notNull(),
+		fromNumber: text('from_number').notNull(),
+		toNumber: text('to_number').notNull(),
+		status: text('status', {
+			enum: ['initiated', 'ringing', 'answered', 'completed', 'failed', 'busy', 'no_answer', 'cancelled']
+		})
+			.notNull()
+			.default('initiated'),
+		startedAt: integer('started_at', { mode: 'number' }),
+		answeredAt: integer('answered_at', { mode: 'number' }),
+		endedAt: integer('ended_at', { mode: 'number' }),
+		durationSeconds: integer('duration_seconds'),
+		recordingUrl: text('recording_url'),
+		contactId: text('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+		companyId: text('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+		crmActivityId: text('crm_activity_id').references(() => crmActivities.id, { onDelete: 'set null' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id),
+		notes: text('notes'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_telnyx_calls_user').on(t.userId, t.createdAt),
+		index('idx_telnyx_calls_contact').on(t.contactId),
+		index('idx_telnyx_calls_company').on(t.companyId),
+		index('idx_telnyx_calls_session').on(t.telnyxCallSessionId),
+		index('idx_telnyx_calls_status').on(t.status)
+	]
+);
 
 // ─── Financials ─────────────────────────────────────────────────────────────
 
