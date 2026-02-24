@@ -85,12 +85,13 @@
 		}
 	}
 
-	async function triggerSync() {
+	async function triggerSync(full = false) {
 		syncing = true;
 		try {
-			await api('/api/crm/gmail/sync', { method: 'POST' });
+			const url = full ? '/api/crm/gmail/sync?full=true' : '/api/crm/gmail/sync';
+			await api(url, { method: 'POST' });
 			await loadThreads();
-			showToast('Email synced');
+			showToast(full ? 'Full sync complete' : 'Email synced');
 		} catch {
 			showToast('Sync failed', 'error');
 		} finally {
@@ -193,9 +194,14 @@
 					<div class="text-[10px] text-surface-500">
 						{data.gmailEmail}
 					</div>
-					<button onclick={disconnectGmail} class="text-[10px] text-red-500 hover:text-red-400">
-						Disconnect
-					</button>
+					<div class="flex gap-2">
+						<button onclick={() => triggerSync(true)} disabled={syncing} class="text-[10px] text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 disabled:opacity-50">
+							Re-sync
+						</button>
+						<button onclick={disconnectGmail} class="text-[10px] text-red-500 hover:text-red-400">
+							Disconnect
+						</button>
+					</div>
 				</div>
 				{#if data.lastSyncAt}
 					<div class="mt-0.5 text-[10px] text-surface-500">

@@ -20,10 +20,18 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	try {
-		if (integration.historyId) {
-			await incrementalSync(user.id);
-		} else {
+		// Support ?full=true to force a full re-sync (clears historyId first)
+		const forceFullSync = event.url.searchParams.get('full') === 'true';
+
+		if (forceFullSync || !integration.historyId) {
+			if (integration.historyId) {
+				await db.update(gmailIntegrations)
+					.set({ historyId: null, updatedAt: Date.now() })
+					.where(eq(gmailIntegrations.userId, user.id));
+			}
 			await initialSync(user.id);
+		} else {
+			await incrementalSync(user.id);
 		}
 
 		return new Response(JSON.stringify({ ok: true }), {

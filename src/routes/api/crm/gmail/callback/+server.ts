@@ -59,10 +59,13 @@ export const GET: RequestHandler = async (event) => {
 		});
 
 	// Fetch Gmail profile to get the user's email address
+	// NOTE: Do NOT save historyId here — leave it null so the first sync
+	// triggers initialSync() which fetches existing messages.
+	// historyId is stored after initialSync completes.
 	try {
 		const profile = await getProfile(user.id);
 		await db.update(gmailIntegrations)
-			.set({ email: profile.email, historyId: profile.historyId, updatedAt: Date.now() })
+			.set({ email: profile.email, updatedAt: Date.now() })
 			.where(eq(gmailIntegrations.userId, user.id));
 	} catch (err) {
 		console.error('[gmail] Failed to fetch profile:', err);
