@@ -69,7 +69,7 @@ async function executeLogActivity(action: CrmActionLogActivity, payload: CrmAuto
 	const subject = await renderTemplate(action.subject, payload.entity);
 	const now = Date.now();
 
-	const activity: Record<string, unknown> = {
+	const activity: typeof crmActivities.$inferInsert = {
 		id: nanoid(12),
 		type: action.activityType,
 		subject,
@@ -81,7 +81,7 @@ async function executeLogActivity(action: CrmActionLogActivity, payload: CrmAuto
 
 	if (payload.entityType === 'opportunity') {
 		activity.opportunityId = payload.entityId;
-		activity.companyId = payload.entity.companyId || null;
+		activity.companyId = (payload.entity.companyId as string) || null;
 	} else if (payload.entityType === 'company') {
 		activity.companyId = payload.entityId;
 	} else if (payload.entityType === 'contact') {
@@ -97,7 +97,7 @@ async function executeCreateTask(action: CrmActionCreateTask, payload: CrmAutoma
 	const now = Date.now();
 	const dueDate = now + (action.daysFromNow * 86400000);
 
-	const task: Record<string, unknown> = {
+	const task: typeof crmTasks.$inferInsert = {
 		id: nanoid(12),
 		title,
 		priority: action.priority,
@@ -111,7 +111,7 @@ async function executeCreateTask(action: CrmActionCreateTask, payload: CrmAutoma
 
 	if (payload.entityType === 'opportunity') {
 		task.opportunityId = payload.entityId;
-		task.companyId = payload.entity.companyId || null;
+		task.companyId = (payload.entity.companyId as string) || null;
 	} else if (payload.entityType === 'company') {
 		task.companyId = payload.entityId;
 	} else if (payload.entityType === 'contact') {

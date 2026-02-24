@@ -92,17 +92,35 @@ async function seedCrmProducts() {
 	const [admin] = await db.select({ id: users.id }).from(users).limit(1);
 	if (!admin) return; // no users yet — skip product seeds
 
-	const products = [
+	interface SeedTier {
+		name: string;
+		billingModel: 'per_unit' | 'recurring' | 'one_time';
+		unitAmount: number;
+		billingInterval?: 'monthly' | 'annual';
+		unitLabel?: string;
+		isDefault?: boolean;
+		setupFee?: number;
+	}
+
+	const products: Array<{
+		id: string;
+		name: string;
+		sku: string;
+		description: string;
+		category: string;
+		type: 'service' | 'subscription';
+		tiers: SeedTier[];
+	}> = [
 		{
 			id: nanoid(12),
 			name: 'Web Development',
 			sku: 'SVC-WEBDEV',
 			description: 'Custom web application development services',
 			category: 'Development',
-			type: 'service' as const,
+			type: 'service',
 			tiers: [
-				{ name: 'Hourly Rate', billingModel: 'per_unit' as const, unitAmount: 15000, unitLabel: 'hour', isDefault: true },
-				{ name: 'Monthly Retainer', billingModel: 'recurring' as const, unitAmount: 800000, billingInterval: 'monthly' as const }
+				{ name: 'Hourly Rate', billingModel: 'per_unit', unitAmount: 15000, unitLabel: 'hour', isDefault: true },
+				{ name: 'Monthly Retainer', billingModel: 'recurring', unitAmount: 800000, billingInterval: 'monthly' }
 			]
 		},
 		{
@@ -111,11 +129,11 @@ async function seedCrmProducts() {
 			sku: 'SUB-SAAS',
 			description: 'Cloud platform subscription with per-seat pricing',
 			category: 'Software',
-			type: 'subscription' as const,
+			type: 'subscription',
 			tiers: [
-				{ name: 'Starter (Monthly)', billingModel: 'per_unit' as const, unitAmount: 2900, billingInterval: 'monthly' as const, unitLabel: 'seat', isDefault: true },
-				{ name: 'Pro (Annual)', billingModel: 'per_unit' as const, unitAmount: 24900, billingInterval: 'annual' as const, unitLabel: 'seat' },
-				{ name: 'Enterprise (Annual)', billingModel: 'recurring' as const, unitAmount: 500000, billingInterval: 'annual' as const, setupFee: 250000 }
+				{ name: 'Starter (Monthly)', billingModel: 'per_unit', unitAmount: 2900, billingInterval: 'monthly', unitLabel: 'seat', isDefault: true },
+				{ name: 'Pro (Annual)', billingModel: 'per_unit', unitAmount: 24900, billingInterval: 'annual', unitLabel: 'seat' },
+				{ name: 'Enterprise (Annual)', billingModel: 'recurring', unitAmount: 500000, billingInterval: 'annual', setupFee: 250000 }
 			]
 		},
 		{
@@ -124,10 +142,10 @@ async function seedCrmProducts() {
 			sku: 'SVC-STRAT',
 			description: 'Business strategy and digital transformation consulting',
 			category: 'Consulting',
-			type: 'service' as const,
+			type: 'service',
 			tiers: [
-				{ name: 'Discovery Workshop', billingModel: 'one_time' as const, unitAmount: 500000, isDefault: true },
-				{ name: 'Advisory Retainer', billingModel: 'recurring' as const, unitAmount: 1500000, billingInterval: 'monthly' as const }
+				{ name: 'Discovery Workshop', billingModel: 'one_time', unitAmount: 500000, isDefault: true },
+				{ name: 'Advisory Retainer', billingModel: 'recurring', unitAmount: 1500000, billingInterval: 'monthly' }
 			]
 		}
 	];

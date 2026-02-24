@@ -155,8 +155,7 @@
 	async function loadCustomFields() {
 		cfLoading = true;
 		try {
-			const res = await api(`/api/crm/custom-fields?entityType=${cfEntityTab}`);
-			const data = await res.json();
+			const data = await api<FieldDef[]>(`/api/crm/custom-fields?entityType=${cfEntityTab}`);
 			cfFields = data.map((d: FieldDef) => ({
 				...d,
 				options: d.options

@@ -118,7 +118,7 @@
 								<ClickToCall
 									phone={contact.phone || ''}
 									contactId={contact.id}
-									companyId={contact.companyId}
+									companyId={contact.companyId ?? undefined}
 									contactName="{contact.firstName} {contact.lastName}"
 									telnyxEnabled={data.telnyxEnabled}
 								/>

@@ -88,7 +88,7 @@
 			<ClickToCall
 				phone={data.contact.phone || ''}
 				contactId={data.contact.id}
-				companyId={data.contact.companyId}
+				companyId={data.contact.companyId ?? undefined}
 				contactName="{data.contact.firstName} {data.contact.lastName}"
 				telnyxEnabled={data.telnyxEnabled}
 			/>

@@ -4,7 +4,7 @@ import { dialSessions, dialQueueItems, crmContacts, crmCompanies } from '$lib/se
 import { eq, desc, asc, and } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const userId = locals.user.id;
+	const userId = locals.user!.id;
 
 	// Load all sessions for this user (most recent first)
 	const sessions = await db

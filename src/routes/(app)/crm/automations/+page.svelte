@@ -91,8 +91,7 @@
 	async function loadRules() {
 		loading = true;
 		try {
-			const res = await api('/api/crm/automations');
-			rules = await res.json();
+			rules = await api<Rule[]>('/api/crm/automations');
 		} catch {
 			rules = [];
 		} finally {
@@ -231,8 +230,7 @@
 	async function viewLog(rule: Rule) {
 		logRuleId = rule.id;
 		try {
-			const res = await api(`/api/crm/automations/${rule.id}`);
-			const data = await res.json();
+			const data: { executions?: typeof logEntries } = await api(`/api/crm/automations/${rule.id}`);
 			logEntries = data.executions || [];
 		} catch {
 			logEntries = [];

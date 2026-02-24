@@ -31,8 +31,8 @@
 
 	const sortedReps = $derived(
 		[...data.repPerformance].sort((a, b) => {
-			const av = (a as Record<string, number>)[sortCol] || 0;
-			const bv = (b as Record<string, number>)[sortCol] || 0;
+			const av = Number((a as Record<string, unknown>)[sortCol]) || 0;
+			const bv = Number((b as Record<string, unknown>)[sortCol]) || 0;
 			return sortAsc ? av - bv : bv - av;
 		})
 	);

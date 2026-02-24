@@ -30,8 +30,7 @@
 	async function loadFields() {
 		loading = true;
 		try {
-			const res = await api(`/api/crm/custom-fields/values?entityId=${entityId}&entityType=${entityType}`);
-			const data = await res.json();
+			const data: { defs: FieldDef[]; values: Record<string, string | null> } = await api(`/api/crm/custom-fields/values?entityId=${entityId}&entityType=${entityType}`);
 			defs = data.defs;
 			values = data.values;
 		} catch {
