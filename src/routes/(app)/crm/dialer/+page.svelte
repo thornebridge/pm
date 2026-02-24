@@ -50,9 +50,15 @@
 			dialMode = 'incall';
 		}
 
-		// Transition: incall/ending → idle (call ended, show disposition)
+		// Transition: incall → idle (call ended after connecting, show disposition)
 		if (dialMode === 'incall' && cs === 'idle' && prevCallState !== 'idle') {
 			lastCallDuration = dialerState.callDuration || 0;
+			dialMode = 'disposing';
+		}
+
+		// Transition: dialing → idle (call failed/ended without ever connecting)
+		if (dialMode === 'dialing' && cs === 'idle' && prevCallState !== 'idle') {
+			lastCallDuration = 0;
 			dialMode = 'disposing';
 		}
 

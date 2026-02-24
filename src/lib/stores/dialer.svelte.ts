@@ -112,6 +112,7 @@ function handleNotification(notification: any) {
 
 	if (type === 'callUpdate' && call) {
 		const state = call.state;
+		console.log('[Dialer] callUpdate:', state, call.cause || '', call.causeCode || '');
 
 		// Attach remote stream to audio element
 		if (_audioElement && call.remoteStream) {
