@@ -40,11 +40,10 @@ export async function generateFromRule(
 	ruleId: string,
 	userId: string
 ): Promise<{ id: string; entryNumber: number } | { error: string; status: number }> {
-	const rule = db
+	const [rule] = await db
 		.select()
 		.from(finRecurringRules)
-		.where(eq(finRecurringRules.id, ruleId))
-		.get();
+		.where(eq(finRecurringRules.id, ruleId));
 
 	if (!rule) {
 		return { error: 'Rule not found', status: 404 };
@@ -57,9 +56,9 @@ export async function generateFromRule(
 	const lines: TemplateLine[] = JSON.parse(rule.templateLines);
 	const now = Date.now();
 	const entryId = nanoid(12);
-	const entryNumber = getNextEntryNumber();
+	const entryNumber = await getNextEntryNumber();
 
-	db.insert(finJournalEntries)
+	await db.insert(finJournalEntries)
 		.values({
 			id: entryId,
 			entryNumber,
@@ -73,8 +72,7 @@ export async function generateFromRule(
 			createdBy: userId,
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
 	const lineValues = lines.map((line, i) => ({
 		id: nanoid(12),
@@ -87,7 +85,7 @@ export async function generateFromRule(
 		createdAt: now
 	}));
 
-	db.insert(finJournalLines).values(lineValues).run();
+	await db.insert(finJournalLines).values(lineValues);
 
 	// Advance nextOccurrence
 	const nextOccurrence = computeNextOccurrence(rule.nextOccurrence, rule.frequency);
@@ -102,10 +100,9 @@ export async function generateFromRule(
 		updates.status = 'cancelled';
 	}
 
-	db.update(finRecurringRules)
+	await db.update(finRecurringRules)
 		.set(updates)
-		.where(eq(finRecurringRules.id, ruleId))
-		.run();
+		.where(eq(finRecurringRules.id, ruleId));
 
 	return { id: entryId, entryNumber };
 }
@@ -114,11 +111,10 @@ export async function processAllDueRules(
 	userId: string
 ): Promise<Array<{ ruleId: string; ruleName: string; entryId?: string; error?: string }>> {
 	const now = Date.now();
-	const dueRules = db
+	const dueRules = await db
 		.select()
 		.from(finRecurringRules)
-		.where(and(eq(finRecurringRules.status, 'active'), lte(finRecurringRules.nextOccurrence, now)))
-		.all();
+		.where(and(eq(finRecurringRules.status, 'active'), lte(finRecurringRules.nextOccurrence, now)));
 
 	const results: Array<{ ruleId: string; ruleName: string; entryId?: string; error?: string }> = [];
 

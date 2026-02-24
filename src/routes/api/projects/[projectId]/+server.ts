@@ -6,6 +6,7 @@ import { projects, tasks, taskStatuses, taskLabels, attachments } from '$lib/ser
 import { eq } from 'drizzle-orm';
 import { unlink } from 'fs/promises';
 import { broadcastProjectChanged } from '$lib/server/ws/handlers.js';
+import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -41,6 +42,7 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	const updated = db.select().from(projects).where(eq(projects.id, event.params.projectId)).get();
+	if (updated) indexDocument('projects', { id: updated.id, name: updated.name, slug: updated.slug, description: updated.description, archived: updated.archived, updatedAt: updated.updatedAt });
 	broadcastProjectChanged('updated');
 	return json(updated);
 };
@@ -57,6 +59,7 @@ export const DELETE: RequestHandler = async (event) => {
 		.all();
 
 	db.delete(projects).where(eq(projects.id, event.params.projectId)).run();
+	removeDocument('projects', event.params.projectId);
 
 	// Clean up files after DB delete (non-blocking)
 	for (const f of files) {

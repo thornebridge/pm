@@ -41,7 +41,7 @@ export function stopGmailSyncPoller(): void {
 }
 
 async function pollAllUsers(): Promise<void> {
-	const integrations = db.select().from(gmailIntegrations).all();
+	const integrations = await db.select().from(gmailIntegrations);
 
 	for (const integration of integrations) {
 		try {
@@ -64,10 +64,9 @@ export async function initialSync(userId: string): Promise<void> {
 		// Still save historyId so incremental sync can start
 		const profile = await getProfile(userId);
 		const now = Date.now();
-		db.update(gmailIntegrations)
+		await db.update(gmailIntegrations)
 			.set({ historyId: profile.historyId, lastSyncAt: now, updatedAt: now })
-			.where(eq(gmailIntegrations.userId, userId))
-			.run();
+			.where(eq(gmailIntegrations.userId, userId));
 		return;
 	}
 
@@ -80,35 +79,32 @@ export async function initialSync(userId: string): Promise<void> {
 
 		for (const msg of messages) {
 			if (!msg) continue;
-			upsertMessage(userId, msg);
+			await upsertMessage(userId, msg);
 		}
 	}
 
 	// Get current historyId
 	const profile = await getProfile(userId);
 	const now = Date.now();
-	db.update(gmailIntegrations)
+	await db.update(gmailIntegrations)
 		.set({ historyId: profile.historyId, lastSyncAt: now, updatedAt: now })
-		.where(eq(gmailIntegrations.userId, userId))
-		.run();
+		.where(eq(gmailIntegrations.userId, userId));
 
 	// Run auto-linking on all synced threads
-	const threads = db.select({ id: gmailThreads.id })
+	const threads = await db.select({ id: gmailThreads.id })
 		.from(gmailThreads)
-		.where(eq(gmailThreads.userId, userId))
-		.all();
+		.where(eq(gmailThreads.userId, userId));
 	for (const thread of threads) {
-		autoLinkThread(thread.id, userId);
+		await autoLinkThread(thread.id, userId);
 	}
 
 	console.log(`[gmail/sync] Initial sync complete for user ${userId}: ${messageRefs.length} messages`);
 }
 
 export async function incrementalSync(userId: string): Promise<void> {
-	const integration = db.select()
+	const [integration] = await db.select()
 		.from(gmailIntegrations)
-		.where(eq(gmailIntegrations.userId, userId))
-		.get();
+		.where(eq(gmailIntegrations.userId, userId));
 	if (!integration?.historyId) return;
 
 	try {
@@ -122,7 +118,7 @@ export async function incrementalSync(userId: string): Promise<void> {
 				for (const { message } of record.messagesAdded) {
 					try {
 						const fullMsg = await getMessage(userId, message.id);
-						upsertMessage(userId, fullMsg);
+						await upsertMessage(userId, fullMsg);
 						addedThreadIds.add(fullMsg.threadId);
 					} catch {
 						// Message may have been deleted already
@@ -133,9 +129,9 @@ export async function incrementalSync(userId: string): Promise<void> {
 			// Handle deleted messages
 			if (record.messagesDeleted) {
 				for (const { message } of record.messagesDeleted) {
-					db.delete(gmailMessages).where(eq(gmailMessages.id, message.id)).run();
+					await db.delete(gmailMessages).where(eq(gmailMessages.id, message.id));
 					// Update thread message count
-					updateThreadFromMessages(message.threadId, userId);
+					await updateThreadFromMessages(message.threadId, userId);
 				}
 			}
 
@@ -145,7 +141,7 @@ export async function incrementalSync(userId: string): Promise<void> {
 				for (const { message } of affected) {
 					try {
 						const fullMsg = await getMessage(userId, message.id);
-						upsertMessage(userId, fullMsg);
+						await upsertMessage(userId, fullMsg);
 					} catch {
 						// Message may have been deleted
 					}
@@ -155,22 +151,20 @@ export async function incrementalSync(userId: string): Promise<void> {
 
 		// Auto-link newly added threads
 		for (const threadId of addedThreadIds) {
-			autoLinkThread(threadId, userId);
+			await autoLinkThread(threadId, userId);
 		}
 
 		const now = Date.now();
-		db.update(gmailIntegrations)
+		await db.update(gmailIntegrations)
 			.set({ historyId: newHistoryId, lastSyncAt: now, updatedAt: now })
-			.where(eq(gmailIntegrations.userId, userId))
-			.run();
+			.where(eq(gmailIntegrations.userId, userId));
 	} catch (err) {
 		if (err instanceof HistoryExpiredError) {
 			console.log(`[gmail/sync] History expired for user ${userId}, doing full re-sync`);
 			// Clear historyId to trigger fresh initial sync
-			db.update(gmailIntegrations)
+			await db.update(gmailIntegrations)
 				.set({ historyId: null, updatedAt: Date.now() })
-				.where(eq(gmailIntegrations.userId, userId))
-				.run();
+				.where(eq(gmailIntegrations.userId, userId));
 			await initialSync(userId);
 		} else {
 			throw err;
@@ -178,7 +172,7 @@ export async function incrementalSync(userId: string): Promise<void> {
 	}
 }
 
-function upsertMessage(userId: string, msg: GmailMessage): void {
+async function upsertMessage(userId: string, msg: GmailMessage): Promise<void> {
 	const now = Date.now();
 	const { html, text } = extractBody(msg.payload);
 	const attachments = extractAttachments(msg.payload);
@@ -192,18 +186,17 @@ function upsertMessage(userId: string, msg: GmailMessage): void {
 	const isRead = !labelIds.includes('UNREAD');
 
 	// Upsert message
-	const existing = db.select({ id: gmailMessages.id }).from(gmailMessages).where(eq(gmailMessages.id, msg.id)).get();
+	const [existing] = await db.select({ id: gmailMessages.id }).from(gmailMessages).where(eq(gmailMessages.id, msg.id));
 	if (existing) {
-		db.update(gmailMessages)
+		await db.update(gmailMessages)
 			.set({
 				labelIds: JSON.stringify(labelIds),
 				isRead,
 				syncedAt: now
 			})
-			.where(eq(gmailMessages.id, msg.id))
-			.run();
+			.where(eq(gmailMessages.id, msg.id));
 	} else {
-		db.insert(gmailMessages)
+		await db.insert(gmailMessages)
 			.values({
 				id: msg.id,
 				threadId: msg.threadId,
@@ -222,12 +215,11 @@ function upsertMessage(userId: string, msg: GmailMessage): void {
 				isRead,
 				hasAttachments: attachments.length > 0,
 				syncedAt: now
-			})
-			.run();
+			});
 
 		// Upsert attachments
 		for (const att of attachments) {
-			db.insert(gmailAttachments)
+			await db.insert(gmailAttachments)
 				.values({
 					id: nanoid(12),
 					messageId: msg.id,
@@ -236,25 +228,23 @@ function upsertMessage(userId: string, msg: GmailMessage): void {
 					mimeType: att.mimeType,
 					size: att.size
 				})
-				.onConflictDoNothing()
-				.run();
+				.onConflictDoNothing();
 		}
 	}
 
 	// Upsert thread
-	updateThreadFromMessages(msg.threadId, userId);
+	await updateThreadFromMessages(msg.threadId, userId);
 }
 
-function updateThreadFromMessages(threadId: string, userId: string): void {
+async function updateThreadFromMessages(threadId: string, userId: string): Promise<void> {
 	const now = Date.now();
-	const messages = db.select()
+	const messages = await db.select()
 		.from(gmailMessages)
-		.where(eq(gmailMessages.threadId, threadId))
-		.all();
+		.where(eq(gmailMessages.threadId, threadId));
 
 	if (messages.length === 0) {
 		// Thread has no messages left — delete it
-		db.delete(gmailThreads).where(eq(gmailThreads.id, threadId)).run();
+		await db.delete(gmailThreads).where(eq(gmailThreads.id, threadId));
 		removeDocument('email_threads', threadId);
 		return;
 	}
@@ -268,9 +258,9 @@ function updateThreadFromMessages(threadId: string, userId: string): void {
 	const isStarred = allLabelIds.includes('STARRED');
 	const category = determineCategory(uniqueLabels);
 
-	const existingThread = db.select({ id: gmailThreads.id }).from(gmailThreads).where(eq(gmailThreads.id, threadId)).get();
+	const [existingThread] = await db.select({ id: gmailThreads.id }).from(gmailThreads).where(eq(gmailThreads.id, threadId));
 	if (existingThread) {
-		db.update(gmailThreads)
+		await db.update(gmailThreads)
 			.set({
 				subject: latest.subject,
 				snippet: latest.snippet,
@@ -282,10 +272,9 @@ function updateThreadFromMessages(threadId: string, userId: string): void {
 				category,
 				syncedAt: now
 			})
-			.where(eq(gmailThreads.id, threadId))
-			.run();
+			.where(eq(gmailThreads.id, threadId));
 	} else {
-		db.insert(gmailThreads)
+		await db.insert(gmailThreads)
 			.values({
 				id: threadId,
 				userId,
@@ -298,8 +287,7 @@ function updateThreadFromMessages(threadId: string, userId: string): void {
 				labels: JSON.stringify(uniqueLabels),
 				category,
 				syncedAt: now
-			})
-			.run();
+			});
 	}
 
 	// Index for search

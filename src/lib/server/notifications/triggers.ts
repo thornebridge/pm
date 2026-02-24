@@ -5,21 +5,21 @@ import { sendPushNotification } from './push.js';
 import { sendEmail, taskEmailHtml } from './email.js';
 import { nanoid } from 'nanoid';
 
-function getPrefs(userId: string) {
-	return db
+async function getPrefs(userId: string) {
+	const [row] = await db
 		.select()
 		.from(notificationPreferences)
-		.where(eq(notificationPreferences.userId, userId))
-		.get();
+		.where(eq(notificationPreferences.userId, userId));
+	return row;
 }
 
-function getUserEmail(userId: string): string | null {
-	const user = db.select({ email: users.email }).from(users).where(eq(users.id, userId)).get();
+async function getUserEmail(userId: string): Promise<string | null> {
+	const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
 	return user?.email ?? null;
 }
 
-function getTaskWithProject(taskId: string) {
-	return db
+async function getTaskWithProject(taskId: string) {
+	const [row] = await db
 		.select({
 			id: tasks.id,
 			number: tasks.number,
@@ -32,21 +32,20 @@ function getTaskWithProject(taskId: string) {
 		})
 		.from(tasks)
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
-		.where(eq(tasks.id, taskId))
-		.get();
+		.where(eq(tasks.id, taskId));
+	return row;
 }
 
 function taskUrl(projectSlug: string, taskNumber: number): string {
 	return `https://pm.thornebridge.tech/projects/${projectSlug}/task/${taskNumber}`;
 }
 
-function getWatcherIds(taskId: string): string[] {
-	return db
+async function getWatcherIds(taskId: string): Promise<string[]> {
+	const rows = await db
 		.select({ userId: taskWatchers.userId })
 		.from(taskWatchers)
-		.where(eq(taskWatchers.taskId, taskId))
-		.all()
-		.map((w) => w.userId);
+		.where(eq(taskWatchers.taskId, taskId));
+	return rows.map((w) => w.userId);
 }
 
 async function sendNotification(
@@ -59,12 +58,12 @@ async function sendNotification(
 		taskId?: string;
 		actorId?: string;
 	},
-	prefs: ReturnType<typeof getPrefs>,
+	prefs: Awaited<ReturnType<typeof getPrefs>>,
 	push: { title: string; body: string; url?: string; tag?: string },
 	email: { subject: string; heading: string; body: string; taskUrl?: string; projectName?: string }
 ) {
 	// Insert in-app notification
-	db.insert(notifications).values({
+	await db.insert(notifications).values({
 		id: nanoid(12),
 		userId: record.userId,
 		type: record.type,
@@ -75,12 +74,12 @@ async function sendNotification(
 		actorId: record.actorId ?? null,
 		read: false,
 		createdAt: Date.now()
-	}).run();
+	});
 
 	await sendPushNotification(record.userId, push);
 
 	if (!prefs || prefs.emailEnabled !== false) {
-		const addr = getUserEmail(record.userId);
+		const addr = await getUserEmail(record.userId);
 		if (addr) {
 			sendEmail(addr, email.subject, taskEmailHtml(email)).catch(() => {});
 		}
@@ -88,10 +87,10 @@ async function sendNotification(
 }
 
 export async function notifyTaskAssigned(taskId: string, assigneeId: string, assignedByName: string, assignedById: string) {
-	const prefs = getPrefs(assigneeId);
+	const prefs = await getPrefs(assigneeId);
 	if (prefs && !prefs.onAssigned) return;
 
-	const task = getTaskWithProject(taskId);
+	const task = await getTaskWithProject(taskId);
 	if (!task) return;
 
 	const url = taskUrl(task.projectSlug, task.number);
@@ -124,19 +123,19 @@ export async function notifyTaskAssigned(taskId: string, assigneeId: string, ass
 }
 
 export async function notifyStatusChanged(taskId: string, changedByUserId: string, changedByName: string) {
-	const task = getTaskWithProject(taskId);
+	const task = await getTaskWithProject(taskId);
 	if (!task) return;
 
 	const notifyIds = new Set<string>();
 	if (task.assigneeId) notifyIds.add(task.assigneeId);
 	if (task.createdBy) notifyIds.add(task.createdBy);
-	for (const id of getWatcherIds(taskId)) notifyIds.add(id);
+	for (const id of await getWatcherIds(taskId)) notifyIds.add(id);
 	notifyIds.delete(changedByUserId);
 
 	const url = taskUrl(task.projectSlug, task.number);
 
 	for (const userId of notifyIds) {
-		const prefs = getPrefs(userId);
+		const prefs = await getPrefs(userId);
 		if (prefs && !prefs.onStatusChange) continue;
 
 		await sendNotification(
@@ -167,10 +166,10 @@ export async function notifyStatusChanged(taskId: string, changedByUserId: strin
 }
 
 export async function notifyMention(taskId: string, mentionedUserId: string, mentionedByName: string, mentionedById: string) {
-	const prefs = getPrefs(mentionedUserId);
+	const prefs = await getPrefs(mentionedUserId);
 	if (prefs && !prefs.onComment) return;
 
-	const task = getTaskWithProject(taskId);
+	const task = await getTaskWithProject(taskId);
 	if (!task) return;
 
 	const url = taskUrl(task.projectSlug, task.number);
@@ -202,19 +201,19 @@ export async function notifyMention(taskId: string, mentionedUserId: string, men
 }
 
 export async function notifyNewComment(taskId: string, commentByUserId: string, commentByName: string) {
-	const task = getTaskWithProject(taskId);
+	const task = await getTaskWithProject(taskId);
 	if (!task) return;
 
 	const notifyIds = new Set<string>();
 	if (task.assigneeId) notifyIds.add(task.assigneeId);
 	if (task.createdBy) notifyIds.add(task.createdBy);
-	for (const id of getWatcherIds(taskId)) notifyIds.add(id);
+	for (const id of await getWatcherIds(taskId)) notifyIds.add(id);
 	notifyIds.delete(commentByUserId);
 
 	const url = taskUrl(task.projectSlug, task.number);
 
 	for (const userId of notifyIds) {
-		const prefs = getPrefs(userId);
+		const prefs = await getPrefs(userId);
 		if (prefs && !prefs.onComment) continue;
 
 		await sendNotification(

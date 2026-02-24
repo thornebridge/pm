@@ -37,9 +37,9 @@ export function stopCrmAutomationPoller(): void {
 async function pollCrmTimeTriggers(): Promise<void> {
 	// Cleanup old execution logs (30 days retention)
 	const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-	db.delete(crmAutomationExecutions).where(lte(crmAutomationExecutions.createdAt, thirtyDaysAgo)).run();
+	await db.delete(crmAutomationExecutions).where(lte(crmAutomationExecutions.createdAt, thirtyDaysAgo));
 
-	const rules = db.select().from(crmAutomationRules).where(eq(crmAutomationRules.enabled, true)).all();
+	const rules = await db.select().from(crmAutomationRules).where(eq(crmAutomationRules.enabled, true));
 
 	for (const row of rules) {
 		let trigger: CrmTriggerDef;
@@ -68,26 +68,24 @@ async function pollDealStale(ruleId: string, trigger: CrmTriggerDef): Promise<vo
 	const threshold = Date.now() - staleDays * 86400000;
 
 	// Get open opportunities (not in closed stages)
-	const closedStageIds = db.select({ id: crmPipelineStages.id })
+	const closedStageRows = await db.select({ id: crmPipelineStages.id })
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.isClosed, true))
-		.all()
-		.map((s) => s.id);
+		.where(eq(crmPipelineStages.isClosed, true));
+	const closedStageIds = closedStageRows.map((s) => s.id);
 
-	const openOpps = db.select().from(crmOpportunities).all()
-		.filter((o) => !closedStageIds.includes(o.stageId));
+	const allOpps = await db.select().from(crmOpportunities);
+	const openOpps = allOpps.filter((o) => !closedStageIds.includes(o.stageId));
 
 	for (const opp of openOpps) {
 		const key = `${ruleId}:${opp.id}`;
 		if (firedSet.has(key)) continue;
 
 		// Check last activity
-		const lastActivity = db.select({ createdAt: crmActivities.createdAt })
+		const [lastActivity] = await db.select({ createdAt: crmActivities.createdAt })
 			.from(crmActivities)
 			.where(eq(crmActivities.opportunityId, opp.id))
 			.orderBy(desc(crmActivities.createdAt))
-			.limit(1)
-			.get();
+			.limit(1);
 
 		const lastActivityTime = lastActivity?.createdAt ?? opp.createdAt;
 		if (lastActivityTime > threshold) continue;
@@ -106,16 +104,14 @@ async function pollDealStale(ruleId: string, trigger: CrmTriggerDef): Promise<vo
 
 async function pollDealNoNextStep(ruleId: string): Promise<void> {
 	// Get open opportunities without a next step
-	const closedStageIds = db.select({ id: crmPipelineStages.id })
+	const closedStageRows = await db.select({ id: crmPipelineStages.id })
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.isClosed, true))
-		.all()
-		.map((s) => s.id);
+		.where(eq(crmPipelineStages.isClosed, true));
+	const closedStageIds = closedStageRows.map((s) => s.id);
 
-	const oppsNoNextStep = db.select().from(crmOpportunities)
-		.where(isNull(crmOpportunities.nextStep))
-		.all()
-		.filter((o) => !closedStageIds.includes(o.stageId));
+	const allOppsNoNextStep = await db.select().from(crmOpportunities)
+		.where(isNull(crmOpportunities.nextStep));
+	const oppsNoNextStep = allOppsNoNextStep.filter((o) => !closedStageIds.includes(o.stageId));
 
 	for (const opp of oppsNoNextStep) {
 		const key = `${ruleId}:${opp.id}`;

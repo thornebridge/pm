@@ -31,7 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const sessionId = getSessionCookie(event.cookies);
 
 	if (sessionId) {
-		const result = validateSession(sessionId);
+		const result = await validateSession(sessionId);
 		if (result) {
 			event.locals.user = result.user;
 			event.locals.sessionId = result.sessionId;
@@ -47,22 +47,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 	// Determine theme mode for SSR
 	event.locals.themeMode = 'dark';
 	if (event.locals.user) {
-		const userRow = db
+		const [userRow] = await db
 			.select({ activeThemeId: users.activeThemeId })
 			.from(users)
-			.where(eq(users.id, event.locals.user.id))
-			.get();
+			.where(eq(users.id, event.locals.user.id));
 
 		if (userRow?.activeThemeId) {
 			const builtin = getBuiltinTheme(userRow.activeThemeId);
 			if (builtin) {
 				event.locals.themeMode = builtin.mode;
 			} else {
-				const custom = db
+				const [custom] = await db
 					.select({ source: userThemes.source })
 					.from(userThemes)
-					.where(and(eq(userThemes.id, userRow.activeThemeId), eq(userThemes.userId, event.locals.user.id)))
-					.get();
+					.where(and(eq(userThemes.id, userRow.activeThemeId), eq(userThemes.userId, event.locals.user.id)));
 				if (custom) {
 					const modeMatch = custom.source.match(/mode:\s*(dark|light)/);
 					event.locals.themeMode = (modeMatch?.[1] as 'dark' | 'light') || 'dark';

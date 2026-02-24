@@ -20,6 +20,8 @@ import { broadcastTaskCreated, broadcastTaskUpdated, broadcastTaskDeleted } from
 import { notifyTaskAssigned, notifyStatusChanged } from '$lib/server/notifications/triggers.js';
 import { fireWebhooks } from '$lib/server/webhooks/fire.js';
 import { emitAutomationEvent } from '$lib/server/automations/emit.js';
+import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js';
+import { projects } from '$lib/server/db/schema.js';
 
 function computeNextDueDate(currentDue: number, rule: { freq: string; interval?: number; endDate?: number }): number {
 	const d = new Date(currentDue);
@@ -226,6 +228,10 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	const updated = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	if (updated) {
+		const proj = db.select({ slug: projects.slug, name: projects.name }).from(projects).where(eq(projects.id, event.params.projectId)).get();
+		indexDocument('tasks', { id: updated.id, number: updated.number, title: updated.title, projectId: event.params.projectId, projectSlug: proj?.slug, projectName: proj?.name, assigneeId: updated.assigneeId, statusId: updated.statusId, priority: updated.priority, dueDate: updated.dueDate, updatedAt: updated.updatedAt });
+	}
 	broadcastTaskUpdated(event.params.projectId, updated, user.id);
 	fireWebhooks('task.updated', { projectId: event.params.projectId, task: updated, changes: body }).catch(() => {});
 
@@ -355,6 +361,7 @@ export const DELETE: RequestHandler = async (event) => {
 	const taskId = event.params.taskId;
 	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
 	db.delete(tasks).where(eq(tasks.id, taskId)).run();
+	removeDocument('tasks', taskId);
 	broadcastTaskDeleted(event.params.projectId, taskId, user.id);
 	fireWebhooks('task.deleted', { projectId: event.params.projectId, taskId }).catch(() => {});
 	if (task) {

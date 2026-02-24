@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const invite = validateInvite(params.token);
+	const invite = await validateInvite(params.token);
 
 	if (!invite) {
 		return { valid: false as const };
@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ params }) => {
 
 export const actions: Actions = {
 	default: async ({ request, params, cookies }) => {
-		const invite = validateInvite(params.token);
+		const invite = await validateInvite(params.token);
 		if (!invite) {
 			return fail(400, { error: 'Invalid or expired invite' });
 		}
@@ -48,7 +48,7 @@ export const actions: Actions = {
 		}
 
 		// Check if email already in use
-		const existing = db.select().from(users).where(eq(users.email, email)).get();
+		const [existing] = await db.select().from(users).where(eq(users.email, email));
 		if (existing) {
 			return fail(400, { error: 'Email already in use', name, email });
 		}
@@ -57,7 +57,7 @@ export const actions: Actions = {
 		const userId = nanoid(12);
 		const hash = await hashPassword(password);
 
-		db.insert(users)
+		await db.insert(users)
 			.values({
 				id: userId,
 				email,
@@ -66,12 +66,11 @@ export const actions: Actions = {
 				role: invite.role as 'admin' | 'member',
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 
-		markInviteUsed(invite.id, userId);
+		await markInviteUsed(invite.id, userId);
 
-		const sessionId = createSession(userId);
+		const sessionId = await createSession(userId);
 		setSessionCookie(cookies, sessionId);
 
 		throw redirect(302, '/projects');

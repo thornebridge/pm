@@ -26,7 +26,7 @@ export async function sendPushNotification(
 ) {
 	if (!ensureConfigured()) return;
 
-	const subs = db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId)).all();
+	const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
 
 	for (const sub of subs) {
 		try {
@@ -42,7 +42,7 @@ export async function sendPushNotification(
 			if (err && typeof err === 'object' && 'statusCode' in err) {
 				const statusCode = (err as { statusCode: number }).statusCode;
 				if (statusCode === 410 || statusCode === 404) {
-					db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id)).run();
+					await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, sub.id));
 				}
 			}
 		}

@@ -11,8 +11,8 @@ export interface GoogleOAuthConfig {
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-export function getGoogleConfig(): GoogleOAuthConfig | null {
-	const org = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
+export async function getGoogleConfig(): Promise<GoogleOAuthConfig | null> {
+	const [org] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'default'));
 	const clientId = org?.googleClientId || env.GOOGLE_CLIENT_ID;
 	const clientSecret = org?.googleClientSecret || env.GOOGLE_CLIENT_SECRET;
 	if (!clientId || !clientSecret) return null;

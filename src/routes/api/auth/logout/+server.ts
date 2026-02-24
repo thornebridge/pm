@@ -5,7 +5,7 @@ import { deleteSession, deleteSessionCookie, getSessionCookie } from '$lib/serve
 export const POST: RequestHandler = async ({ cookies }) => {
 	const sessionId = getSessionCookie(cookies);
 	if (sessionId) {
-		deleteSession(sessionId);
+		await deleteSession(sessionId);
 	}
 	deleteSessionCookie(cookies);
 

@@ -4,15 +4,45 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { tasks, projects, comments } from '$lib/server/db/schema.js';
 import { like, desc, eq } from 'drizzle-orm';
+import { getSearchClient } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const q = event.url.searchParams.get('q')?.trim();
 
 	if (!q || q.length < 2) {
-		return json({ tasks: [], projects: [], comments: [] });
+		return json({ tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] });
 	}
 
+	// Try Meilisearch first
+	const client = getSearchClient();
+	if (client) {
+		try {
+			const results = await client.multiSearch({
+				queries: [
+					{ indexUid: 'tasks', q, limit: 10 },
+					{ indexUid: 'projects', q, limit: 5 },
+					{ indexUid: 'comments', q, limit: 5 },
+					{ indexUid: 'contacts', q, limit: 5 },
+					{ indexUid: 'companies', q, limit: 5 },
+					{ indexUid: 'opportunities', q, limit: 5 }
+				]
+			});
+
+			return json({
+				tasks: results.results[0]?.hits || [],
+				projects: results.results[1]?.hits || [],
+				comments: results.results[2]?.hits || [],
+				contacts: results.results[3]?.hits || [],
+				companies: results.results[4]?.hits || [],
+				opportunities: results.results[5]?.hits || []
+			});
+		} catch (err) {
+			console.error('[search] Meilisearch query failed, falling back to SQL:', (err as Error).message);
+		}
+	}
+
+	// SQL fallback
 	const pattern = `%${q}%`;
 
 	const matchedTasks = db
@@ -62,6 +92,9 @@ export const GET: RequestHandler = async (event) => {
 	return json({
 		tasks: matchedTasks,
 		projects: matchedProjects,
-		comments: matchedComments
+		comments: matchedComments,
+		contacts: [],
+		companies: [],
+		opportunities: []
 	});
 };

@@ -35,9 +35,9 @@ export function stopAutomationPoller(): void {
 async function pollTimeTriggers(): Promise<void> {
 	// Cleanup old execution logs (30 days retention)
 	const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-	db.delete(automationExecutions).where(lte(automationExecutions.createdAt, thirtyDaysAgo)).run();
+	await db.delete(automationExecutions).where(lte(automationExecutions.createdAt, thirtyDaysAgo));
 
-	const rules = db.select().from(automationRules).where(eq(automationRules.enabled, true)).all();
+	const rules = await db.select().from(automationRules).where(eq(automationRules.enabled, true));
 
 	for (const row of rules) {
 		let trigger: TriggerDef;
@@ -69,7 +69,7 @@ async function pollDueDateApproaching(
 	const now = Date.now();
 	const threshold = now + hoursBefore * 60 * 60 * 1000;
 
-	const approachingTasks = db
+	const approachingTasks = await db
 		.select()
 		.from(tasks)
 		.where(
@@ -79,8 +79,7 @@ async function pollDueDateApproaching(
 				gt(tasks.dueDate, now),
 				lte(tasks.dueDate, threshold)
 			)
-		)
-		.all();
+		);
 
 	for (const task of approachingTasks) {
 		const key = `${ruleId}:${task.id}`;
@@ -100,18 +99,16 @@ async function pollDueDateApproaching(
 
 async function pollChecklistCompleted(ruleId: string, projectId: string): Promise<void> {
 	// Find tasks in this project that have checklists
-	const projectTasks = db
+	const projectTasks = await db
 		.select({ id: tasks.id })
 		.from(tasks)
-		.where(eq(tasks.projectId, projectId))
-		.all();
+		.where(eq(tasks.projectId, projectId));
 
 	for (const t of projectTasks) {
-		const items = db
+		const items = await db
 			.select({ completed: checklistItems.completed })
 			.from(checklistItems)
-			.where(eq(checklistItems.taskId, t.id))
-			.all();
+			.where(eq(checklistItems.taskId, t.id));
 
 		if (items.length === 0) continue;
 		const allCompleted = items.every((i) => i.completed);
@@ -121,7 +118,7 @@ async function pollChecklistCompleted(ruleId: string, projectId: string): Promis
 		if (firedSet.has(key)) continue;
 		firedSet.add(key);
 
-		const fullTask = db.select().from(tasks).where(eq(tasks.id, t.id)).get();
+		const [fullTask] = await db.select().from(tasks).where(eq(tasks.id, t.id));
 		if (!fullTask) continue;
 
 		emitAutomationEvent({

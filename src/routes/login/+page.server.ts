@@ -20,13 +20,13 @@ export const actions: Actions = {
 			return fail(400, { error: 'Email and password are required', email });
 		}
 
-		const user = db.select().from(users).where(eq(users.email, email)).get();
+		const [user] = await db.select().from(users).where(eq(users.email, email));
 
 		if (!user || !(await verifyPassword(user.passwordHash, password))) {
 			return fail(400, { error: 'Invalid email or password', email });
 		}
 
-		const sessionId = createSession(user.id);
+		const sessionId = await createSession(user.id);
 		setSessionCookie(cookies, sessionId);
 
 		throw redirect(302, '/projects');

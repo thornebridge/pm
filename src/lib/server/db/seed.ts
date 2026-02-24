@@ -11,19 +11,19 @@ export async function seed() {
 
 	// Always run idempotent seeds regardless of admin state
 	await seedAutomationUser();
-	seedCrmPipelineStages();
-	seedCrmProducts();
-	seedFinancialAccounts();
+	await seedCrmPipelineStages();
+	await seedCrmProducts();
+	await seedFinancialAccounts();
 
 	if (!adminEmail || !adminPassword) return;
 
-	const existing = db.select().from(users).where(eq(users.email, adminEmail)).get();
+	const [existing] = await db.select().from(users).where(eq(users.email, adminEmail));
 	if (existing) return;
 
 	const now = Date.now();
 	const hash = await hashPassword(adminPassword);
 
-	db.insert(users)
+	await db.insert(users)
 		.values({
 			id: nanoid(12),
 			email: adminEmail,
@@ -32,8 +32,7 @@ export async function seed() {
 			role: 'admin',
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
 	console.log(`[seed] Created admin user: ${adminEmail}`);
 }
@@ -41,13 +40,13 @@ export async function seed() {
 const AUTOMATION_USER_ID = '__automation__';
 
 async function seedAutomationUser() {
-	const existing = db.select().from(users).where(eq(users.id, AUTOMATION_USER_ID)).get();
+	const [existing] = await db.select().from(users).where(eq(users.id, AUTOMATION_USER_ID));
 	if (existing) return;
 
 	const now = Date.now();
 	const hash = await hashPassword(nanoid(32)); // random pw, never used for login
 
-	db.insert(users)
+	await db.insert(users)
 		.values({
 			id: AUTOMATION_USER_ID,
 			email: 'automation@system.local',
@@ -56,14 +55,13 @@ async function seedAutomationUser() {
 			role: 'member',
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
 	console.log('[seed] Created automation system user');
 }
 
-function seedCrmPipelineStages() {
-	const existing = db.select({ n: count() }).from(crmPipelineStages).get();
+async function seedCrmPipelineStages() {
+	const [existing] = await db.select({ n: count() }).from(crmPipelineStages);
 	if (existing && existing.n > 0) return;
 
 	const now = Date.now();
@@ -77,22 +75,21 @@ function seedCrmPipelineStages() {
 	];
 
 	for (const stage of stages) {
-		db.insert(crmPipelineStages)
-			.values({ id: nanoid(12), ...stage, createdAt: now })
-			.run();
+		await db.insert(crmPipelineStages)
+			.values({ id: nanoid(12), ...stage, createdAt: now });
 	}
 
 	console.log('[seed] Created default CRM pipeline stages');
 }
 
-function seedCrmProducts() {
-	const existing = db.select({ n: count() }).from(crmProducts).get();
+async function seedCrmProducts() {
+	const [existing] = await db.select({ n: count() }).from(crmProducts);
 	if (existing && existing.n > 0) return;
 
 	const now = Date.now();
 
 	// Find an admin user to use as createdBy
-	const admin = db.select({ id: users.id }).from(users).limit(1).get();
+	const [admin] = await db.select({ id: users.id }).from(users).limit(1);
 	if (!admin) return; // no users yet — skip product seeds
 
 	const products = [
@@ -137,7 +134,7 @@ function seedCrmProducts() {
 
 	for (const product of products) {
 		const { tiers, ...productData } = product;
-		db.insert(crmProducts)
+		await db.insert(crmProducts)
 			.values({
 				...productData,
 				status: 'active',
@@ -145,12 +142,11 @@ function seedCrmProducts() {
 				createdBy: admin.id,
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 
 		for (let i = 0; i < tiers.length; i++) {
 			const tier = tiers[i];
-			db.insert(crmPriceTiers)
+			await db.insert(crmPriceTiers)
 				.values({
 					id: nanoid(12),
 					productId: product.id,
@@ -168,19 +164,18 @@ function seedCrmProducts() {
 					position: i,
 					createdAt: now,
 					updatedAt: now
-				})
-				.run();
+				});
 		}
 	}
 
 	console.log('[seed] Created example CRM products with price tiers');
 }
 
-function seedFinancialAccounts() {
-	const existing = db.select({ n: count() }).from(finAccounts).get();
+async function seedFinancialAccounts() {
+	const [existing] = await db.select({ n: count() }).from(finAccounts);
 	if (existing && existing.n > 0) return;
 
-	const admin = db.select({ id: users.id }).from(users).limit(1).get();
+	const [admin] = await db.select({ id: users.id }).from(users).limit(1);
 	if (!admin) return;
 
 	const now = Date.now();
@@ -268,7 +263,7 @@ function seedFinancialAccounts() {
 		const id = numberToId.get(acct.accountNumber)!;
 		const parentId = acct.parentNumber ? numberToId.get(acct.parentNumber) ?? null : null;
 
-		db.insert(finAccounts)
+		await db.insert(finAccounts)
 			.values({
 				id,
 				accountNumber: acct.accountNumber,
@@ -284,8 +279,7 @@ function seedFinancialAccounts() {
 				createdBy: admin.id,
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 	}
 
 	console.log(`[seed] Created ${accounts.length} default financial accounts`);

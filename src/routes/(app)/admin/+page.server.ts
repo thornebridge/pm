@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		throw redirect(302, '/projects');
 	}
 
-	const allUsers = db
+	const allUsers = await db
 		.select({
 			id: users.id,
 			name: users.name,
@@ -20,8 +20,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			createdAt: users.createdAt
 		})
 		.from(users)
-		.orderBy(users.createdAt)
-		.all();
+		.orderBy(users.createdAt);
 
 	// Audit log - load recent activity with filters
 	const auditLimit = 50;
@@ -37,7 +36,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-	const auditData = db
+	const auditData = await db
 		.select({
 			id: activityLog.id,
 			action: activityLog.action,
@@ -59,16 +58,14 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.where(whereClause)
 		.orderBy(desc(activityLog.createdAt))
 		.limit(auditLimit)
-		.offset(auditOffset)
-		.all();
+		.offset(auditOffset);
 
-	const allProjects = db
+	const allProjects = await db
 		.select({ id: projects.id, name: projects.name })
-		.from(projects)
-		.all();
+		.from(projects);
 
 	return {
-		invites: listInvites(),
+		invites: await listInvites(),
 		users: allUsers,
 		auditLog: auditData,
 		auditOffset,

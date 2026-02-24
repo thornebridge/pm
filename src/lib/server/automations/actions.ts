@@ -44,14 +44,14 @@ export async function executeAction(
 	}
 }
 
-function executeSetField(action: ActionSetField, taskId: string): ActionResult {
+async function executeSetField(action: ActionSetField, taskId: string): Promise<ActionResult> {
 	const now = Date.now();
 	const updates: Record<string, unknown> = { updatedAt: now };
 	updates[action.field] = action.value;
 
-	db.update(tasks).set(updates).where(eq(tasks.id, taskId)).run();
+	await db.update(tasks).set(updates).where(eq(tasks.id, taskId));
 
-	db.insert(activityLog).values({
+	await db.insert(activityLog).values({
 		id: nanoid(12),
 		taskId,
 		userId: AUTOMATION_USER_ID,
@@ -61,68 +61,66 @@ function executeSetField(action: ActionSetField, taskId: string): ActionResult {
 			: 'edited',
 		detail: JSON.stringify({ field: action.field, to: action.value, automated: true }),
 		createdAt: now
-	}).run();
+	});
 
 	return { action: 'set_field', result: `Set ${action.field} to ${action.value}` };
 }
 
-function executeAddLabel(action: ActionAddLabel, taskId: string): ActionResult {
-	db.insert(taskLabelAssignments)
+async function executeAddLabel(action: ActionAddLabel, taskId: string): Promise<ActionResult> {
+	await db.insert(taskLabelAssignments)
 		.values({ taskId, labelId: action.labelId })
-		.onConflictDoNothing()
-		.run();
+		.onConflictDoNothing();
 
-	db.insert(activityLog).values({
+	await db.insert(activityLog).values({
 		id: nanoid(12),
 		taskId,
 		userId: AUTOMATION_USER_ID,
 		action: 'label_added',
 		detail: JSON.stringify({ labelId: action.labelId, automated: true }),
 		createdAt: Date.now()
-	}).run();
+	});
 
 	return { action: 'add_label', result: `Added label ${action.labelId}` };
 }
 
-function executeRemoveLabel(action: ActionRemoveLabel, taskId: string): ActionResult {
-	db.delete(taskLabelAssignments)
-		.where(and(eq(taskLabelAssignments.taskId, taskId), eq(taskLabelAssignments.labelId, action.labelId)))
-		.run();
+async function executeRemoveLabel(action: ActionRemoveLabel, taskId: string): Promise<ActionResult> {
+	await db.delete(taskLabelAssignments)
+		.where(and(eq(taskLabelAssignments.taskId, taskId), eq(taskLabelAssignments.labelId, action.labelId)));
 
-	db.insert(activityLog).values({
+	await db.insert(activityLog).values({
 		id: nanoid(12),
 		taskId,
 		userId: AUTOMATION_USER_ID,
 		action: 'label_removed',
 		detail: JSON.stringify({ labelId: action.labelId, automated: true }),
 		createdAt: Date.now()
-	}).run();
+	});
 
 	return { action: 'remove_label', result: `Removed label ${action.labelId}` };
 }
 
-function executeAddComment(action: ActionAddComment, taskId: string, task: Record<string, unknown>): ActionResult {
+async function executeAddComment(action: ActionAddComment, taskId: string, task: Record<string, unknown>): Promise<ActionResult> {
 	const body = renderTemplate(action.body, task);
 	const now = Date.now();
 	const id = nanoid(12);
 
-	db.insert(comments).values({
+	await db.insert(comments).values({
 		id,
 		taskId,
 		userId: AUTOMATION_USER_ID,
 		body,
 		createdAt: now,
 		updatedAt: now
-	}).run();
+	});
 
-	db.insert(activityLog).values({
+	await db.insert(activityLog).values({
 		id: nanoid(12),
 		taskId,
 		userId: AUTOMATION_USER_ID,
 		action: 'commented',
 		detail: JSON.stringify({ commentId: id, automated: true }),
 		createdAt: now
-	}).run();
+	});
 
 	return { action: 'add_comment', result: `Added comment: ${body.slice(0, 80)}` };
 }
@@ -150,7 +148,7 @@ async function executeSendNotification(
 		return { action: 'send_notification', result: 'skipped — no target user' };
 	}
 
-	db.insert(notifications).values({
+	await db.insert(notifications).values({
 		id: nanoid(12),
 		userId: targetUserId,
 		type: 'status_change',
@@ -161,7 +159,7 @@ async function executeSendNotification(
 		actorId: AUTOMATION_USER_ID,
 		read: false,
 		createdAt: Date.now()
-	}).run();
+	});
 
 	sendPushNotification(targetUserId, { title, body, tag: `automation-${taskId}` }).catch(() => {});
 

@@ -8,6 +8,8 @@
 	import OpportunityItemsTab from '$lib/components/crm/OpportunityItemsTab.svelte';
 	import ProposalForm from '$lib/components/crm/ProposalForm.svelte';
 	import CustomFieldsPanel from '$lib/components/crm/CustomFieldsPanel.svelte';
+	import ForecastCategoryBadge from '$lib/components/crm/ForecastCategoryBadge.svelte';
+	import { forecastCategoryConfig, deriveForecastCategory, type ForecastCategory } from '$lib/utils/forecast.js';
 
 	let { data } = $props();
 
@@ -272,7 +274,7 @@
 	{/if}
 
 	<!-- Deal info + health -->
-	<div class="mb-6 grid grid-cols-2 gap-4 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900 md:grid-cols-7">
+	<div class="mb-6 grid grid-cols-2 gap-4 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900 md:grid-cols-4 lg:grid-cols-8">
 		<div>
 			<p class="text-xs text-surface-500">Stage</p>
 			<p class="text-sm text-surface-900 dark:text-surface-100">{data.stage?.name}</p>
@@ -292,6 +294,28 @@
 		<div>
 			<p class="text-xs text-surface-500">Source</p>
 			<p class="text-sm capitalize text-surface-900 dark:text-surface-100">{data.opportunity.source || '\u2014'}</p>
+		</div>
+		<div>
+			<p class="mb-1 text-xs text-surface-500">Forecast</p>
+			<select
+				value={data.opportunity.forecastCategory || ''}
+				onchange={async (e) => {
+					const val = (e.target as HTMLSelectElement).value;
+					try {
+						await api(`/api/crm/opportunities/${data.opportunity.id}`, {
+							method: 'PATCH',
+							body: JSON.stringify({ forecastCategory: val || null })
+						});
+						await invalidateAll();
+					} catch { showToast('Failed to update forecast category', 'error'); }
+				}}
+				class="rounded border border-surface-300 bg-transparent px-1.5 py-0.5 text-xs text-surface-700 dark:border-surface-700 dark:text-surface-300"
+			>
+				<option value="">Auto ({forecastCategoryConfig[deriveForecastCategory(null, data.opportunity.probability, data.stage?.probability ?? 0)].label})</option>
+				{#each (['commit', 'best_case', 'upside', 'pipeline', 'omit'] as const) as cat}
+					<option value={cat}>{forecastCategoryConfig[cat].label}</option>
+				{/each}
+			</select>
 		</div>
 		<div>
 			<p class="text-xs text-surface-500">Days in Stage</p>

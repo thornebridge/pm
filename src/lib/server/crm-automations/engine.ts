@@ -13,14 +13,13 @@ export async function processCrmAutomations(payload: CrmAutomationPayload): Prom
 	const depth = payload.chainDepth ?? 0;
 	if (depth >= CRM_MAX_CHAIN_DEPTH) return;
 
-	const rules = db
+	const rules = await db
 		.select()
 		.from(crmAutomationRules)
 		.where(and(
 			eq(crmAutomationRules.entityType, payload.entityType),
 			eq(crmAutomationRules.enabled, true)
-		))
-		.all();
+		));
 
 	for (const row of rules) {
 		let rule: CrmAutomationRule;
@@ -51,7 +50,7 @@ export async function processCrmAutomations(payload: CrmAutomationPayload): Prom
 				const conditionsMet = evaluateConditions(rule.conditions, payload.entity);
 				if (!conditionsMet) {
 					execStatus = 'skipped';
-					logExecution(rule.id, payload.entityType, payload.entityId, payload.event, execStatus, actionsRun, null, Date.now() - start);
+					await logExecution(rule.id, payload.entityType, payload.entityId, payload.event, execStatus, actionsRun, null, Date.now() - start);
 					continue;
 				}
 			}
@@ -68,7 +67,7 @@ export async function processCrmAutomations(payload: CrmAutomationPayload): Prom
 						action.type === 'set_field' &&
 						payload.entityType === 'opportunity'
 					) {
-						const updatedOpp = db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId)).get();
+						const [updatedOpp] = await db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId));
 						if (updatedOpp) {
 							const fieldToEvent: Record<string, string> = {
 								stageId: 'opportunity.stage_changed',
@@ -102,7 +101,7 @@ export async function processCrmAutomations(payload: CrmAutomationPayload): Prom
 			execError = err instanceof Error ? err.message : String(err);
 		}
 
-		logExecution(rule.id, payload.entityType, payload.entityId, payload.event, execStatus, actionsRun, execError, Date.now() - start);
+		await logExecution(rule.id, payload.entityType, payload.entityId, payload.event, execStatus, actionsRun, execError, Date.now() - start);
 	}
 }
 
@@ -165,7 +164,7 @@ function evaluateCondition(condition: CrmCondition, entity: Record<string, unkno
 	}
 }
 
-function logExecution(
+async function logExecution(
 	ruleId: string,
 	entityType: string,
 	entityId: string,
@@ -175,7 +174,7 @@ function logExecution(
 	error: string | null,
 	durationMs: number
 ) {
-	db.insert(crmAutomationExecutions).values({
+	await db.insert(crmAutomationExecutions).values({
 		id: nanoid(12),
 		ruleId,
 		entityType,
@@ -186,5 +185,5 @@ function logExecution(
 		error,
 		durationMs,
 		createdAt: Date.now()
-	}).run();
+	});
 }

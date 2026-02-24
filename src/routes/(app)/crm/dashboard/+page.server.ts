@@ -8,7 +8,7 @@ import {
 	crmCompanies,
 	users
 } from '$lib/server/db/schema.js';
-import { eq, and, desc, asc, isNull, sql, lte, gte } from 'drizzle-orm';
+import { eq, and, desc, asc, isNull, sql, lte, gte, max, inArray, isNotNull } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ parent }) => {
 	const { user } = await parent();
@@ -197,6 +197,157 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.limit(10)
 		.all();
 
+	// === ACTION VIEW QUERIES ===
+
+	// Today's tasks
+	const todayStart = new Date();
+	todayStart.setHours(0, 0, 0, 0);
+	const todayEnd = new Date();
+	todayEnd.setHours(23, 59, 59, 999);
+	const todayTasks = db
+		.select({
+			id: crmTasks.id,
+			title: crmTasks.title,
+			dueDate: crmTasks.dueDate,
+			priority: crmTasks.priority,
+			opportunityId: crmTasks.opportunityId,
+			companyName: crmCompanies.name,
+			assigneeName: users.name
+		})
+		.from(crmTasks)
+		.leftJoin(users, eq(crmTasks.assigneeId, users.id))
+		.leftJoin(crmCompanies, eq(crmTasks.companyId, crmCompanies.id))
+		.where(
+			and(
+				isNull(crmTasks.completedAt),
+				gte(crmTasks.dueDate, todayStart.getTime()),
+				lte(crmTasks.dueDate, todayEnd.getTime())
+			)
+		)
+		.orderBy(asc(crmTasks.priority), asc(crmTasks.dueDate))
+		.limit(20)
+		.all();
+
+	// Overdue next steps — open opps where nextStepDueDate < now
+	const overdueNextSteps = db
+		.select({
+			id: crmOpportunities.id,
+			title: crmOpportunities.title,
+			companyName: crmCompanies.name,
+			nextStep: crmOpportunities.nextStep,
+			nextStepDueDate: crmOpportunities.nextStepDueDate,
+			value: crmOpportunities.value,
+			currency: crmOpportunities.currency,
+			ownerName: users.name,
+			stageName: crmPipelineStages.name,
+			stageColor: crmPipelineStages.color
+		})
+		.from(crmOpportunities)
+		.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
+		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
+		.leftJoin(users, eq(crmOpportunities.ownerId, users.id))
+		.where(
+			and(
+				eq(crmPipelineStages.isClosed, false),
+				isNotNull(crmOpportunities.nextStepDueDate),
+				lte(crmOpportunities.nextStepDueDate, now)
+			)
+		)
+		.orderBy(asc(crmOpportunities.nextStepDueDate))
+		.limit(15)
+		.all();
+
+	// Stale deals — open opps with last activity > 7 days ago
+	const sevenDaysAgo = now - 7 * 86400000;
+	let staleDeals: Array<{
+		id: string;
+		title: string;
+		companyName: string;
+		value: number | null;
+		currency: string;
+		ownerName: string | null;
+		stageName: string;
+		stageColor: string;
+		lastActivityAt: number | null;
+	}> = [];
+
+	if (openStageIds.length > 0) {
+		const openOpps = db
+			.select({
+				id: crmOpportunities.id,
+				title: crmOpportunities.title,
+				companyName: crmCompanies.name,
+				value: crmOpportunities.value,
+				currency: crmOpportunities.currency,
+				ownerName: users.name,
+				stageName: crmPipelineStages.name,
+				stageColor: crmPipelineStages.color,
+				createdAt: crmOpportunities.createdAt
+			})
+			.from(crmOpportunities)
+			.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
+			.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
+			.leftJoin(users, eq(crmOpportunities.ownerId, users.id))
+			.where(eq(crmPipelineStages.isClosed, false))
+			.all();
+
+		const oppIds = openOpps.map((o) => o.id);
+		const lastActivities: Record<string, number> = {};
+		if (oppIds.length > 0) {
+			const actRows = db
+				.select({
+					opportunityId: crmActivities.opportunityId,
+					lastAt: max(crmActivities.createdAt)
+				})
+				.from(crmActivities)
+				.where(inArray(crmActivities.opportunityId, oppIds))
+				.groupBy(crmActivities.opportunityId)
+				.all();
+			for (const row of actRows) {
+				if (row.opportunityId && row.lastAt) {
+					lastActivities[row.opportunityId] = row.lastAt;
+				}
+			}
+		}
+
+		staleDeals = openOpps
+			.map((o) => ({
+				...o,
+				lastActivityAt: lastActivities[o.id] || o.createdAt
+			}))
+			.filter((o) => (o.lastActivityAt || 0) < sevenDaysAgo)
+			.sort((a, b) => (a.lastActivityAt || 0) - (b.lastActivityAt || 0))
+			.slice(0, 15);
+	}
+
+	// Closing this week
+	const closingThisWeek = db
+		.select({
+			id: crmOpportunities.id,
+			title: crmOpportunities.title,
+			companyName: crmCompanies.name,
+			value: crmOpportunities.value,
+			currency: crmOpportunities.currency,
+			expectedCloseDate: crmOpportunities.expectedCloseDate,
+			stageName: crmPipelineStages.name,
+			stageColor: crmPipelineStages.color,
+			ownerName: users.name
+		})
+		.from(crmOpportunities)
+		.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
+		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
+		.leftJoin(users, eq(crmOpportunities.ownerId, users.id))
+		.where(
+			and(
+				eq(crmPipelineStages.isClosed, false),
+				gte(crmOpportunities.expectedCloseDate, now),
+				lte(crmOpportunities.expectedCloseDate, sevenDays)
+			)
+		)
+		.orderBy(asc(crmOpportunities.expectedCloseDate))
+		.limit(15)
+		.all();
+
 	return {
 		metrics: {
 			openDeals: openDeals?.count || 0,
@@ -210,6 +361,17 @@ export const load: PageServerLoad = async ({ parent }) => {
 		upcomingActivities,
 		overdueTasks,
 		closingSoon,
-		recentActivity
+		recentActivity,
+		// Action View
+		todayTasks,
+		overdueNextSteps,
+		staleDeals,
+		closingThisWeek,
+		actionCounts: {
+			todayTaskCount: todayTasks.length,
+			overdueStepCount: overdueNextSteps.length,
+			staleDealCount: staleDeals.length,
+			closingWeekCount: closingThisWeek.length
+		}
 	};
 };

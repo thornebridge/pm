@@ -8,26 +8,24 @@ import { nanoid } from 'nanoid';
  * Create a revenue journal entry when a CRM opportunity is won.
  * Debit: Accounts Receivable (1200), Credit: Sales Revenue (4010)
  */
-export function createRevenueJournalEntry(opts: {
+export async function createRevenueJournalEntry(opts: {
 	opportunityId: string;
 	companyId: string;
 	amount: number; // cents
 	description: string;
 	userId: string;
 	proposalId?: string;
-}): { id: string; entryNumber: number } | null {
+}): Promise<{ id: string; entryNumber: number } | null> {
 	// Guard: check if accounts exist (financials seeded)
-	const arAccount = db
+	const [arAccount] = await db
 		.select({ id: finAccounts.id })
 		.from(finAccounts)
-		.where(eq(finAccounts.accountNumber, 1200))
-		.get();
+		.where(eq(finAccounts.accountNumber, 1200));
 
-	const revenueAccount = db
+	const [revenueAccount] = await db
 		.select({ id: finAccounts.id })
 		.from(finAccounts)
-		.where(eq(finAccounts.accountNumber, 4010))
-		.get();
+		.where(eq(finAccounts.accountNumber, 4010));
 
 	if (!arAccount || !revenueAccount) {
 		// Financials not seeded yet — silently skip
@@ -35,7 +33,7 @@ export function createRevenueJournalEntry(opts: {
 	}
 
 	// Guard: check for existing entry (prevent double-sync)
-	const existing = db
+	const [existing] = await db
 		.select({ id: finJournalEntries.id })
 		.from(finJournalEntries)
 		.where(
@@ -43,8 +41,7 @@ export function createRevenueJournalEntry(opts: {
 				eq(finJournalEntries.crmOpportunityId, opts.opportunityId),
 				eq(finJournalEntries.source, 'crm_sync')
 			)
-		)
-		.get();
+		);
 
 	if (existing) {
 		return null; // Already synced
@@ -56,9 +53,9 @@ export function createRevenueJournalEntry(opts: {
 
 	const now = Date.now();
 	const entryId = nanoid(12);
-	const entryNumber = getNextEntryNumber();
+	const entryNumber = await getNextEntryNumber();
 
-	db.insert(finJournalEntries)
+	await db.insert(finJournalEntries)
 		.values({
 			id: entryId,
 			entryNumber,
@@ -74,10 +71,9 @@ export function createRevenueJournalEntry(opts: {
 			createdBy: opts.userId,
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
-	db.insert(finJournalLines)
+	await db.insert(finJournalLines)
 		.values([
 			{
 				id: nanoid(12),
@@ -99,8 +95,7 @@ export function createRevenueJournalEntry(opts: {
 				position: 1,
 				createdAt: now
 			}
-		])
-		.run();
+		]);
 
 	return { id: entryId, entryNumber };
 }
@@ -109,27 +104,26 @@ export function createRevenueJournalEntry(opts: {
  * Record a payment received against an A/R entry.
  * Debit: Bank Account, Credit: Accounts Receivable
  */
-export function recordPaymentReceived(opts: {
+export async function recordPaymentReceived(opts: {
 	bankAccountId: string;
 	amount: number;
 	opportunityId: string;
 	companyId: string;
 	description: string;
 	userId: string;
-}): { id: string; entryNumber: number } | null {
-	const arAccount = db
+}): Promise<{ id: string; entryNumber: number } | null> {
+	const [arAccount] = await db
 		.select({ id: finAccounts.id })
 		.from(finAccounts)
-		.where(eq(finAccounts.accountNumber, 1200))
-		.get();
+		.where(eq(finAccounts.accountNumber, 1200));
 
 	if (!arAccount) return null;
 
 	const now = Date.now();
 	const entryId = nanoid(12);
-	const entryNumber = getNextEntryNumber();
+	const entryNumber = await getNextEntryNumber();
 
-	db.insert(finJournalEntries)
+	await db.insert(finJournalEntries)
 		.values({
 			id: entryId,
 			entryNumber,
@@ -144,10 +138,9 @@ export function recordPaymentReceived(opts: {
 			createdBy: opts.userId,
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
-	db.insert(finJournalLines)
+	await db.insert(finJournalLines)
 		.values([
 			{
 				id: nanoid(12),
@@ -169,8 +162,7 @@ export function recordPaymentReceived(opts: {
 				position: 1,
 				createdAt: now
 			}
-		])
-		.run();
+		]);
 
 	return { id: entryId, entryNumber };
 }

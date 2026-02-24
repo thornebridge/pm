@@ -20,14 +20,13 @@ export function getAuthUrl(config: GoogleOAuthConfig, redirectUri: string, state
 }
 
 export async function getValidToken(userId: string): Promise<string | null> {
-	const config = getGoogleConfig();
+	const config = await getGoogleConfig();
 	if (!config) return null;
 
-	const integration = db
+	const [integration] = await db
 		.select()
 		.from(calendarIntegrations)
-		.where(eq(calendarIntegrations.userId, userId))
-		.get();
+		.where(eq(calendarIntegrations.userId, userId));
 	if (!integration) return null;
 
 	// Refresh if expiring within 5 minutes
@@ -35,14 +34,13 @@ export async function getValidToken(userId: string): Promise<string | null> {
 		try {
 			const refreshed = await refreshAccessToken(config, integration.refreshToken);
 			const now = Date.now();
-			db.update(calendarIntegrations)
+			await db.update(calendarIntegrations)
 				.set({
 					accessToken: refreshed.accessToken,
 					tokenExpiry: now + refreshed.expiresIn * 1000,
 					updatedAt: now
 				})
-				.where(eq(calendarIntegrations.userId, userId))
-				.run();
+				.where(eq(calendarIntegrations.userId, userId));
 			return refreshed.accessToken;
 		} catch (err) {
 			console.error('[google-calendar] Token refresh failed:', err);
@@ -61,11 +59,10 @@ export async function getFreeBusy(
 	const token = await getValidToken(userId);
 	if (!token) return [];
 
-	const integration = db
+	const [integration] = await db
 		.select({ calendarId: calendarIntegrations.calendarId })
 		.from(calendarIntegrations)
-		.where(eq(calendarIntegrations.userId, userId))
-		.get();
+		.where(eq(calendarIntegrations.userId, userId));
 
 	const calendarId = integration?.calendarId || 'primary';
 
@@ -109,11 +106,10 @@ export async function createCalendarEvent(
 	const token = await getValidToken(userId);
 	if (!token) return null;
 
-	const integration = db
+	const [integration] = await db
 		.select({ calendarId: calendarIntegrations.calendarId })
 		.from(calendarIntegrations)
-		.where(eq(calendarIntegrations.userId, userId))
-		.get();
+		.where(eq(calendarIntegrations.userId, userId));
 
 	const calendarId = integration?.calendarId || 'primary';
 
@@ -146,11 +142,10 @@ export async function deleteCalendarEvent(userId: string, eventId: string): Prom
 	const token = await getValidToken(userId);
 	if (!token) return;
 
-	const integration = db
+	const [integration] = await db
 		.select({ calendarId: calendarIntegrations.calendarId })
 		.from(calendarIntegrations)
-		.where(eq(calendarIntegrations.userId, userId))
-		.get();
+		.where(eq(calendarIntegrations.userId, userId));
 
 	const calendarId = integration?.calendarId || 'primary';
 

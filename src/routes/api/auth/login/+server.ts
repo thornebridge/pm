@@ -13,17 +13,16 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 		return json({ error: 'Email and password are required' }, { status: 400 });
 	}
 
-	const user = db
+	const [user] = await db
 		.select()
 		.from(users)
-		.where(eq(users.email, email.trim().toLowerCase()))
-		.get();
+		.where(eq(users.email, email.trim().toLowerCase()));
 
 	if (!user || !(await verifyPassword(user.passwordHash, password))) {
 		return json({ error: 'Invalid email or password' }, { status: 400 });
 	}
 
-	const sessionId = createSession(user.id);
+	const sessionId = await createSession(user.id);
 	setSessionCookie(cookies, sessionId);
 
 	return json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });

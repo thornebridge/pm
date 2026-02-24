@@ -6,6 +6,7 @@ import { projects, taskStatuses, taskLabels, taskTemplates } from '$lib/server/d
 import { desc, eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastProjectChanged } from '$lib/server/ws/handlers.js';
+import { indexDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -132,6 +133,7 @@ export const POST: RequestHandler = async (event) => {
 		}
 	}
 
+	indexDocument('projects', { id: project.id, name: project.name, slug: project.slug, description: project.description, archived: false, updatedAt: project.updatedAt });
 	broadcastProjectChanged('created');
 	return json(project, { status: 201 });
 };

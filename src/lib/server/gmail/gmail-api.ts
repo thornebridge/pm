@@ -9,11 +9,10 @@ export async function getValidGmailToken(userId: string): Promise<string | null>
 	const config = getGoogleConfig();
 	if (!config) return null;
 
-	const integration = db
+	const [integration] = await db
 		.select()
 		.from(gmailIntegrations)
-		.where(eq(gmailIntegrations.userId, userId))
-		.get();
+		.where(eq(gmailIntegrations.userId, userId));
 	if (!integration) return null;
 
 	// Refresh if expiring within 5 minutes
@@ -21,14 +20,13 @@ export async function getValidGmailToken(userId: string): Promise<string | null>
 		try {
 			const refreshed = await refreshAccessToken(config, integration.refreshToken);
 			const now = Date.now();
-			db.update(gmailIntegrations)
+			await db.update(gmailIntegrations)
 				.set({
 					accessToken: refreshed.accessToken,
 					tokenExpiry: now + refreshed.expiresIn * 1000,
 					updatedAt: now
 				})
-				.where(eq(gmailIntegrations.userId, userId))
-				.run();
+				.where(eq(gmailIntegrations.userId, userId));
 			return refreshed.accessToken;
 		} catch (err) {
 			console.error('[gmail] Token refresh failed:', err);

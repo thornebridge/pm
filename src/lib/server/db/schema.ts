@@ -1,28 +1,28 @@
-import { sqliteTable, text, integer, real, primaryKey, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, bigint, boolean, doublePrecision, primaryKey, uniqueIndex, index } from 'drizzle-orm/pg-core';
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
 	id: text('id').primaryKey(),
 	email: text('email').notNull().unique(),
 	name: text('name').notNull(),
 	passwordHash: text('password_hash').notNull(),
 	role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
 	activeThemeId: text('active_theme_id'),
-	createdAt: integer('created_at', { mode: 'number' }).notNull(),
-	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
-export const sessions = sqliteTable('sessions', {
+export const sessions = pgTable('sessions', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
 		.references(() => users.id, { onDelete: 'cascade' }),
-	expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
-	createdAt: integer('created_at', { mode: 'number' }).notNull()
+	expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
-export const inviteTokens = sqliteTable('invite_tokens', {
+export const inviteTokens = pgTable('invite_tokens', {
 	id: text('id').primaryKey(),
 	token: text('token').notNull().unique(),
 	email: text('email'),
@@ -31,14 +31,14 @@ export const inviteTokens = sqliteTable('invite_tokens', {
 		.notNull()
 		.references(() => users.id),
 	usedBy: text('used_by').references(() => users.id),
-	expiresAt: integer('expires_at', { mode: 'number' }).notNull(),
-	usedAt: integer('used_at', { mode: 'number' }),
-	createdAt: integer('created_at', { mode: 'number' }).notNull()
+	expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+	usedAt: bigint('used_at', { mode: 'number' }),
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
 // ─── Folders ──────────────────────────────────────────────────────────────────
 
-export const folders = sqliteTable('folders', {
+export const folders = pgTable('folders', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
 	slug: text('slug').notNull(),
@@ -48,29 +48,29 @@ export const folders = sqliteTable('folders', {
 	createdBy: text('created_by')
 		.notNull()
 		.references(() => users.id),
-	createdAt: integer('created_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export const projects = sqliteTable('projects', {
+export const projects = pgTable('projects', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
 	slug: text('slug').notNull().unique(),
 	description: text('description'),
 	color: text('color').notNull().default('#2d4f3e'),
 	folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
-	archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+	archived: boolean('archived').notNull().default(false),
 	readme: text('readme'),
 	defaultAssigneeId: text('default_assignee_id').references(() => users.id, { onDelete: 'set null' }),
 	createdBy: text('created_by')
 		.notNull()
 		.references(() => users.id),
-	createdAt: integer('created_at', { mode: 'number' }).notNull(),
-	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
-export const taskStatuses = sqliteTable(
+export const taskStatuses = pgTable(
 	'task_statuses',
 	{
 		id: text('id').primaryKey(),
@@ -80,15 +80,15 @@ export const taskStatuses = sqliteTable(
 		name: text('name').notNull(),
 		color: text('color').notNull(),
 		position: integer('position').notNull(),
-		isClosed: integer('is_closed', { mode: 'boolean' }).notNull().default(false),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		isClosed: boolean('is_closed').notNull().default(false),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_statuses_project').on(table.projectId, table.position)]
 );
 
 // ─── Sprints ──────────────────────────────────────────────────────────────────
 
-export const sprints = sqliteTable(
+export const sprints = pgTable(
 	'sprints',
 	{
 		id: text('id').primaryKey(),
@@ -97,19 +97,19 @@ export const sprints = sqliteTable(
 			.references(() => projects.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
 		goal: text('goal'),
-		startDate: integer('start_date', { mode: 'number' }),
-		endDate: integer('end_date', { mode: 'number' }),
+		startDate: bigint('start_date', { mode: 'number' }),
+		endDate: bigint('end_date', { mode: 'number' }),
 		status: text('status', { enum: ['planning', 'active', 'completed', 'cancelled'] })
 			.notNull()
 			.default('planning'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_sprints_project').on(table.projectId, table.status)]
 );
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
-export const tasks = sqliteTable(
+export const tasks = pgTable(
 	'tasks',
 	{
 		id: text('id').primaryKey(),
@@ -131,15 +131,15 @@ export const tasks = sqliteTable(
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		dueDate: integer('due_date', { mode: 'number' }),
-		startDate: integer('start_date', { mode: 'number' }),
+		dueDate: bigint('due_date', { mode: 'number' }),
+		startDate: bigint('start_date', { mode: 'number' }),
 		sprintId: text('sprint_id').references(() => sprints.id, { onDelete: 'set null' }),
 		estimatePoints: integer('estimate_points'),
 		recurrence: text('recurrence'), // JSON: { freq, interval, endDate? }
 		recurrenceSourceId: text('recurrence_source_id'),
-		position: real('position').notNull(),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		position: doublePrecision('position').notNull(),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(table) => [
 		index('idx_tasks_board').on(table.projectId, table.statusId, table.position),
@@ -150,17 +150,17 @@ export const tasks = sqliteTable(
 	]
 );
 
-export const taskLabels = sqliteTable('task_labels', {
+export const taskLabels = pgTable('task_labels', {
 	id: text('id').primaryKey(),
 	projectId: text('project_id')
 		.notNull()
 		.references(() => projects.id, { onDelete: 'cascade' }),
 	name: text('name').notNull(),
 	color: text('color').notNull(),
-	createdAt: integer('created_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
-export const taskLabelAssignments = sqliteTable(
+export const taskLabelAssignments = pgTable(
 	'task_label_assignments',
 	{
 		taskId: text('task_id')
@@ -175,7 +175,7 @@ export const taskLabelAssignments = sqliteTable(
 
 // ─── Checklist Items ─────────────────────────────────────────────────────────
 
-export const checklistItems = sqliteTable(
+export const checklistItems = pgTable(
 	'checklist_items',
 	{
 		id: text('id').primaryKey(),
@@ -183,16 +183,16 @@ export const checklistItems = sqliteTable(
 			.notNull()
 			.references(() => tasks.id, { onDelete: 'cascade' }),
 		title: text('title').notNull(),
-		completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
+		completed: boolean('completed').notNull().default(false),
 		position: integer('position').notNull().default(0),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_checklist_task').on(table.taskId, table.position)]
 );
 
 // ─── Task Dependencies ───────────────────────────────────────────────────────
 
-export const taskDependencies = sqliteTable(
+export const taskDependencies = pgTable(
 	'task_dependencies',
 	{
 		taskId: text('task_id')
@@ -211,7 +211,7 @@ export const taskDependencies = sqliteTable(
 
 // ─── Attachments ─────────────────────────────────────────────────────────────
 
-export const attachments = sqliteTable(
+export const attachments = pgTable(
 	'attachments',
 	{
 		id: text('id').primaryKey(),
@@ -226,14 +226,14 @@ export const attachments = sqliteTable(
 		uploadedBy: text('uploaded_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_attachments_task').on(table.taskId)]
 );
 
 // ─── Collaboration ────────────────────────────────────────────────────────────
 
-export const comments = sqliteTable(
+export const comments = pgTable(
 	'comments',
 	{
 		id: text('id').primaryKey(),
@@ -244,13 +244,13 @@ export const comments = sqliteTable(
 			.notNull()
 			.references(() => users.id),
 		body: text('body').notNull(),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_comments_task').on(table.taskId, table.createdAt)]
 );
 
-export const commentReactions = sqliteTable(
+export const commentReactions = pgTable(
 	'comment_reactions',
 	{
 		commentId: text('comment_id')
@@ -260,7 +260,7 @@ export const commentReactions = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		emoji: text('emoji').notNull(),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [
 		primaryKey({ columns: [table.commentId, table.userId, table.emoji] }),
@@ -268,7 +268,7 @@ export const commentReactions = sqliteTable(
 	]
 );
 
-export const activityLog = sqliteTable(
+export const activityLog = pgTable(
 	'activity_log',
 	{
 		id: text('id').primaryKey(),
@@ -293,14 +293,14 @@ export const activityLog = sqliteTable(
 			]
 		}).notNull(),
 		detail: text('detail'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_activity_task').on(table.taskId, table.createdAt)]
 );
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
-export const pushSubscriptions = sqliteTable('push_subscriptions', {
+export const pushSubscriptions = pgTable('push_subscriptions', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
@@ -308,32 +308,32 @@ export const pushSubscriptions = sqliteTable('push_subscriptions', {
 	endpoint: text('endpoint').notNull().unique(),
 	keysP256dh: text('keys_p256dh').notNull(),
 	keysAuth: text('keys_auth').notNull(),
-	createdAt: integer('created_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
-export const notificationPreferences = sqliteTable('notification_preferences', {
+export const notificationPreferences = pgTable('notification_preferences', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
 		.references(() => users.id, { onDelete: 'cascade' })
 		.unique(),
-	onAssigned: integer('on_assigned', { mode: 'boolean' }).notNull().default(true),
-	onStatusChange: integer('on_status_change', { mode: 'boolean' }).notNull().default(true),
-	onComment: integer('on_comment', { mode: 'boolean' }).notNull().default(true),
-	onMention: integer('on_mention', { mode: 'boolean' }).notNull().default(true),
-	emailEnabled: integer('email_enabled', { mode: 'boolean' }).notNull().default(true),
-	reminderDueSoon: integer('reminder_due_soon', { mode: 'boolean' }).notNull().default(true),
-	reminderDueToday: integer('reminder_due_today', { mode: 'boolean' }).notNull().default(true),
-	reminderOverdue: integer('reminder_overdue', { mode: 'boolean' }).notNull().default(true),
+	onAssigned: boolean('on_assigned').notNull().default(true),
+	onStatusChange: boolean('on_status_change').notNull().default(true),
+	onComment: boolean('on_comment').notNull().default(true),
+	onMention: boolean('on_mention').notNull().default(true),
+	emailEnabled: boolean('email_enabled').notNull().default(true),
+	reminderDueSoon: boolean('reminder_due_soon').notNull().default(true),
+	reminderDueToday: boolean('reminder_due_today').notNull().default(true),
+	reminderOverdue: boolean('reminder_overdue').notNull().default(true),
 	dueDateEmailMode: text('due_date_email_mode', { enum: ['off', 'each', 'daily', 'weekly'] }).notNull().default('off'),
 	digestDay: integer('digest_day').notNull().default(1),
 	digestHour: integer('digest_hour').notNull().default(8),
-	lastDigestSentAt: integer('last_digest_sent_at', { mode: 'number' }).notNull().default(0)
+	lastDigestSentAt: bigint('last_digest_sent_at', { mode: 'number' }).notNull().default(0)
 });
 
 // ─── In-App Notifications ────────────────────────────────────────────────────
 
-export const notifications = sqliteTable(
+export const notifications = pgTable(
 	'notifications',
 	{
 		id: text('id').primaryKey(),
@@ -346,8 +346,8 @@ export const notifications = sqliteTable(
 		url: text('url'),
 		taskId: text('task_id').references(() => tasks.id, { onDelete: 'cascade' }),
 		actorId: text('actor_id').references(() => users.id),
-		read: integer('read', { mode: 'boolean' }).notNull().default(false),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		read: boolean('read').notNull().default(false),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [
 		index('idx_notifications_user').on(table.userId, table.read, table.createdAt)
@@ -356,7 +356,7 @@ export const notifications = sqliteTable(
 
 // ─── Time Tracking ───────────────────────────────────────────────────────────
 
-export const timeEntries = sqliteTable(
+export const timeEntries = pgTable(
 	'time_entries',
 	{
 		id: text('id').primaryKey(),
@@ -367,17 +367,17 @@ export const timeEntries = sqliteTable(
 			.notNull()
 			.references(() => users.id),
 		description: text('description'),
-		startedAt: integer('started_at', { mode: 'number' }).notNull(),
-		stoppedAt: integer('stopped_at', { mode: 'number' }),
+		startedAt: bigint('started_at', { mode: 'number' }).notNull(),
+		stoppedAt: bigint('stopped_at', { mode: 'number' }),
 		durationMs: integer('duration_ms'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_time_entries_task').on(table.taskId)]
 );
 
 // ─── Task Templates ──────────────────────────────────────────────────────────
 
-export const taskTemplates = sqliteTable('task_templates', {
+export const taskTemplates = pgTable('task_templates', {
 	id: text('id').primaryKey(),
 	projectId: text('project_id')
 		.notNull()
@@ -388,12 +388,12 @@ export const taskTemplates = sqliteTable('task_templates', {
 	type: text('type', { enum: ['task', 'bug', 'feature', 'improvement'] }).default('task'),
 	priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] }).default('medium'),
 	labelIds: text('label_ids'),
-	createdAt: integer('created_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
 // ─── Saved Views ─────────────────────────────────────────────────────────────
 
-export const savedViews = sqliteTable(
+export const savedViews = pgTable(
 	'saved_views',
 	{
 		id: text('id').primaryKey(),
@@ -405,33 +405,33 @@ export const savedViews = sqliteTable(
 			.references(() => users.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
 		filters: text('filters').notNull(), // JSON string: SavedViewData
-		shared: integer('shared', { mode: 'boolean' }).notNull().default(false),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		shared: boolean('shared').notNull().default(false),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_views_project_user').on(table.projectId, table.userId)]
 );
 
 // ─── Webhooks ────────────────────────────────────────────────────────────────
 
-export const webhooks = sqliteTable(
+export const webhooks = pgTable(
 	'webhooks',
 	{
 		id: text('id').primaryKey(),
 		url: text('url').notNull(),
 		secret: text('secret'),
 		events: text('events').notNull(), // JSON array: ["task.created", "task.updated", ...]
-		active: integer('active', { mode: 'boolean' }).notNull().default(true),
+		active: boolean('active').notNull().default(true),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	}
 );
 
 // ─── Task Watchers ──────────────────────────────────────────────────────────
 
-export const taskWatchers = sqliteTable(
+export const taskWatchers = pgTable(
 	'task_watchers',
 	{
 		taskId: text('task_id')
@@ -440,7 +440,7 @@ export const taskWatchers = sqliteTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [
 		primaryKey({ columns: [table.taskId, table.userId] })
@@ -449,26 +449,26 @@ export const taskWatchers = sqliteTable(
 
 // ─── Sprint Snapshots ────────────────────────────────────────────────────────
 
-export const sprintSnapshots = sqliteTable(
+export const sprintSnapshots = pgTable(
 	'sprint_snapshots',
 	{
 		id: text('id').primaryKey(),
 		sprintId: text('sprint_id')
 			.notNull()
 			.references(() => sprints.id, { onDelete: 'cascade' }),
-		date: integer('date', { mode: 'number' }).notNull(),
+		date: bigint('date', { mode: 'number' }).notNull(),
 		totalTasks: integer('total_tasks').notNull(),
 		completedTasks: integer('completed_tasks').notNull(),
 		totalPoints: integer('total_points').notNull().default(0),
 		completedPoints: integer('completed_points').notNull().default(0),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_snapshots_sprint').on(table.sprintId, table.date)]
 );
 
 // ─── Automation Rules ────────────────────────────────────────────────────────
 
-export const automationRules = sqliteTable(
+export const automationRules = pgTable(
 	'automation_rules',
 	{
 		id: text('id').primaryKey(),
@@ -480,17 +480,17 @@ export const automationRules = sqliteTable(
 		trigger: text('trigger').notNull(), // JSON: { event, config? }
 		conditions: text('conditions'), // JSON: [{ field, operator, value }] or null
 		actions: text('actions').notNull(), // JSON: [{ type, ...config }]
-		enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+		enabled: boolean('enabled').notNull().default(true),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(table) => [index('idx_automation_rules_project').on(table.projectId, table.enabled)]
 );
 
-export const automationExecutions = sqliteTable(
+export const automationExecutions = pgTable(
 	'automation_executions',
 	{
 		id: text('id').primaryKey(),
@@ -503,7 +503,7 @@ export const automationExecutions = sqliteTable(
 		actionsRun: text('actions_run'), // JSON: [{ action, result, error? }]
 		error: text('error'),
 		durationMs: integer('duration_ms'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(table) => [
 		index('idx_automation_exec_rule').on(table.ruleId, table.createdAt),
@@ -513,7 +513,7 @@ export const automationExecutions = sqliteTable(
 
 // ─── Due Date Reminder Tracking ──────────────────────────────────────────────
 
-export const dueDateRemindersSent = sqliteTable(
+export const dueDateRemindersSent = pgTable(
 	'due_date_reminders_sent',
 	{
 		id: text('id').primaryKey(),
@@ -524,7 +524,7 @@ export const dueDateRemindersSent = sqliteTable(
 			.notNull()
 			.references(() => tasks.id, { onDelete: 'cascade' }),
 		tier: text('tier', { enum: ['day_before', 'day_of', 'overdue'] }).notNull(),
-		sentAt: integer('sent_at', { mode: 'number' }).notNull()
+		sentAt: bigint('sent_at', { mode: 'number' }).notNull()
 	},
 	(table) => [
 		uniqueIndex('idx_reminders_unique').on(table.userId, table.taskId, table.tier),
@@ -534,7 +534,7 @@ export const dueDateRemindersSent = sqliteTable(
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
 
-export const crmCompanies = sqliteTable(
+export const crmCompanies = pgTable(
 	'crm_companies',
 	{
 		id: text('id').primaryKey(),
@@ -552,13 +552,13 @@ export const crmCompanies = sqliteTable(
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_crm_companies_owner').on(t.ownerId)]
 );
 
-export const crmContacts = sqliteTable(
+export const crmContacts = pgTable(
 	'crm_contacts',
 	{
 		id: text('id').primaryKey(),
@@ -568,7 +568,7 @@ export const crmContacts = sqliteTable(
 		email: text('email'),
 		phone: text('phone'),
 		title: text('title'),
-		isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
+		isPrimary: boolean('is_primary').notNull().default(false),
 		source: text('source', {
 			enum: ['referral', 'inbound', 'outbound', 'website', 'event', 'other']
 		}),
@@ -577,8 +577,8 @@ export const crmContacts = sqliteTable(
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_contacts_company').on(t.companyId),
@@ -587,22 +587,22 @@ export const crmContacts = sqliteTable(
 	]
 );
 
-export const crmPipelineStages = sqliteTable(
+export const crmPipelineStages = pgTable(
 	'crm_pipeline_stages',
 	{
 		id: text('id').primaryKey(),
 		name: text('name').notNull(),
 		color: text('color').notNull(),
 		position: integer('position').notNull(),
-		isClosed: integer('is_closed', { mode: 'boolean' }).notNull().default(false),
-		isWon: integer('is_won', { mode: 'boolean' }).notNull().default(false),
+		isClosed: boolean('is_closed').notNull().default(false),
+		isWon: boolean('is_won').notNull().default(false),
 		probability: integer('probability').notNull().default(0),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_crm_stages_position').on(t.position)]
 );
 
-export const crmOpportunities = sqliteTable(
+export const crmOpportunities = pgTable(
 	'crm_opportunities',
 	{
 		id: text('id').primaryKey(),
@@ -617,24 +617,27 @@ export const crmOpportunities = sqliteTable(
 		value: integer('value'),
 		currency: text('currency').notNull().default('USD'),
 		probability: integer('probability'),
-		expectedCloseDate: integer('expected_close_date', { mode: 'number' }),
-		actualCloseDate: integer('actual_close_date', { mode: 'number' }),
+		expectedCloseDate: bigint('expected_close_date', { mode: 'number' }),
+		actualCloseDate: bigint('actual_close_date', { mode: 'number' }),
 		priority: text('priority', { enum: ['hot', 'warm', 'cold'] }).notNull().default('warm'),
 		source: text('source', {
 			enum: ['referral', 'inbound', 'outbound', 'website', 'event', 'partner', 'other']
 		}),
 		description: text('description'),
 		lostReason: text('lost_reason'),
+		forecastCategory: text('forecast_category', {
+			enum: ['commit', 'best_case', 'upside', 'pipeline', 'omit']
+		}),
 		nextStep: text('next_step'),
-		nextStepDueDate: integer('next_step_due_date', { mode: 'number' }),
-		stageEnteredAt: integer('stage_entered_at', { mode: 'number' }),
-		position: real('position').notNull(),
+		nextStepDueDate: bigint('next_step_due_date', { mode: 'number' }),
+		stageEnteredAt: bigint('stage_entered_at', { mode: 'number' }),
+		position: doublePrecision('position').notNull(),
 		ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_opps_company').on(t.companyId),
@@ -644,7 +647,7 @@ export const crmOpportunities = sqliteTable(
 	]
 );
 
-export const crmOpportunityContacts = sqliteTable(
+export const crmOpportunityContacts = pgTable(
 	'crm_opportunity_contacts',
 	{
 		opportunityId: text('opportunity_id')
@@ -661,7 +664,7 @@ export const crmOpportunityContacts = sqliteTable(
 	(t) => [primaryKey({ columns: [t.opportunityId, t.contactId] })]
 );
 
-export const crmActivities = sqliteTable(
+export const crmActivities = pgTable(
 	'crm_activities',
 	{
 		id: text('id').primaryKey(),
@@ -673,14 +676,14 @@ export const crmActivities = sqliteTable(
 		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, {
 			onDelete: 'set null'
 		}),
-		scheduledAt: integer('scheduled_at', { mode: 'number' }),
-		completedAt: integer('completed_at', { mode: 'number' }),
+		scheduledAt: bigint('scheduled_at', { mode: 'number' }),
+		completedAt: bigint('completed_at', { mode: 'number' }),
 		durationMinutes: integer('duration_minutes'),
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_act_company').on(t.companyId),
@@ -690,14 +693,14 @@ export const crmActivities = sqliteTable(
 	]
 );
 
-export const crmTasks = sqliteTable(
+export const crmTasks = pgTable(
 	'crm_tasks',
 	{
 		id: text('id').primaryKey(),
 		title: text('title').notNull(),
 		description: text('description'),
-		dueDate: integer('due_date', { mode: 'number' }),
-		completedAt: integer('completed_at', { mode: 'number' }),
+		dueDate: bigint('due_date', { mode: 'number' }),
+		completedAt: bigint('completed_at', { mode: 'number' }),
 		priority: text('priority', { enum: ['urgent', 'high', 'medium', 'low'] })
 			.notNull()
 			.default('medium'),
@@ -710,8 +713,8 @@ export const crmTasks = sqliteTable(
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_tasks_assignee').on(t.assigneeId, t.completedAt),
@@ -719,7 +722,7 @@ export const crmTasks = sqliteTable(
 	]
 );
 
-export const crmProposals = sqliteTable(
+export const crmProposals = pgTable(
 	'crm_proposals',
 	{
 		id: text('id').primaryKey(),
@@ -734,19 +737,19 @@ export const crmProposals = sqliteTable(
 		})
 			.notNull()
 			.default('draft'),
-		sentAt: integer('sent_at', { mode: 'number' }),
-		expiresAt: integer('expires_at', { mode: 'number' }),
-		respondedAt: integer('responded_at', { mode: 'number' }),
+		sentAt: bigint('sent_at', { mode: 'number' }),
+		expiresAt: bigint('expires_at', { mode: 'number' }),
+		respondedAt: bigint('responded_at', { mode: 'number' }),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_crm_proposals_opp').on(t.opportunityId)]
 );
 
-export const crmProducts = sqliteTable(
+export const crmProducts = pgTable(
 	'crm_products',
 	{
 		id: text('id').primaryKey(),
@@ -756,17 +759,17 @@ export const crmProducts = sqliteTable(
 		category: text('category'),
 		type: text('type', { enum: ['product', 'service', 'subscription'] }).notNull().default('service'),
 		status: text('status', { enum: ['active', 'archived'] }).notNull().default('active'),
-		taxable: integer('taxable', { mode: 'boolean' }).notNull().default(true),
+		taxable: boolean('taxable').notNull().default(true),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [uniqueIndex('idx_crm_products_sku').on(t.sku)]
 );
 
-export const crmPriceTiers = sqliteTable(
+export const crmPriceTiers = pgTable(
 	'crm_price_tiers',
 	{
 		id: text('id').primaryKey(),
@@ -789,15 +792,15 @@ export const crmPriceTiers = sqliteTable(
 		unitLabel: text('unit_label'),
 		minQuantity: integer('min_quantity'),
 		maxQuantity: integer('max_quantity'),
-		isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+		isDefault: boolean('is_default').notNull().default(false),
 		position: integer('position').notNull().default(0),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_crm_price_tiers_product').on(t.productId, t.position)]
 );
 
-export const crmPriceBrackets = sqliteTable(
+export const crmPriceBrackets = pgTable(
 	'crm_price_brackets',
 	{
 		id: text('id').primaryKey(),
@@ -813,7 +816,7 @@ export const crmPriceBrackets = sqliteTable(
 	(t) => [index('idx_crm_price_brackets_tier').on(t.priceTierId, t.position)]
 );
 
-export const crmOpportunityItems = sqliteTable(
+export const crmOpportunityItems = pgTable(
 	'crm_opportunity_items',
 	{
 		id: text('id').primaryKey(),
@@ -825,7 +828,7 @@ export const crmOpportunityItems = sqliteTable(
 			.references(() => crmProducts.id),
 		priceTierId: text('price_tier_id').references(() => crmPriceTiers.id, { onDelete: 'set null' }),
 		description: text('description'),
-		quantity: real('quantity').notNull().default(1),
+		quantity: doublePrecision('quantity').notNull().default(1),
 		unitAmount: integer('unit_amount').notNull(),
 		discountPercent: integer('discount_percent'),
 		discountAmount: integer('discount_amount'),
@@ -837,8 +840,8 @@ export const crmOpportunityItems = sqliteTable(
 			enum: ['weekly', 'monthly', 'quarterly', 'semi_annual', 'annual']
 		}),
 		position: integer('position').notNull().default(0),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_opp_items_opp').on(t.opportunityId, t.position),
@@ -846,7 +849,7 @@ export const crmOpportunityItems = sqliteTable(
 	]
 );
 
-export const crmProposalItems = sqliteTable(
+export const crmProposalItems = pgTable(
 	'crm_proposal_items',
 	{
 		id: text('id').primaryKey(),
@@ -859,7 +862,7 @@ export const crmProposalItems = sqliteTable(
 		productName: text('product_name').notNull(),
 		productSku: text('product_sku'),
 		description: text('description'),
-		quantity: real('quantity').notNull(),
+		quantity: doublePrecision('quantity').notNull(),
 		unitAmount: integer('unit_amount').notNull(),
 		discountPercent: integer('discount_percent'),
 		discountAmount: integer('discount_amount'),
@@ -872,14 +875,14 @@ export const crmProposalItems = sqliteTable(
 		}),
 		lineTotal: integer('line_total').notNull(),
 		position: integer('position').notNull().default(0),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_crm_proposal_items_proposal').on(t.proposalId, t.position)]
 );
 
 // ─── User Themes ─────────────────────────────────────────────────────────────
 
-export const userThemes = sqliteTable(
+export const userThemes = pgTable(
 	'user_themes',
 	{
 		id: text('id').primaryKey(),
@@ -890,24 +893,24 @@ export const userThemes = sqliteTable(
 		description: text('description'),
 		source: text('source').notNull(),
 		variables: text('variables').notNull(),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_user_themes_user').on(t.userId)]
 );
 
 // ─── Organization Settings ───────────────────────────────────────────────────
 
-export const orgSettings = sqliteTable('org_settings', {
+export const orgSettings = pgTable('org_settings', {
 	id: text('id').primaryKey(), // always 'default'
 	platformName: text('platform_name').notNull().default('PM'),
 	// Telnyx telephony integration
-	telnyxEnabled: integer('telnyx_enabled', { mode: 'boolean' }).notNull().default(false),
+	telnyxEnabled: boolean('telnyx_enabled').notNull().default(false),
 	telnyxApiKey: text('telnyx_api_key'),
 	telnyxConnectionId: text('telnyx_connection_id'),
 	telnyxCredentialId: text('telnyx_credential_id'),
 	telnyxCallerNumber: text('telnyx_caller_number'),
-	telnyxRecordCalls: integer('telnyx_record_calls', { mode: 'boolean' }).notNull().default(false),
+	telnyxRecordCalls: boolean('telnyx_record_calls').notNull().default(false),
 	// Google Calendar OAuth
 	googleClientId: text('google_client_id'),
 	googleClientSecret: text('google_client_secret'),
@@ -915,12 +918,12 @@ export const orgSettings = sqliteTable('org_settings', {
 	emailProvider: text('email_provider'), // 'resend' | null
 	emailFromAddress: text('email_from_address'),
 	resendApiKey: text('resend_api_key'),
-	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
 // ─── Telnyx Call Logs ────────────────────────────────────────────────────────
 
-export const telnyxCallLogs = sqliteTable(
+export const telnyxCallLogs = pgTable(
 	'telnyx_call_logs',
 	{
 		id: text('id').primaryKey(),
@@ -934,9 +937,9 @@ export const telnyxCallLogs = sqliteTable(
 		})
 			.notNull()
 			.default('initiated'),
-		startedAt: integer('started_at', { mode: 'number' }),
-		answeredAt: integer('answered_at', { mode: 'number' }),
-		endedAt: integer('ended_at', { mode: 'number' }),
+		startedAt: bigint('started_at', { mode: 'number' }),
+		answeredAt: bigint('answered_at', { mode: 'number' }),
+		endedAt: bigint('ended_at', { mode: 'number' }),
 		durationSeconds: integer('duration_seconds'),
 		recordingUrl: text('recording_url'),
 		contactId: text('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
@@ -946,8 +949,8 @@ export const telnyxCallLogs = sqliteTable(
 			.notNull()
 			.references(() => users.id),
 		notes: text('notes'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_telnyx_calls_user').on(t.userId, t.createdAt),
@@ -960,7 +963,7 @@ export const telnyxCallLogs = sqliteTable(
 
 // ─── Financials ─────────────────────────────────────────────────────────────
 
-export const finAccounts = sqliteTable(
+export const finAccounts = pgTable(
 	'fin_accounts',
 	{
 		id: text('id').primaryKey(),
@@ -974,13 +977,13 @@ export const finAccounts = sqliteTable(
 		parentId: text('parent_id'),
 		normalBalance: text('normal_balance', { enum: ['debit', 'credit'] }).notNull(),
 		currency: text('currency').notNull().default('USD'),
-		active: integer('active', { mode: 'boolean' }).notNull().default(true),
-		isSystem: integer('is_system', { mode: 'boolean' }).notNull().default(false),
+		active: boolean('active').notNull().default(true),
+		isSystem: boolean('is_system').notNull().default(false),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_fin_accounts_type_active').on(t.accountType, t.active),
@@ -988,7 +991,7 @@ export const finAccounts = sqliteTable(
 	]
 );
 
-export const finBankAccountMeta = sqliteTable(
+export const finBankAccountMeta = pgTable(
 	'fin_bank_account_meta',
 	{
 		id: text('id').primaryKey(),
@@ -1003,20 +1006,20 @@ export const finBankAccountMeta = sqliteTable(
 			enum: ['checking', 'savings', 'credit_card', 'money_market', 'petty_cash', 'paypal', 'other']
 		}).notNull(),
 		openingBalance: integer('opening_balance').notNull().default(0),
-		openingBalanceDate: integer('opening_balance_date', { mode: 'number' }),
-		lastReconciledDate: integer('last_reconciled_date', { mode: 'number' }),
+		openingBalanceDate: bigint('opening_balance_date', { mode: 'number' }),
+		lastReconciledDate: bigint('last_reconciled_date', { mode: 'number' }),
 		lastReconciledBalance: integer('last_reconciled_balance'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	}
 );
 
-export const finJournalEntries = sqliteTable(
+export const finJournalEntries = pgTable(
 	'fin_journal_entries',
 	{
 		id: text('id').primaryKey(),
 		entryNumber: integer('entry_number').notNull(),
-		date: integer('date', { mode: 'number' }).notNull(),
+		date: bigint('date', { mode: 'number' }).notNull(),
 		description: text('description').notNull(),
 		memo: text('memo'),
 		referenceNumber: text('reference_number'),
@@ -1028,14 +1031,14 @@ export const finJournalEntries = sqliteTable(
 		crmProposalId: text('crm_proposal_id').references(() => crmProposals.id, { onDelete: 'set null' }),
 		crmCompanyId: text('crm_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
 		voidedEntryId: text('voided_entry_id'),
-		voidedAt: integer('voided_at', { mode: 'number' }),
+		voidedAt: bigint('voided_at', { mode: 'number' }),
 		voidReason: text('void_reason'),
 		recurringRuleId: text('recurring_rule_id'),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_fin_je_date').on(t.date),
@@ -1046,7 +1049,7 @@ export const finJournalEntries = sqliteTable(
 	]
 );
 
-export const finJournalLines = sqliteTable(
+export const finJournalLines = pgTable(
 	'fin_journal_lines',
 	{
 		id: text('id').primaryKey(),
@@ -1060,9 +1063,9 @@ export const finJournalLines = sqliteTable(
 		credit: integer('credit').notNull().default(0),
 		memo: text('memo'),
 		position: integer('position').notNull().default(0),
-		reconciled: integer('reconciled', { mode: 'boolean' }).notNull().default(false),
-		reconciledAt: integer('reconciled_at', { mode: 'number' }),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		reconciled: boolean('reconciled').notNull().default(false),
+		reconciledAt: bigint('reconciled_at', { mode: 'number' }),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_fin_jl_entry_pos').on(t.journalEntryId, t.position),
@@ -1071,7 +1074,7 @@ export const finJournalLines = sqliteTable(
 	]
 );
 
-export const finRecurringRules = sqliteTable(
+export const finRecurringRules = pgTable(
 	'fin_recurring_rules',
 	{
 		id: text('id').primaryKey(),
@@ -1080,19 +1083,19 @@ export const finRecurringRules = sqliteTable(
 		frequency: text('frequency', {
 			enum: ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']
 		}).notNull(),
-		startDate: integer('start_date', { mode: 'number' }).notNull(),
-		endDate: integer('end_date', { mode: 'number' }),
-		nextOccurrence: integer('next_occurrence', { mode: 'number' }).notNull(),
-		autoPost: integer('auto_post', { mode: 'boolean' }).notNull().default(false),
+		startDate: bigint('start_date', { mode: 'number' }).notNull(),
+		endDate: bigint('end_date', { mode: 'number' }),
+		nextOccurrence: bigint('next_occurrence', { mode: 'number' }).notNull(),
+		autoPost: boolean('auto_post').notNull().default(false),
 		status: text('status', { enum: ['active', 'paused', 'cancelled'] }).notNull().default('active'),
 		templateDescription: text('template_description').notNull(),
 		templateLines: text('template_lines').notNull(), // JSON: [{ accountId, debit, credit, memo }]
-		lastGeneratedAt: integer('last_generated_at', { mode: 'number' }),
+		lastGeneratedAt: bigint('last_generated_at', { mode: 'number' }),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_fin_rr_status_next').on(t.status, t.nextOccurrence),
@@ -1100,7 +1103,7 @@ export const finRecurringRules = sqliteTable(
 	]
 );
 
-export const finBudgets = sqliteTable(
+export const finBudgets = pgTable(
 	'fin_budgets',
 	{
 		id: text('id').primaryKey(),
@@ -1108,15 +1111,15 @@ export const finBudgets = sqliteTable(
 			.notNull()
 			.references(() => finAccounts.id, { onDelete: 'cascade' }),
 		periodType: text('period_type', { enum: ['monthly', 'quarterly', 'yearly'] }).notNull(),
-		periodStart: integer('period_start', { mode: 'number' }).notNull(),
-		periodEnd: integer('period_end', { mode: 'number' }).notNull(),
+		periodStart: bigint('period_start', { mode: 'number' }).notNull(),
+		periodEnd: bigint('period_end', { mode: 'number' }).notNull(),
 		amount: integer('amount').notNull(),
 		notes: text('notes'),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_fin_budgets_account_period').on(t.accountId, t.periodStart),
@@ -1126,7 +1129,7 @@ export const finBudgets = sqliteTable(
 
 // ─── Dial Sessions ───────────────────────────────────────────────────────────
 
-export const dialSessions = sqliteTable(
+export const dialSessions = pgTable(
 	'dial_sessions',
 	{
 		id: text('id').primaryKey(),
@@ -1140,10 +1143,10 @@ export const dialSessions = sqliteTable(
 		totalConnected: integer('total_connected').notNull().default(0),
 		totalNoAnswer: integer('total_no_answer').notNull().default(0),
 		totalDurationSeconds: integer('total_duration_seconds').notNull().default(0),
-		startedAt: integer('started_at', { mode: 'number' }),
-		endedAt: integer('ended_at', { mode: 'number' }),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		startedAt: bigint('started_at', { mode: 'number' }),
+		endedAt: bigint('ended_at', { mode: 'number' }),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_dial_sessions_user').on(t.userId, t.createdAt),
@@ -1151,7 +1154,7 @@ export const dialSessions = sqliteTable(
 	]
 );
 
-export const dialQueueItems = sqliteTable(
+export const dialQueueItems = pgTable(
 	'dial_queue_items',
 	{
 		id: text('id').primaryKey(),
@@ -1161,7 +1164,7 @@ export const dialQueueItems = sqliteTable(
 		contactId: text('contact_id')
 			.notNull()
 			.references(() => crmContacts.id, { onDelete: 'cascade' }),
-		position: real('position').notNull(),
+		position: doublePrecision('position').notNull(),
 		status: text('status', {
 			enum: ['pending', 'calling', 'completed', 'skipped']
 		}).notNull().default('pending'),
@@ -1175,15 +1178,15 @@ export const dialQueueItems = sqliteTable(
 			]
 		}),
 		notes: text('notes'),
-		callbackAt: integer('callback_at', { mode: 'number' }),
+		callbackAt: bigint('callback_at', { mode: 'number' }),
 		callLogId: text('call_log_id')
 			.references(() => telnyxCallLogs.id, { onDelete: 'set null' }),
 		crmActivityId: text('crm_activity_id')
 			.references(() => crmActivities.id, { onDelete: 'set null' }),
 		callDurationSeconds: integer('call_duration_seconds'),
-		dialedAt: integer('dialed_at', { mode: 'number' }),
-		completedAt: integer('completed_at', { mode: 'number' }),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		dialedAt: bigint('dialed_at', { mode: 'number' }),
+		completedAt: bigint('completed_at', { mode: 'number' }),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_dial_queue_session').on(t.sessionId, t.position),
@@ -1194,29 +1197,29 @@ export const dialQueueItems = sqliteTable(
 
 // ─── Financials ──────────────────────────────────────────────────────────────
 
-export const finReconciliations = sqliteTable(
+export const finReconciliations = pgTable(
 	'fin_reconciliations',
 	{
 		id: text('id').primaryKey(),
 		bankAccountId: text('bank_account_id')
 			.notNull()
 			.references(() => finAccounts.id),
-		statementDate: integer('statement_date', { mode: 'number' }).notNull(),
+		statementDate: bigint('statement_date', { mode: 'number' }).notNull(),
 		statementBalance: integer('statement_balance').notNull(),
 		reconciledBalance: integer('reconciled_balance'),
 		status: text('status', { enum: ['in_progress', 'completed'] }).notNull().default('in_progress'),
-		completedAt: integer('completed_at', { mode: 'number' }),
+		completedAt: bigint('completed_at', { mode: 'number' }),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	}
 );
 
 // ─── Bookings ────────────────────────────────────────────────────────────────
 
-export const bookingEventTypes = sqliteTable(
+export const bookingEventTypes = pgTable(
 	'booking_event_types',
 	{
 		id: text('id').primaryKey(),
@@ -1232,9 +1235,9 @@ export const bookingEventTypes = sqliteTable(
 		bufferMinutes: integer('buffer_minutes').notNull().default(0),
 		minNoticeHours: integer('min_notice_hours').notNull().default(4),
 		maxDaysOut: integer('max_days_out').notNull().default(60),
-		isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		isActive: boolean('is_active').notNull().default(true),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_booking_event_types_user').on(t.userId),
@@ -1242,7 +1245,7 @@ export const bookingEventTypes = sqliteTable(
 	]
 );
 
-export const bookings = sqliteTable(
+export const bookings = pgTable(
 	'bookings',
 	{
 		id: text('id').primaryKey(),
@@ -1251,13 +1254,13 @@ export const bookings = sqliteTable(
 			.references(() => bookingEventTypes.id, { onDelete: 'cascade' }),
 		inviteeName: text('invitee_name').notNull(),
 		inviteeEmail: text('invitee_email').notNull(),
-		startTime: integer('start_time', { mode: 'number' }).notNull(),
-		endTime: integer('end_time', { mode: 'number' }).notNull(),
+		startTime: bigint('start_time', { mode: 'number' }).notNull(),
+		endTime: bigint('end_time', { mode: 'number' }).notNull(),
 		timezone: text('timezone').notNull().default('America/New_York'),
 		status: text('status', { enum: ['confirmed', 'cancelled'] }).notNull().default('confirmed'),
 		notes: text('notes'),
 		googleEventId: text('google_event_id'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_bookings_event_type').on(t.eventTypeId),
@@ -1266,7 +1269,7 @@ export const bookings = sqliteTable(
 	]
 );
 
-export const calendarIntegrations = sqliteTable('calendar_integrations', {
+export const calendarIntegrations = pgTable('calendar_integrations', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
@@ -1275,15 +1278,15 @@ export const calendarIntegrations = sqliteTable('calendar_integrations', {
 	provider: text('provider', { enum: ['google'] }).notNull().default('google'),
 	accessToken: text('access_token').notNull(),
 	refreshToken: text('refresh_token').notNull(),
-	tokenExpiry: integer('token_expiry', { mode: 'number' }).notNull(),
+	tokenExpiry: bigint('token_expiry', { mode: 'number' }).notNull(),
 	calendarId: text('calendar_id').notNull().default('primary'),
-	createdAt: integer('created_at', { mode: 'number' }).notNull(),
-	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
 // ─── Gmail Integration ───────────────────────────────────────────────────────
 
-export const gmailIntegrations = sqliteTable('gmail_integrations', {
+export const gmailIntegrations = pgTable('gmail_integrations', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
@@ -1292,14 +1295,14 @@ export const gmailIntegrations = sqliteTable('gmail_integrations', {
 	email: text('email').notNull(),
 	accessToken: text('access_token').notNull(),
 	refreshToken: text('refresh_token').notNull(),
-	tokenExpiry: integer('token_expiry', { mode: 'number' }).notNull(),
+	tokenExpiry: bigint('token_expiry', { mode: 'number' }).notNull(),
 	historyId: text('history_id'),
-	lastSyncAt: integer('last_sync_at', { mode: 'number' }),
-	createdAt: integer('created_at', { mode: 'number' }).notNull(),
-	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	lastSyncAt: bigint('last_sync_at', { mode: 'number' }),
+	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
-export const gmailThreads = sqliteTable(
+export const gmailThreads = pgTable(
 	'gmail_threads',
 	{
 		id: text('id').primaryKey(),
@@ -1308,15 +1311,15 @@ export const gmailThreads = sqliteTable(
 			.references(() => users.id, { onDelete: 'cascade' }),
 		subject: text('subject').notNull(),
 		snippet: text('snippet'),
-		lastMessageAt: integer('last_message_at', { mode: 'number' }).notNull(),
+		lastMessageAt: bigint('last_message_at', { mode: 'number' }).notNull(),
 		messageCount: integer('message_count').notNull().default(1),
-		isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
-		isStarred: integer('is_starred', { mode: 'boolean' }).notNull().default(false),
+		isRead: boolean('is_read').notNull().default(false),
+		isStarred: boolean('is_starred').notNull().default(false),
 		labels: text('labels'),
 		category: text('category', {
 			enum: ['inbox', 'sent', 'draft', 'archived', 'trash']
 		}).notNull().default('inbox'),
-		syncedAt: integer('synced_at', { mode: 'number' }).notNull()
+		syncedAt: bigint('synced_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_gmail_threads_user').on(t.userId, t.lastMessageAt),
@@ -1324,7 +1327,7 @@ export const gmailThreads = sqliteTable(
 	]
 );
 
-export const gmailMessages = sqliteTable(
+export const gmailMessages = pgTable(
 	'gmail_messages',
 	{
 		id: text('id').primaryKey(),
@@ -1343,11 +1346,11 @@ export const gmailMessages = sqliteTable(
 		bodyHtml: text('body_html'),
 		bodyText: text('body_text'),
 		snippet: text('snippet'),
-		internalDate: integer('internal_date', { mode: 'number' }).notNull(),
+		internalDate: bigint('internal_date', { mode: 'number' }).notNull(),
 		labelIds: text('label_ids'),
-		isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
-		hasAttachments: integer('has_attachments', { mode: 'boolean' }).notNull().default(false),
-		syncedAt: integer('synced_at', { mode: 'number' }).notNull()
+		isRead: boolean('is_read').notNull().default(false),
+		hasAttachments: boolean('has_attachments').notNull().default(false),
+		syncedAt: bigint('synced_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_gmail_msgs_thread').on(t.threadId),
@@ -1356,7 +1359,7 @@ export const gmailMessages = sqliteTable(
 	]
 );
 
-export const gmailAttachments = sqliteTable(
+export const gmailAttachments = pgTable(
 	'gmail_attachments',
 	{
 		id: text('id').primaryKey(),
@@ -1371,7 +1374,7 @@ export const gmailAttachments = sqliteTable(
 	(t) => [index('idx_gmail_attachments_msg').on(t.messageId)]
 );
 
-export const gmailEntityLinks = sqliteTable(
+export const gmailEntityLinks = pgTable(
 	'gmail_entity_links',
 	{
 		id: text('id').primaryKey(),
@@ -1382,7 +1385,7 @@ export const gmailEntityLinks = sqliteTable(
 		companyId: text('company_id').references(() => crmCompanies.id, { onDelete: 'cascade' }),
 		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, { onDelete: 'cascade' }),
 		linkType: text('link_type', { enum: ['auto', 'manual'] }).notNull().default('auto'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_gmail_links_thread').on(t.threadId),
@@ -1394,7 +1397,7 @@ export const gmailEntityLinks = sqliteTable(
 
 // ─── CRM Custom Fields ──────────────────────────────────────────────────────
 
-export const crmCustomFieldDefs = sqliteTable(
+export const crmCustomFieldDefs = pgTable(
 	'crm_custom_field_defs',
 	{
 		id: text('id').primaryKey(),
@@ -1405,15 +1408,15 @@ export const crmCustomFieldDefs = sqliteTable(
 			enum: ['text', 'number', 'date', 'select', 'multi_select', 'boolean', 'url', 'email', 'currency']
 		}).notNull(),
 		options: text('options'), // JSON array for select/multi_select
-		required: integer('required', { mode: 'boolean' }).notNull().default(false),
+		required: boolean('required').notNull().default(false),
 		position: integer('position').notNull().default(0),
-		showInList: integer('show_in_list', { mode: 'boolean' }).notNull().default(false),
-		showInCard: integer('show_in_card', { mode: 'boolean' }).notNull().default(false),
+		showInList: boolean('show_in_list').notNull().default(false),
+		showInCard: boolean('show_in_card').notNull().default(false),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_cfd_entity').on(t.entityType, t.position),
@@ -1421,7 +1424,7 @@ export const crmCustomFieldDefs = sqliteTable(
 	]
 );
 
-export const crmCustomFieldValues = sqliteTable(
+export const crmCustomFieldValues = pgTable(
 	'crm_custom_field_values',
 	{
 		id: text('id').primaryKey(),
@@ -1430,8 +1433,8 @@ export const crmCustomFieldValues = sqliteTable(
 			.references(() => crmCustomFieldDefs.id, { onDelete: 'cascade' }),
 		entityId: text('entity_id').notNull(),
 		value: text('value'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		uniqueIndex('idx_crm_cfv_field_entity').on(t.fieldDefId, t.entityId),
@@ -1441,7 +1444,7 @@ export const crmCustomFieldValues = sqliteTable(
 
 // ─── CRM Automations ────────────────────────────────────────────────────────
 
-export const crmAutomationRules = sqliteTable(
+export const crmAutomationRules = pgTable(
 	'crm_automation_rules',
 	{
 		id: text('id').primaryKey(),
@@ -1453,17 +1456,17 @@ export const crmAutomationRules = sqliteTable(
 		trigger: text('trigger').notNull(), // JSON: { event, config? }
 		conditions: text('conditions'), // JSON: [{ field, operator, value }]
 		actions: text('actions').notNull(), // JSON: [{ type, ...config }]
-		enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+		enabled: boolean('enabled').notNull().default(true),
 		createdBy: text('created_by')
 			.notNull()
 			.references(() => users.id),
-		createdAt: integer('created_at', { mode: 'number' }).notNull(),
-		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
 	(t) => [index('idx_crm_auto_rules_entity').on(t.entityType, t.enabled)]
 );
 
-export const crmAutomationExecutions = sqliteTable(
+export const crmAutomationExecutions = pgTable(
 	'crm_automation_executions',
 	{
 		id: text('id').primaryKey(),
@@ -1477,7 +1480,7 @@ export const crmAutomationExecutions = sqliteTable(
 		actionsRun: text('actions_run'), // JSON
 		error: text('error'),
 		durationMs: integer('duration_ms'),
-		createdAt: integer('created_at', { mode: 'number' }).notNull()
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
 		index('idx_crm_auto_exec_rule').on(t.ruleId, t.createdAt),

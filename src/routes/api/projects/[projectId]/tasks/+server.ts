@@ -16,6 +16,7 @@ import { nanoid } from 'nanoid';
 import { broadcastTaskCreated } from '$lib/server/ws/handlers.js';
 import { fireWebhooks } from '$lib/server/webhooks/fire.js';
 import { emitAutomationEvent } from '$lib/server/automations/emit.js';
+import { indexDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -199,6 +200,8 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const result = { ...task, labels: assignedLabels };
+	const proj = db.select({ slug: projects.slug, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
+	indexDocument('tasks', { id: task.id, number: task.number, title: task.title, projectId, projectSlug: proj?.slug, projectName: proj?.name, assigneeId: task.assigneeId, statusId: task.statusId, priority: task.priority, dueDate: task.dueDate, updatedAt: task.updatedAt });
 	broadcastTaskCreated(projectId, result, user.id);
 	fireWebhooks('task.created', { projectId, task: result }).catch(() => {});
 	emitAutomationEvent({ event: 'task.created', projectId, taskId: id, task: result, userId: user.id });

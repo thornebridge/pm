@@ -8,10 +8,10 @@ import { eq, and, sql, gte, lte } from 'drizzle-orm';
  * Credit-normal (liability, equity, revenue): balance = SUM(credit) - SUM(debit)
  * Only counts posted journal entries.
  */
-export function getAccountBalance(
+export async function getAccountBalance(
 	accountId: string,
 	opts?: { from?: number; to?: number }
-): number {
+): Promise<number> {
 	const conditions = [
 		eq(finJournalLines.accountId, accountId),
 		eq(finJournalEntries.status, 'posted')
@@ -24,25 +24,23 @@ export function getAccountBalance(
 		conditions.push(lte(finJournalEntries.date, opts.to));
 	}
 
-	const result = db
+	const [result] = await db
 		.select({
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 			totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
 		})
 		.from(finJournalLines)
 		.innerJoin(finJournalEntries, eq(finJournalLines.journalEntryId, finJournalEntries.id))
-		.where(and(...conditions))
-		.get();
+		.where(and(...conditions));
 
 	const totalDebit = result?.totalDebit ?? 0;
 	const totalCredit = result?.totalCredit ?? 0;
 
 	// Look up normal balance direction
-	const account = db
+	const [account] = await db
 		.select({ normalBalance: finAccounts.normalBalance })
 		.from(finAccounts)
-		.where(eq(finAccounts.id, accountId))
-		.get();
+		.where(eq(finAccounts.id, accountId));
 
 	if (!account) return 0;
 
@@ -54,10 +52,10 @@ export function getAccountBalance(
 /**
  * Compute balances for multiple accounts at once.
  */
-export function getAccountBalances(
+export async function getAccountBalances(
 	accountIds: string[],
 	opts?: { from?: number; to?: number }
-): Map<string, number> {
+): Promise<Map<string, number>> {
 	if (accountIds.length === 0) return new Map();
 
 	const conditions = [eq(finJournalEntries.status, 'posted')];
@@ -69,7 +67,7 @@ export function getAccountBalances(
 		conditions.push(lte(finJournalEntries.date, opts.to));
 	}
 
-	const rows = db
+	const rows = await db
 		.select({
 			accountId: finJournalLines.accountId,
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
@@ -81,15 +79,13 @@ export function getAccountBalances(
 			sql`${finJournalLines.accountId} IN (${sql.join(accountIds.map(id => sql`${id}`), sql`,`)})`,
 			...conditions
 		))
-		.groupBy(finJournalLines.accountId)
-		.all();
+		.groupBy(finJournalLines.accountId);
 
 	// Get account normal balances
-	const accounts = db
+	const accounts = await db
 		.select({ id: finAccounts.id, normalBalance: finAccounts.normalBalance })
 		.from(finAccounts)
-		.where(sql`${finAccounts.id} IN (${sql.join(accountIds.map(id => sql`${id}`), sql`,`)})`)
-		.all();
+		.where(sql`${finAccounts.id} IN (${sql.join(accountIds.map(id => sql`${id}`), sql`,`)})`);
 
 	const normalBalanceMap = new Map(accounts.map(a => [a.id, a.normalBalance]));
 	const balances = new Map<string, number>();
@@ -113,11 +109,10 @@ export function getAccountBalances(
 /**
  * Get the next available journal entry number.
  */
-export function getNextEntryNumber(): number {
-	const result = db
+export async function getNextEntryNumber(): Promise<number> {
+	const [result] = await db
 		.select({ max: sql<number>`coalesce(max(${finJournalEntries.entryNumber}), 0)` })
-		.from(finJournalEntries)
-		.get();
+		.from(finJournalEntries);
 
 	return (result?.max ?? 0) + 1;
 }

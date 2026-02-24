@@ -2,12 +2,13 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { comments, activityLog, users, tasks } from '$lib/server/db/schema.js';
+import { comments, activityLog, users, tasks, projects } from '$lib/server/db/schema.js';
 import { eq, asc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { broadcastCommentAdded } from '$lib/server/ws/handlers.js';
 import { notifyNewComment, notifyMention } from '$lib/server/notifications/triggers.js';
 import { emitAutomationEvent } from '$lib/server/automations/emit.js';
+import { indexDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -64,6 +65,9 @@ export const POST: RequestHandler = async (event) => {
 		.run();
 
 	const result = { id, body: body.trim(), userId: user.id, userName: user.name, createdAt: now, updatedAt: now };
+	const taskForIndex = db.select({ number: tasks.number, title: tasks.title, projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, event.params.taskId)).get();
+	const projForIndex = db.select({ slug: projects.slug }).from(projects).where(eq(projects.id, event.params.projectId)).get();
+	indexDocument('comments', { id, body: body.trim(), taskId: event.params.taskId, taskNumber: taskForIndex?.number, taskTitle: taskForIndex?.title, projectId: event.params.projectId, projectSlug: projForIndex?.slug, createdAt: now });
 	broadcastCommentAdded(event.params.projectId, event.params.taskId, result, user.id);
 	notifyNewComment(event.params.taskId, user.id, user.name).catch(() => {});
 

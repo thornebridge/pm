@@ -11,26 +11,25 @@ function generateSessionId(): string {
 	return crypto.randomBytes(20).toString('hex'); // 40 chars
 }
 
-export function createSession(userId: string): string {
+export async function createSession(userId: string): Promise<string> {
 	const id = generateSessionId();
 	const now = Date.now();
 
-	db.insert(sessions)
+	await db.insert(sessions)
 		.values({
 			id,
 			userId,
 			expiresAt: now + SESSION_MAX_AGE,
 			createdAt: now
-		})
-		.run();
+		});
 
 	return id;
 }
 
-export function validateSession(sessionId: string) {
+export async function validateSession(sessionId: string) {
 	const now = Date.now();
 
-	const result = db
+	const [result] = await db
 		.select({
 			sessionId: sessions.id,
 			expiresAt: sessions.expiresAt,
@@ -41,17 +40,15 @@ export function validateSession(sessionId: string) {
 		})
 		.from(sessions)
 		.innerJoin(users, eq(sessions.userId, users.id))
-		.where(and(eq(sessions.id, sessionId), gt(sessions.expiresAt, now)))
-		.get();
+		.where(and(eq(sessions.id, sessionId), gt(sessions.expiresAt, now)));
 
 	if (!result) return null;
 
 	// Rolling expiry: extend if less than 15 days remaining
 	if (result.expiresAt - now < SESSION_MAX_AGE / 2) {
-		db.update(sessions)
+		await db.update(sessions)
 			.set({ expiresAt: now + SESSION_MAX_AGE })
-			.where(eq(sessions.id, sessionId))
-			.run();
+			.where(eq(sessions.id, sessionId));
 	}
 
 	return {
@@ -65,12 +62,12 @@ export function validateSession(sessionId: string) {
 	};
 }
 
-export function deleteSession(sessionId: string) {
-	db.delete(sessions).where(eq(sessions.id, sessionId)).run();
+export async function deleteSession(sessionId: string) {
+	await db.delete(sessions).where(eq(sessions.id, sessionId));
 }
 
-export function deleteUserSessions(userId: string) {
-	db.delete(sessions).where(eq(sessions.userId, userId)).run();
+export async function deleteUserSessions(userId: string) {
+	await db.delete(sessions).where(eq(sessions.userId, userId));
 }
 
 export function setSessionCookie(cookies: Cookies, sessionId: string) {

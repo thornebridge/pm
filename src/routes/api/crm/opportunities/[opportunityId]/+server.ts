@@ -117,6 +117,7 @@ export const PATCH: RequestHandler = async (event) => {
 		'source',
 		'description',
 		'lostReason',
+		'forecastCategory',
 		'ownerId',
 		'nextStep',
 		'nextStepDueDate'

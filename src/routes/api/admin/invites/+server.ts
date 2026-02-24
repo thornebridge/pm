@@ -7,14 +7,14 @@ import { broadcastAdminChanged } from '$lib/server/ws/handlers.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAdmin(event);
-	return json(listInvites());
+	return json(await listInvites());
 };
 
 export const POST: RequestHandler = async (event) => {
 	const user = requireAdmin(event);
 	const { email, role } = await event.request.json();
 
-	const invite = createInvite(user.id, role || 'member', email);
+	const invite = await createInvite(user.id, role || 'member', email);
 
 	if (email) {
 		const inviteUrl = `${event.url.origin}/invite/${invite.token}`;
@@ -51,7 +51,7 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'id is required' }, { status: 400 });
 	}
 
-	deleteInvite(id);
+	await deleteInvite(id);
 	broadcastAdminChanged();
 	return json({ ok: true });
 };

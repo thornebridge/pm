@@ -14,18 +14,17 @@ import type {
 } from './types.js';
 import crypto from 'node:crypto';
 
-function renderTemplate(template: string, entity: Record<string, unknown>): string {
+async function renderTemplate(template: string, entity: Record<string, unknown>): Promise<string> {
+	let companyName = '';
+	if (entity.companyId) {
+		const [c] = await db.select({ name: crmCompanies.name }).from(crmCompanies).where(eq(crmCompanies.id, entity.companyId as string));
+		companyName = c?.name || '';
+	}
 	return template
 		.replace(/\{\{opp\.title\}\}/g, String(entity.title || ''))
 		.replace(/\{\{opp\.id\}\}/g, String(entity.id || ''))
 		.replace(/\{\{opp\.value\}\}/g, String(entity.value || ''))
-		.replace(/\{\{company\.name\}\}/g, (() => {
-			if (entity.companyId) {
-				const c = db.select({ name: crmCompanies.name }).from(crmCompanies).where(eq(crmCompanies.id, entity.companyId as string)).get();
-				return c?.name || '';
-			}
-			return '';
-		})());
+		.replace(/\{\{company\.name\}\}/g, companyName);
 }
 
 export async function executeCrmAction(
@@ -48,7 +47,7 @@ export async function executeCrmAction(
 	}
 }
 
-function executeSetField(action: CrmActionSetField, payload: CrmAutomationPayload): CrmActionResult {
+async function executeSetField(action: CrmActionSetField, payload: CrmAutomationPayload): Promise<CrmActionResult> {
 	const now = Date.now();
 	const updates: Record<string, unknown> = { updatedAt: now };
 	updates[action.field] = action.value;
@@ -58,16 +57,16 @@ function executeSetField(action: CrmActionSetField, payload: CrmAutomationPayloa
 		if (action.field === 'stageId') {
 			updates.stageEnteredAt = now;
 		}
-		db.update(crmOpportunities).set(updates).where(eq(crmOpportunities.id, payload.entityId)).run();
-		const updated = db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId)).get();
+		await db.update(crmOpportunities).set(updates).where(eq(crmOpportunities.id, payload.entityId));
+		const [updated] = await db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId));
 		if (updated) indexDocument('opportunities', { id: updated.id, title: updated.title, description: updated.description, value: updated.value, currency: updated.currency, priority: updated.priority, source: updated.source, companyId: updated.companyId, stageId: updated.stageId, ownerId: updated.ownerId, nextStep: updated.nextStep, expectedCloseDate: updated.expectedCloseDate, updatedAt: updated.updatedAt });
 	}
 
 	return { action: 'set_field', result: `Set ${action.field} to ${action.value}` };
 }
 
-function executeLogActivity(action: CrmActionLogActivity, payload: CrmAutomationPayload): CrmActionResult {
-	const subject = renderTemplate(action.subject, payload.entity);
+async function executeLogActivity(action: CrmActionLogActivity, payload: CrmAutomationPayload): Promise<CrmActionResult> {
+	const subject = await renderTemplate(action.subject, payload.entity);
 	const now = Date.now();
 
 	const activity: Record<string, unknown> = {
@@ -89,12 +88,12 @@ function executeLogActivity(action: CrmActionLogActivity, payload: CrmAutomation
 		activity.contactId = payload.entityId;
 	}
 
-	db.insert(crmActivities).values(activity).run();
+	await db.insert(crmActivities).values(activity);
 	return { action: 'log_activity', result: `Logged ${action.activityType}: ${subject}` };
 }
 
-function executeCreateTask(action: CrmActionCreateTask, payload: CrmAutomationPayload): CrmActionResult {
-	const title = renderTemplate(action.title, payload.entity);
+async function executeCreateTask(action: CrmActionCreateTask, payload: CrmAutomationPayload): Promise<CrmActionResult> {
+	const title = await renderTemplate(action.title, payload.entity);
 	const now = Date.now();
 	const dueDate = now + (action.daysFromNow * 86400000);
 
@@ -119,7 +118,7 @@ function executeCreateTask(action: CrmActionCreateTask, payload: CrmAutomationPa
 		task.contactId = payload.entityId;
 	}
 
-	db.insert(crmTasks).values(task).run();
+	await db.insert(crmTasks).values(task);
 	return { action: 'create_task', result: `Created task: ${title}` };
 }
 
@@ -127,8 +126,8 @@ async function executeSendNotification(
 	action: CrmActionSendNotification,
 	payload: CrmAutomationPayload
 ): Promise<CrmActionResult> {
-	const title = renderTemplate(action.title, payload.entity);
-	const body = renderTemplate(action.body, payload.entity);
+	const title = await renderTemplate(action.title, payload.entity);
+	const body = await renderTemplate(action.body, payload.entity);
 
 	let targetUserId: string | null = null;
 	if (action.target === 'owner') {
@@ -141,7 +140,7 @@ async function executeSendNotification(
 		return { action: 'send_notification', result: 'skipped - no target user' };
 	}
 
-	db.insert(notifications).values({
+	await db.insert(notifications).values({
 		id: nanoid(12),
 		userId: targetUserId,
 		type: 'status_change',
@@ -152,7 +151,7 @@ async function executeSendNotification(
 		actorId: AUTOMATION_USER_ID,
 		read: false,
 		createdAt: Date.now()
-	}).run();
+	});
 
 	sendPushNotification(targetUserId, { title, body, tag: `crm-auto-${payload.entityId}` }).catch(() => {});
 

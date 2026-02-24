@@ -4,11 +4,10 @@ import { eq } from 'drizzle-orm';
 import crypto from 'node:crypto';
 
 export async function fireWebhooks(event: string, payload: Record<string, unknown>) {
-	const activeHooks = db
+	const activeHooks = await db
 		.select()
 		.from(webhooks)
-		.where(eq(webhooks.active, true))
-		.all();
+		.where(eq(webhooks.active, true));
 
 	for (const hook of activeHooks) {
 		const events = JSON.parse(hook.events) as string[];

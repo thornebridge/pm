@@ -15,8 +15,8 @@ const TELNYX_API_BASE = 'https://api.telnyx.com/v2';
 
 let _rotationIndex = 0;
 
-export function getTelnyxConfig(): TelnyxConfig | null {
-	const org = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
+export async function getTelnyxConfig(): Promise<TelnyxConfig | null> {
+	const [org] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'default'));
 	if (!org?.telnyxEnabled || !org.telnyxApiKey || !org.telnyxConnectionId || !org.telnyxCredentialId) {
 		return null;
 	}
@@ -89,7 +89,7 @@ export async function validateTelnyxCredentials(apiKey: string, credentialId: st
 	}
 }
 
-export function lookupContactByPhone(phone: string) {
+export async function lookupContactByPhone(phone: string) {
 	// Normalize: strip everything except digits, then try with/without leading 1
 	const digits = phone.replace(/\D/g, '');
 	const variants = [phone, digits, `+${digits}`, `+1${digits}`];
@@ -99,21 +99,19 @@ export function lookupContactByPhone(phone: string) {
 
 	// Search contacts
 	for (const variant of variants) {
-		const contact = db
+		const [contact] = await db
 			.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName, companyId: crmContacts.companyId })
 			.from(crmContacts)
-			.where(eq(crmContacts.phone, variant))
-			.get();
+			.where(eq(crmContacts.phone, variant));
 		if (contact) return { contactId: contact.id, contactName: `${contact.firstName} ${contact.lastName}`, companyId: contact.companyId };
 	}
 
 	// Search companies
 	for (const variant of variants) {
-		const company = db
+		const [company] = await db
 			.select({ id: crmCompanies.id, name: crmCompanies.name })
 			.from(crmCompanies)
-			.where(eq(crmCompanies.phone, variant))
-			.get();
+			.where(eq(crmCompanies.phone, variant));
 		if (company) return { companyId: company.id, contactName: company.name, contactId: null };
 	}
 

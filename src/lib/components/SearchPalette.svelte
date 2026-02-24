@@ -17,7 +17,10 @@
 		tasks: Array<{ id: string; number: number; title: string; projectSlug: string; projectName: string }>;
 		projects: Array<{ id: string; name: string; slug: string }>;
 		comments: Array<{ id: string; body: string; taskNumber: number; taskTitle: string; projectSlug: string }>;
-	}>({ tasks: [], projects: [], comments: [] });
+		contacts: Array<{ id: string; firstName: string; lastName: string; email: string | null; title: string | null }>;
+		companies: Array<{ id: string; name: string }>;
+		opportunities: Array<{ id: string; title: string; value: number | null; currency: string }>;
+	}>({ tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] });
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let inputEl: HTMLInputElement | undefined = $state();
 	let selectedIndex = $state(-1);
@@ -84,13 +87,16 @@
 	// Flat items for search mode
 	interface FlatItem {
 		url: string;
-		type: 'project' | 'task' | 'comment';
+		type: 'project' | 'task' | 'comment' | 'contact' | 'company' | 'opportunity';
 	}
 
 	const flatResults = $derived<FlatItem[]>([
 		...results.projects.map((p) => ({ url: `/projects/${p.slug}/home`, type: 'project' as const })),
 		...results.tasks.map((t) => ({ url: `/projects/${t.projectSlug}/task/${t.number}`, type: 'task' as const })),
-		...results.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const }))
+		...results.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const })),
+		...results.contacts.map((c) => ({ url: `/crm/contacts/${c.id}`, type: 'contact' as const })),
+		...results.companies.map((c) => ({ url: `/crm/companies/${c.id}`, type: 'company' as const })),
+		...results.opportunities.map((o) => ({ url: `/crm/opportunities/${o.id}`, type: 'opportunity' as const }))
 	]);
 
 	const totalItems = $derived(isCommandMode ? filteredCommands.length : flatResults.length);
@@ -100,7 +106,7 @@
 			requestAnimationFrame(() => inputEl?.focus());
 		} else {
 			query = '';
-			results = { tasks: [], projects: [], comments: [] };
+			results = { tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] };
 			selectedIndex = -1;
 		}
 	});
@@ -120,7 +126,7 @@
 		if (debounceTimer) clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(async () => {
 			if (query.trim().length < 2) {
-				results = { tasks: [], projects: [], comments: [] };
+				results = { tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] };
 				return;
 			}
 			try {
@@ -165,10 +171,16 @@
 		return selectedIndex === sectionOffset + itemIndex;
 	}
 
-	const hasResults = $derived(results.tasks.length > 0 || results.projects.length > 0 || results.comments.length > 0);
+	const hasResults = $derived(
+		results.tasks.length > 0 || results.projects.length > 0 || results.comments.length > 0 ||
+		results.contacts.length > 0 || results.companies.length > 0 || results.opportunities.length > 0
+	);
 	const projectsOffset = 0;
 	const tasksOffset = $derived(results.projects.length);
 	const commentsOffset = $derived(results.projects.length + results.tasks.length);
+	const contactsOffset = $derived(results.projects.length + results.tasks.length + results.comments.length);
+	const companiesOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length);
+	const opportunitiesOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length + results.companies.length);
 </script>
 
 {#if open}
@@ -258,7 +270,7 @@
 					{/if}
 
 					{#if results.comments.length > 0}
-						<div>
+						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Comments</span>
 							{#each results.comments as comment, i}
 								<button
@@ -267,6 +279,51 @@
 								>
 									<span class="text-xs {isSelected(commentsOffset, i) ? '' : 'text-surface-700 dark:text-surface-300'}">#{comment.taskNumber} {comment.taskTitle}</span>
 									<span class="truncate text-[10px] {isSelected(commentsOffset, i) ? 'text-brand-500' : 'text-surface-500'}">{comment.body}</span>
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					{#if results.contacts.length > 0}
+						<div class="mb-2">
+							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Contacts</span>
+							{#each results.contacts as contact, i}
+								<button
+									onclick={() => navigate(`/crm/contacts/${contact.id}`)}
+									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(contactsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
+								>
+									<span class="flex-1 truncate">{contact.firstName} {contact.lastName}</span>
+									{#if contact.email}
+										<span class="text-[10px] {isSelected(contactsOffset, i) ? 'text-brand-500' : 'text-surface-400'}">{contact.email}</span>
+									{/if}
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					{#if results.companies.length > 0}
+						<div class="mb-2">
+							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Companies</span>
+							{#each results.companies as company, i}
+								<button
+									onclick={() => navigate(`/crm/companies/${company.id}`)}
+									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(companiesOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
+								>
+									{company.name}
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					{#if results.opportunities.length > 0}
+						<div>
+							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Opportunities</span>
+							{#each results.opportunities as opp, i}
+								<button
+									onclick={() => navigate(`/crm/opportunities/${opp.id}`)}
+									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(opportunitiesOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
+								>
+									<span class="flex-1 truncate">{opp.title}</span>
 								</button>
 							{/each}
 						</div>

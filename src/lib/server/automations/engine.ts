@@ -13,11 +13,10 @@ export async function processAutomations(payload: AutomationEventPayload): Promi
 	const depth = payload.chainDepth ?? 0;
 	if (depth >= MAX_CHAIN_DEPTH) return;
 
-	const rules = db
+	const rules = await db
 		.select()
 		.from(automationRules)
-		.where(and(eq(automationRules.projectId, payload.projectId), eq(automationRules.enabled, true)))
-		.all();
+		.where(and(eq(automationRules.projectId, payload.projectId), eq(automationRules.enabled, true)));
 
 	for (const row of rules) {
 		let rule: AutomationRule;
@@ -46,10 +45,10 @@ export async function processAutomations(payload: AutomationEventPayload): Promi
 			// Evaluate conditions
 			if (rule.conditions && rule.conditions.length > 0) {
 				const task = payload.task;
-				const conditionsMet = evaluateConditions(rule.conditions, task, payload.taskId);
+				const conditionsMet = await evaluateConditions(rule.conditions, task, payload.taskId);
 				if (!conditionsMet) {
 					execStatus = 'skipped';
-					logExecution(rule.id, payload.taskId, payload.event, execStatus, actionsRun, null, Date.now() - start);
+					await logExecution(rule.id, payload.taskId, payload.event, execStatus, actionsRun, null, Date.now() - start);
 					continue;
 				}
 			}
@@ -62,7 +61,7 @@ export async function processAutomations(payload: AutomationEventPayload): Promi
 
 					// Re-emit events for field mutations (non-terminal actions)
 					if (!TERMINAL_ACTIONS.includes(action.type as ActionType) && action.type === 'set_field') {
-						const updatedTask = db.select().from(tasks).where(eq(tasks.id, payload.taskId)).get();
+						const [updatedTask] = await db.select().from(tasks).where(eq(tasks.id, payload.taskId));
 						if (updatedTask) {
 							const fieldToEvent: Record<string, string> = {
 								statusId: 'task.status_changed',
@@ -98,7 +97,7 @@ export async function processAutomations(payload: AutomationEventPayload): Promi
 			execError = err instanceof Error ? err.message : String(err);
 		}
 
-		logExecution(rule.id, payload.taskId, payload.event, execStatus, actionsRun, execError, Date.now() - start);
+		await logExecution(rule.id, payload.taskId, payload.event, execStatus, actionsRun, execError, Date.now() - start);
 	}
 }
 
@@ -121,29 +120,28 @@ function matchesTrigger(trigger: TriggerDef, payload: AutomationEventPayload): b
 	return true;
 }
 
-function evaluateConditions(
+async function evaluateConditions(
 	groups: ConditionGroup[],
 	task: Record<string, unknown>,
 	taskId: string
-): boolean {
+): Promise<boolean> {
 	// All groups must pass (groups are AND-ed together)
 	for (const group of groups) {
-		const results = group.conditions.map((c) => evaluateCondition(c, task, taskId));
+		const results = await Promise.all(group.conditions.map((c) => evaluateCondition(c, task, taskId)));
 		const passed = group.logic === 'and' ? results.every(Boolean) : results.some(Boolean);
 		if (!passed) return false;
 	}
 	return true;
 }
 
-function evaluateCondition(condition: Condition, task: Record<string, unknown>, taskId: string): boolean {
+async function evaluateCondition(condition: Condition, task: Record<string, unknown>, taskId: string): Promise<boolean> {
 	let fieldValue: unknown;
 
 	if (condition.field === 'labelIds') {
-		const labels = db
+		const labels = await db
 			.select({ labelId: taskLabelAssignments.labelId })
 			.from(taskLabelAssignments)
-			.where(eq(taskLabelAssignments.taskId, taskId))
-			.all();
+			.where(eq(taskLabelAssignments.taskId, taskId));
 		fieldValue = labels.map((l) => l.labelId);
 	} else {
 		fieldValue = task[condition.field];
@@ -181,7 +179,7 @@ function evaluateCondition(condition: Condition, task: Record<string, unknown>, 
 	}
 }
 
-function logExecution(
+async function logExecution(
 	ruleId: string,
 	taskId: string,
 	triggerEvent: string,
@@ -190,7 +188,7 @@ function logExecution(
 	error: string | null,
 	durationMs: number
 ) {
-	db.insert(automationExecutions).values({
+	await db.insert(automationExecutions).values({
 		id: nanoid(12),
 		ruleId,
 		taskId,
@@ -200,5 +198,5 @@ function logExecution(
 		error,
 		durationMs,
 		createdAt: Date.now()
-	}).run();
+	});
 }

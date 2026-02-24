@@ -9,7 +9,8 @@ import {
 	crmCompanies,
 	crmOpportunities
 } from '$lib/server/db/schema.js';
-import { eq, and, desc, like, or, sql } from 'drizzle-orm';
+import { eq, and, desc, like, or, sql, inArray } from 'drizzle-orm';
+import { getSearchClient } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -49,12 +50,36 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	if (search) {
-		threadConditions.push(
-			or(
-				like(gmailThreads.subject, `%${search}%`),
-				like(gmailThreads.snippet, `%${search}%`)
-			)!
-		);
+		// Try Meilisearch for better typo-tolerant search
+		const client = getSearchClient();
+		let meiliThreadIds: string[] | null = null;
+		if (client) {
+			try {
+				const filters = [`userId = "${user.id}"`];
+				if (category !== 'all') filters.push(`category = "${category}"`);
+				const meiliResults = await client.index('email_threads').search(search, {
+					filter: filters.join(' AND '),
+					limit: 200
+				});
+				meiliThreadIds = meiliResults.hits.map((h: Record<string, unknown>) => h.id as string);
+			} catch {
+				// Fall through to SQL LIKE
+			}
+		}
+
+		if (meiliThreadIds !== null) {
+			if (meiliThreadIds.length === 0) {
+				return Response.json({ threads: [], total: 0 });
+			}
+			threadConditions.push(inArray(gmailThreads.id, meiliThreadIds));
+		} else {
+			threadConditions.push(
+				or(
+					like(gmailThreads.subject, `%${search}%`),
+					like(gmailThreads.snippet, `%${search}%`)
+				)!
+			);
+		}
 	}
 
 	if (entityThreadIds) {

@@ -18,11 +18,10 @@ export async function getAvailableSlots(
 	dateStr: string, // YYYY-MM-DD
 	timezone: string
 ): Promise<TimeSlot[]> {
-	const eventType = db
+	const [eventType] = await db
 		.select()
 		.from(bookingEventTypes)
-		.where(eq(bookingEventTypes.id, eventTypeId))
-		.get();
+		.where(eq(bookingEventTypes.id, eventTypeId));
 	if (!eventType || !eventType.isActive) return [];
 
 	const now = Date.now();
@@ -51,17 +50,16 @@ export async function getAvailableSlots(
 	if (candidates.length === 0) return [];
 
 	// Collect busy periods from existing bookings across all owner's event types
-	const ownerEventTypeIds = db
+	const ownerEventTypes = await db
 		.select({ id: bookingEventTypes.id })
 		.from(bookingEventTypes)
-		.where(eq(bookingEventTypes.userId, eventType.userId))
-		.all()
-		.map((et) => et.id);
+		.where(eq(bookingEventTypes.userId, eventType.userId));
+	const ownerEventTypeIds = ownerEventTypes.map((et) => et.id);
 
 	const busyPeriods: Array<{ start: number; end: number }> = [];
 
 	if (ownerEventTypeIds.length > 0) {
-		const existingBookings = db
+		const existingBookings = await db
 			.select({ startTime: bookings.startTime, endTime: bookings.endTime })
 			.from(bookings)
 			.where(
@@ -71,8 +69,7 @@ export async function getAvailableSlots(
 					gte(bookings.startTime, workStart),
 					lt(bookings.startTime, workEnd)
 				)
-			)
-			.all();
+			);
 		for (const b of existingBookings) {
 			busyPeriods.push({ start: b.startTime, end: b.endTime });
 		}

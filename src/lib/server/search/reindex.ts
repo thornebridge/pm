@@ -67,7 +67,7 @@ export async function reindexAll(): Promise<Record<string, number>> {
 async function reindexContacts(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.contacts.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select().from(crmContacts).all();
+	const rows = await db.select().from(crmContacts);
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 		const batch = rows.slice(i, i + BATCH_SIZE).map((r) => ({
@@ -91,7 +91,7 @@ async function reindexContacts(client: import('meilisearch').MeiliSearch): Promi
 async function reindexCompanies(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.companies.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select().from(crmCompanies).all();
+	const rows = await db.select().from(crmCompanies);
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 		const batch = rows.slice(i, i + BATCH_SIZE).map((r) => ({
@@ -115,7 +115,7 @@ async function reindexCompanies(client: import('meilisearch').MeiliSearch): Prom
 async function reindexOpportunities(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.opportunities.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select().from(crmOpportunities).all();
+	const rows = await db.select().from(crmOpportunities);
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 		const batch = rows.slice(i, i + BATCH_SIZE).map((r) => ({
@@ -141,16 +141,16 @@ async function reindexOpportunities(client: import('meilisearch').MeiliSearch): 
 async function reindexEmailThreads(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.email_threads.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select().from(gmailThreads).all();
+	const rows = await db.select().from(gmailThreads);
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-		const batch = rows.slice(i, i + BATCH_SIZE).map((thread) => {
-			const latestMsg = db.select({ fromEmail: gmailMessages.fromEmail, fromName: gmailMessages.fromName })
+		const batchThreads = rows.slice(i, i + BATCH_SIZE);
+		const batch = await Promise.all(batchThreads.map(async (thread) => {
+			const [latestMsg] = await db.select({ fromEmail: gmailMessages.fromEmail, fromName: gmailMessages.fromName })
 				.from(gmailMessages)
 				.where(eq(gmailMessages.threadId, thread.id))
 				.orderBy(desc(gmailMessages.internalDate))
-				.limit(1)
-				.get();
+				.limit(1);
 			return {
 				id: thread.id,
 				userId: thread.userId,
@@ -164,7 +164,7 @@ async function reindexEmailThreads(client: import('meilisearch').MeiliSearch): P
 				fromEmail: latestMsg?.fromEmail || '',
 				fromName: latestMsg?.fromName || ''
 			};
-		});
+		}));
 		await index.addDocuments(batch);
 	}
 	return rows.length;
@@ -173,7 +173,7 @@ async function reindexEmailThreads(client: import('meilisearch').MeiliSearch): P
 async function reindexTasks(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.tasks.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select({
+	const rows = await db.select({
 		id: tasks.id,
 		number: tasks.number,
 		title: tasks.title,
@@ -185,7 +185,7 @@ async function reindexTasks(client: import('meilisearch').MeiliSearch): Promise<
 		priority: tasks.priority,
 		dueDate: tasks.dueDate,
 		updatedAt: tasks.updatedAt
-	}).from(tasks).innerJoin(projects, eq(tasks.projectId, projects.id)).all();
+	}).from(tasks).innerJoin(projects, eq(tasks.projectId, projects.id));
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 		await index.addDocuments(rows.slice(i, i + BATCH_SIZE));
@@ -196,14 +196,14 @@ async function reindexTasks(client: import('meilisearch').MeiliSearch): Promise<
 async function reindexProjects(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.projects.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select({
+	const rows = await db.select({
 		id: projects.id,
 		name: projects.name,
 		slug: projects.slug,
 		description: projects.description,
 		archived: projects.archived,
 		updatedAt: projects.updatedAt
-	}).from(projects).all();
+	}).from(projects);
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 		await index.addDocuments(rows.slice(i, i + BATCH_SIZE));
@@ -214,7 +214,7 @@ async function reindexProjects(client: import('meilisearch').MeiliSearch): Promi
 async function reindexComments(client: import('meilisearch').MeiliSearch): Promise<number> {
 	const index = client.index(INDEXES.comments.uid);
 	await index.deleteAllDocuments();
-	const rows = db.select({
+	const rows = await db.select({
 		id: comments.id,
 		body: comments.body,
 		taskId: comments.taskId,
@@ -225,8 +225,7 @@ async function reindexComments(client: import('meilisearch').MeiliSearch): Promi
 		createdAt: comments.createdAt
 	}).from(comments)
 		.innerJoin(tasks, eq(comments.taskId, tasks.id))
-		.innerJoin(projects, eq(tasks.projectId, projects.id))
-		.all();
+		.innerJoin(projects, eq(tasks.projectId, projects.id));
 	if (rows.length === 0) return 0;
 	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
 		await index.addDocuments(rows.slice(i, i + BATCH_SIZE));
