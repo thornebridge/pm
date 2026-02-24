@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 	import FolderTree from './FolderTree.svelte';
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
@@ -95,8 +96,11 @@
 	});
 
 	$effect(() => {
-		activeMode = detectedMode;
-		if (browser) localStorage.setItem('pm-sidebar-mode', activeMode);
+		const mode = detectedMode;
+		untrack(() => {
+			activeMode = mode;
+			if (browser) localStorage.setItem('pm-sidebar-mode', mode);
+		});
 	});
 
 	function setMode(mode: SidebarMode) {
