@@ -3,6 +3,8 @@ import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { crmCompanies, users } from '$lib/server/db/schema.js';
+import { emitCrmAutomationEvent } from '$lib/server/crm-automations/emit.js';
+import { indexDocument } from '$lib/server/search/meilisearch.js';
 import { eq, like, desc, asc, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
@@ -91,5 +93,15 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(crmCompanies).values(company).run();
+	indexDocument('companies', { id: company.id, name: company.name, website: company.website, industry: company.industry, size: company.size, phone: company.phone, city: company.city, state: company.state, ownerId: company.ownerId, notes: company.notes, updatedAt: company.updatedAt });
+
+	emitCrmAutomationEvent({
+		event: 'company.created',
+		entityType: 'company',
+		entityId: company.id,
+		entity: company as unknown as Record<string, unknown>,
+		userId: user.id
+	});
+
 	return json(company, { status: 201 });
 };

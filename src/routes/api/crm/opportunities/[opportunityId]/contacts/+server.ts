@@ -13,6 +13,9 @@ export const GET: RequestHandler = async (event) => {
 		.select({
 			contactId: crmOpportunityContacts.contactId,
 			role: crmOpportunityContacts.role,
+			influence: crmOpportunityContacts.influence,
+			sentiment: crmOpportunityContacts.sentiment,
+			notes: crmOpportunityContacts.notes,
 			firstName: crmContacts.firstName,
 			lastName: crmContacts.lastName,
 			email: crmContacts.email,
@@ -39,11 +42,44 @@ export const POST: RequestHandler = async (event) => {
 		.values({
 			opportunityId,
 			contactId: body.contactId,
-			role: body.role || null
+			role: body.role || null,
+			influence: body.influence || null,
+			sentiment: body.sentiment || null,
+			notes: body.notes || null
 		})
 		.run();
 
 	return json({ ok: true }, { status: 201 });
+};
+
+export const PATCH: RequestHandler = async (event) => {
+	requireAuth(event);
+	const { opportunityId } = event.params;
+	const body = await event.request.json();
+
+	if (!body.contactId) {
+		return json({ error: 'Contact ID is required' }, { status: 400 });
+	}
+
+	const updates: Record<string, unknown> = {};
+	if ('role' in body) updates.role = body.role || null;
+	if ('influence' in body) updates.influence = body.influence || null;
+	if ('sentiment' in body) updates.sentiment = body.sentiment || null;
+	if ('notes' in body) updates.notes = body.notes || null;
+
+	if (Object.keys(updates).length > 0) {
+		db.update(crmOpportunityContacts)
+			.set(updates)
+			.where(
+				and(
+					eq(crmOpportunityContacts.opportunityId, opportunityId),
+					eq(crmOpportunityContacts.contactId, body.contactId)
+				)
+			)
+			.run();
+	}
+
+	return json({ ok: true });
 };
 
 export const DELETE: RequestHandler = async (event) => {

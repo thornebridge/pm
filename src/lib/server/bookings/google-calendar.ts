@@ -1,86 +1,22 @@
 import { db } from '$lib/server/db/index.js';
-import { orgSettings, calendarIntegrations } from '$lib/server/db/schema.js';
+import { calendarIntegrations } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
-import { env } from '$env/dynamic/private';
+import {
+	getGoogleConfig,
+	getAuthUrl as _getAuthUrl,
+	exchangeCodeForTokens,
+	refreshAccessToken,
+	type GoogleOAuthConfig
+} from '$lib/server/google-auth.js';
 
-export interface GoogleCalendarConfig {
-	clientId: string;
-	clientSecret: string;
-}
+export type { GoogleOAuthConfig as GoogleCalendarConfig };
+export { getGoogleConfig, exchangeCodeForTokens };
 
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
+const CALENDAR_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
-export function getGoogleConfig(): GoogleCalendarConfig | null {
-	const org = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
-	const clientId = org?.googleClientId || env.GOOGLE_CLIENT_ID;
-	const clientSecret = org?.googleClientSecret || env.GOOGLE_CLIENT_SECRET;
-	if (!clientId || !clientSecret) return null;
-	return { clientId, clientSecret };
-}
-
-export function getAuthUrl(config: GoogleCalendarConfig, redirectUri: string, state: string): string {
-	const params = new URLSearchParams({
-		client_id: config.clientId,
-		redirect_uri: redirectUri,
-		response_type: 'code',
-		scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events',
-		access_type: 'offline',
-		prompt: 'consent',
-		state
-	});
-	return `${GOOGLE_AUTH_URL}?${params}`;
-}
-
-export async function exchangeCodeForTokens(
-	config: GoogleCalendarConfig,
-	code: string,
-	redirectUri: string
-): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
-	const res = await fetch(GOOGLE_TOKEN_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({
-			code,
-			client_id: config.clientId,
-			client_secret: config.clientSecret,
-			redirect_uri: redirectUri,
-			grant_type: 'authorization_code'
-		})
-	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(`Google token exchange failed (${res.status}): ${text}`);
-	}
-	const data = await res.json();
-	return {
-		accessToken: data.access_token,
-		refreshToken: data.refresh_token,
-		expiresIn: data.expires_in
-	};
-}
-
-async function refreshAccessToken(
-	config: GoogleCalendarConfig,
-	refreshToken: string
-): Promise<{ accessToken: string; expiresIn: number }> {
-	const res = await fetch(GOOGLE_TOKEN_URL, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		body: new URLSearchParams({
-			refresh_token: refreshToken,
-			client_id: config.clientId,
-			client_secret: config.clientSecret,
-			grant_type: 'refresh_token'
-		})
-	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(`Google token refresh failed (${res.status}): ${text}`);
-	}
-	const data = await res.json();
-	return { accessToken: data.access_token, expiresIn: data.expires_in };
+export function getAuthUrl(config: GoogleOAuthConfig, redirectUri: string, state: string): string {
+	return _getAuthUrl(config, redirectUri, state, CALENDAR_SCOPES);
 }
 
 export async function getValidToken(userId: string): Promise<string | null> {

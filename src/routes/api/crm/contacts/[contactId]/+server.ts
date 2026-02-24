@@ -4,6 +4,7 @@ import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { crmContacts } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
+import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -50,6 +51,7 @@ export const PATCH: RequestHandler = async (event) => {
 
 	db.update(crmContacts).set(updates).where(eq(crmContacts.id, contactId)).run();
 	const updated = db.select().from(crmContacts).where(eq(crmContacts.id, contactId)).get();
+	if (updated) indexDocument('contacts', { id: updated.id, firstName: updated.firstName, lastName: updated.lastName, email: updated.email, phone: updated.phone, title: updated.title, source: updated.source, companyId: updated.companyId, ownerId: updated.ownerId, notes: updated.notes, updatedAt: updated.updatedAt });
 	return json(updated);
 };
 
@@ -61,5 +63,6 @@ export const DELETE: RequestHandler = async (event) => {
 	if (!existing) return json({ error: 'Contact not found' }, { status: 404 });
 
 	db.delete(crmContacts).where(eq(crmContacts.id, contactId)).run();
+	removeDocument('contacts', contactId);
 	return json({ ok: true });
 };

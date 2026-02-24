@@ -3,6 +3,8 @@ import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { crmContacts, crmCompanies, users } from '$lib/server/db/schema.js';
+import { emitCrmAutomationEvent } from '$lib/server/crm-automations/emit.js';
+import { indexDocument } from '$lib/server/search/meilisearch.js';
 import { eq, like, desc, asc, sql, or } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
@@ -101,5 +103,15 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(crmContacts).values(contact).run();
+	indexDocument('contacts', { id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, title: contact.title, source: contact.source, companyId: contact.companyId, ownerId: contact.ownerId, notes: contact.notes, updatedAt: contact.updatedAt });
+
+	emitCrmAutomationEvent({
+		event: 'contact.created',
+		entityType: 'contact',
+		entityId: contact.id,
+		entity: contact as unknown as Record<string, unknown>,
+		userId: user.id
+	});
+
 	return json(contact, { status: 201 });
 };

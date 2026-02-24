@@ -10,7 +10,9 @@ import {
 	users
 } from '$lib/server/db/schema.js';
 import { eq, like, desc, asc, sql, and, lte, gte } from 'drizzle-orm';
+import { indexDocument } from '$lib/server/search/meilisearch.js';
 import { nanoid } from 'nanoid';
+import { emitCrmAutomationEvent } from '$lib/server/crm-automations/emit.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -146,6 +148,9 @@ export const POST: RequestHandler = async (event) => {
 		source: body.source || null,
 		description: body.description || null,
 		lostReason: null,
+		nextStep: body.nextStep || null,
+		nextStepDueDate: body.nextStepDueDate ?? null,
+		stageEnteredAt: now,
 		position: (maxPos?.max ?? 0) + 1,
 		ownerId: body.ownerId || null,
 		createdBy: user.id,
@@ -154,5 +159,15 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(crmOpportunities).values(opp).run();
+	indexDocument('opportunities', { id: opp.id, title: opp.title, description: opp.description, value: opp.value, currency: opp.currency, priority: opp.priority, source: opp.source, companyId: opp.companyId, stageId: opp.stageId, ownerId: opp.ownerId, nextStep: opp.nextStep, expectedCloseDate: opp.expectedCloseDate, updatedAt: opp.updatedAt });
+
+	emitCrmAutomationEvent({
+		event: 'opportunity.created',
+		entityType: 'opportunity',
+		entityId: opp.id,
+		entity: opp as unknown as Record<string, unknown>,
+		userId: user.id
+	});
+
 	return json(opp, { status: 201 });
 };

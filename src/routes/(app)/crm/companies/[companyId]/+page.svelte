@@ -6,12 +6,13 @@
 	import CompanyForm from '$lib/components/crm/CompanyForm.svelte';
 	import ContactForm from '$lib/components/crm/ContactForm.svelte';
 	import ClickToCall from '$lib/components/crm/ClickToCall.svelte';
+	import CustomFieldsPanel from '$lib/components/crm/CustomFieldsPanel.svelte';
 
 	let { data } = $props();
 
 	let showEdit = $state(false);
 	let showAddContact = $state(false);
-	let tab = $state<'contacts' | 'opportunities' | 'activities' | 'tasks'>('contacts');
+	let tab = $state<'details' | 'contacts' | 'opportunities' | 'activities' | 'tasks'>('contacts');
 
 	async function deleteCompany() {
 		if (!confirm('Delete this company? This will also delete all linked opportunities.')) return;
@@ -115,7 +116,7 @@
 
 	<!-- Tabs -->
 	<div class="mb-4 flex gap-4 border-b border-surface-300 dark:border-surface-800">
-		{#each ['contacts', 'opportunities', 'activities', 'tasks'] as t}
+		{#each ['details', 'contacts', 'opportunities', 'activities', 'tasks'] as t}
 			<button
 				onclick={() => (tab = t as typeof tab)}
 				class="border-b-2 px-1 pb-2 text-sm font-medium transition {tab === t ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'}"
@@ -130,6 +131,13 @@
 	</div>
 
 	<!-- Tab content -->
+	{#if tab === 'details'}
+		<div class="rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
+			<h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-500">Custom Fields</h3>
+			<CustomFieldsPanel entityType="company" entityId={data.company.id} />
+		</div>
+	{/if}
+
 	{#if tab === 'contacts'}
 		<div class="mb-3 flex justify-end">
 			<button onclick={() => (showAddContact = true)} class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500">

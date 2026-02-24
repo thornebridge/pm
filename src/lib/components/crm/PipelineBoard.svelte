@@ -23,14 +23,45 @@
 		position: number;
 		ownerId: string | null;
 		ownerName: string | null;
+		nextStep: string | null;
+		nextStepDueDate: number | null;
+		stageEnteredAt: number | null;
 	}
 
 	interface Props {
 		stages: Stage[];
 		opportunities: Opportunity[];
+		lastActivities?: Record<string, number>;
 	}
 
-	let { stages, opportunities }: Props = $props();
+	let { stages, opportunities, lastActivities = {} }: Props = $props();
+
+	const now = Date.now();
+
+	function getDaysInStage(opp: Opportunity): number | null {
+		if (!opp.stageEnteredAt) return null;
+		return Math.floor((now - opp.stageEnteredAt) / 86400000);
+	}
+
+	function getDaysSinceActivity(oppId: string): number | null {
+		const lastAt = lastActivities[oppId];
+		if (!lastAt) return null;
+		return Math.floor((now - lastAt) / 86400000);
+	}
+
+	function cardHealthClass(opp: Opportunity): string {
+		const daysSince = getDaysSinceActivity(opp.id);
+		if (daysSince !== null && daysSince >= 7) return 'ring-2 ring-red-400/50';
+		if (daysSince !== null && daysSince >= 3) return 'ring-2 ring-amber-400/40';
+		return '';
+	}
+
+	function healthDotColor(opp: Opportunity): string {
+		const daysSince = getDaysSinceActivity(opp.id);
+		if (daysSince !== null && daysSince >= 7) return 'bg-red-500';
+		if (daysSince !== null && daysSince >= 3) return 'bg-amber-400';
+		return 'bg-green-500';
+	}
 
 	let localOpps = $state<Opportunity[]>([]);
 	let draggedOpp: Opportunity | null = $state(null);
@@ -135,23 +166,34 @@
 						draggable="true"
 						ondragstart={(e) => handleDragStart(e, opp)}
 						ondragend={handleDragEnd}
-						class="cursor-grab rounded-lg border border-surface-300 bg-surface-50 p-3 shadow-sm transition hover:shadow-md active:cursor-grabbing dark:border-surface-700 dark:bg-surface-900"
+						class="cursor-grab rounded-lg border border-surface-300 bg-surface-50 p-3 shadow-sm transition hover:shadow-md active:cursor-grabbing dark:border-surface-700 dark:bg-surface-900 {cardHealthClass(opp)}"
 					>
 						<a href="/crm/opportunities/{opp.id}" class="block" onclick={(e) => e.stopPropagation()}>
 							<div class="flex items-start justify-between gap-2">
 								<p class="text-sm font-medium text-surface-900 dark:text-surface-100 line-clamp-2">{opp.title}</p>
-								<div class="h-2 w-2 shrink-0 rounded-full mt-1.5 {priorityColor(opp.priority)}" title={opp.priority}></div>
+								<div class="flex items-center gap-1 shrink-0 mt-1">
+									<div class="h-2 w-2 rounded-full {healthDotColor(opp)}" title="Health"></div>
+									<div class="h-2 w-2 rounded-full {priorityColor(opp.priority)}" title={opp.priority}></div>
+								</div>
 							</div>
 							<p class="mt-1 text-xs text-surface-500">{opp.companyName}</p>
+							{#if opp.nextStep}
+								<p class="mt-1 text-[10px] text-brand-600 dark:text-brand-400 truncate" title={opp.nextStep}>&#x2192; {opp.nextStep}</p>
+							{/if}
 							<div class="mt-2 flex items-center justify-between">
 								{#if opp.value}
 									<span class="text-xs font-medium text-surface-700 dark:text-surface-300">{formatCurrency(opp.value, opp.currency)}</span>
 								{:else}
 									<span></span>
 								{/if}
-								{#if opp.expectedCloseDate}
-									<span class="text-[10px] text-surface-500">{new Date(opp.expectedCloseDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-								{/if}
+								<div class="flex items-center gap-2">
+									{#if getDaysInStage(opp) !== null}
+										<span class="text-[10px] {(getDaysInStage(opp) ?? 0) >= 14 ? 'text-amber-500 font-medium' : 'text-surface-400'}">{getDaysInStage(opp)}d</span>
+									{/if}
+									{#if opp.expectedCloseDate}
+										<span class="text-[10px] text-surface-500">{new Date(opp.expectedCloseDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+									{/if}
+								</div>
 							</div>
 							{#if opp.ownerName}
 								<p class="mt-1.5 text-[10px] text-surface-400">{opp.ownerName}</p>

@@ -4,6 +4,9 @@ import { seed } from '$lib/server/db/seed.js';
 import { checkRateLimit } from '$lib/server/security/rateLimit.js';
 import { generateCsrfToken, validateCsrf } from '$lib/server/security/csrf.js';
 import { startAutomationPoller } from '$lib/server/automations/polling.js';
+import { startCrmAutomationPoller } from '$lib/server/crm-automations/polling.js';
+import { startGmailSyncPoller } from '$lib/server/gmail/sync.js';
+import { initSearchIndexes } from '$lib/server/search/reindex.js';
 import { db } from '$lib/server/db/index.js';
 import { users, userThemes } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
@@ -18,7 +21,10 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 export const handle: Handle = async ({ event, resolve }) => {
 	if (!seeded) {
 		await seed();
+		initSearchIndexes().catch(() => {});
 		startAutomationPoller(60_000);
+		startCrmAutomationPoller(60_000);
+		startGmailSyncPoller(120_000);
 		seeded = true;
 	}
 

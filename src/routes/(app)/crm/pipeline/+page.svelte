@@ -84,6 +84,7 @@
 	<PipelineBoard
 		stages={data.stages.filter((s) => !s.isClosed)}
 		opportunities={filteredOpps}
+		lastActivities={data.lastActivities}
 	/>
 </div>
 

@@ -11,6 +11,7 @@ import {
 } from '$lib/server/db/schema.js';
 import { eq, desc, asc, and, lte, gte } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { emitCrmAutomationEvent } from '$lib/server/crm-automations/emit.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -100,5 +101,14 @@ export const POST: RequestHandler = async (event) => {
 	};
 
 	db.insert(crmActivities).values(activity).run();
+
+	emitCrmAutomationEvent({
+		event: 'activity.logged',
+		entityType: 'activity',
+		entityId: activity.id,
+		entity: activity as unknown as Record<string, unknown>,
+		userId: user.id
+	});
+
 	return json(activity, { status: 201 });
 };

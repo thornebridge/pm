@@ -8,7 +8,9 @@ import {
 	crmOpportunities,
 	crmActivities,
 	crmPipelineStages,
-	users
+	users,
+	gmailEntityLinks,
+	gmailThreads
 } from '$lib/server/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
@@ -81,5 +83,16 @@ export const load: PageServerLoad = async ({ params }) => {
 		.limit(20)
 		.all();
 
-	return { contact, company, owner, opportunities, activities };
+	// Get linked email threads
+	const emailLinks = db.select({ threadId: gmailEntityLinks.threadId })
+		.from(gmailEntityLinks)
+		.where(eq(gmailEntityLinks.contactId, params.contactId))
+		.all();
+	const emailThreadIds = [...new Set(emailLinks.map((l) => l.threadId))];
+	const emails = emailThreadIds.flatMap((tid) => {
+		const t = db.select().from(gmailThreads).where(eq(gmailThreads.id, tid)).get();
+		return t ? [t] : [];
+	}).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+
+	return { contact, company, owner, opportunities, activities, emails };
 };

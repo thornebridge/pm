@@ -9,6 +9,7 @@ import {
 	crmActivities
 } from '$lib/server/db/schema.js';
 import { eq, count } from 'drizzle-orm';
+import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -76,6 +77,7 @@ export const PATCH: RequestHandler = async (event) => {
 
 	db.update(crmCompanies).set(updates).where(eq(crmCompanies.id, companyId)).run();
 	const updated = db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId)).get();
+	if (updated) indexDocument('companies', { id: updated.id, name: updated.name, website: updated.website, industry: updated.industry, size: updated.size, phone: updated.phone, city: updated.city, state: updated.state, ownerId: updated.ownerId, notes: updated.notes, updatedAt: updated.updatedAt });
 	return json(updated);
 };
 
@@ -87,5 +89,6 @@ export const DELETE: RequestHandler = async (event) => {
 	if (!existing) return json({ error: 'Company not found' }, { status: 404 });
 
 	db.delete(crmCompanies).where(eq(crmCompanies.id, companyId)).run();
+	removeDocument('companies', companyId);
 	return json({ ok: true });
 };

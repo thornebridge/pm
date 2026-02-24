@@ -22,6 +22,8 @@
 			source?: string | null;
 			description?: string | null;
 			ownerId?: string | null;
+			nextStep?: string | null;
+			nextStepDueDate?: number | null;
 		};
 		companies: Array<{ id: string; name: string }>;
 		stages: Array<{ id: string; name: string; color: string }>;
@@ -42,6 +44,8 @@
 	let source = $state('');
 	let description = $state('');
 	let ownerId = $state('');
+	let nextStep = $state('');
+	let nextStepDueDateStr = $state('');
 	let saving = $state(false);
 	let inputEl: HTMLInputElement | undefined = $state();
 
@@ -60,6 +64,10 @@
 				source = opportunity.source || '';
 				description = opportunity.description || '';
 				ownerId = opportunity.ownerId || '';
+				nextStep = opportunity.nextStep || '';
+				nextStepDueDateStr = opportunity.nextStepDueDate
+					? new Date(opportunity.nextStepDueDate).toISOString().split('T')[0]
+					: '';
 			} else {
 				title = '';
 				companyId = prefilledCompanyId || '';
@@ -71,6 +79,8 @@
 				source = '';
 				description = '';
 				ownerId = '';
+				nextStep = '';
+				nextStepDueDateStr = '';
 			}
 			saving = false;
 			requestAnimationFrame(() => inputEl?.focus());
@@ -85,6 +95,8 @@
 			const expectedCloseDate = closeDateStr ? new Date(closeDateStr).getTime() : null;
 			const prob = probability ? parseInt(probability) : null;
 
+			const nextStepDueDate = nextStepDueDateStr ? new Date(nextStepDueDateStr).getTime() : null;
+
 			const payload = {
 				title: title.trim(),
 				companyId,
@@ -95,7 +107,9 @@
 				priority,
 				source: source || null,
 				description: description || null,
-				ownerId: ownerId || null
+				ownerId: ownerId || null,
+				nextStep: nextStep.trim() || null,
+				nextStepDueDate
 			};
 
 			if (opportunity) {
@@ -214,6 +228,16 @@
 								<option value={m.id}>{m.name}</option>
 							{/each}
 						</select>
+					</div>
+				</div>
+				<div class="grid grid-cols-3 gap-3">
+					<div class="col-span-2">
+						<label for="opp-next-step" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Next Step</label>
+						<input id="opp-next-step" bind:value={nextStep} placeholder="e.g. Send pricing proposal" class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm text-surface-900 outline-none placeholder:text-surface-500 focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</div>
+					<div>
+						<label for="opp-next-step-due" class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Step Due</label>
+						<input id="opp-next-step-due" type="date" bind:value={nextStepDueDateStr} class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm text-surface-900 outline-none focus:border-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
 					</div>
 				</div>
 				<div>

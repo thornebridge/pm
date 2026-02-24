@@ -625,6 +625,9 @@ export const crmOpportunities = sqliteTable(
 		}),
 		description: text('description'),
 		lostReason: text('lost_reason'),
+		nextStep: text('next_step'),
+		nextStepDueDate: integer('next_step_due_date', { mode: 'number' }),
+		stageEnteredAt: integer('stage_entered_at', { mode: 'number' }),
 		position: real('position').notNull(),
 		ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
 		createdBy: text('created_by')
@@ -650,7 +653,10 @@ export const crmOpportunityContacts = sqliteTable(
 		contactId: text('contact_id')
 			.notNull()
 			.references(() => crmContacts.id, { onDelete: 'cascade' }),
-		role: text('role')
+		role: text('role'),
+		influence: text('influence', { enum: ['high', 'medium', 'low'] }),
+		sentiment: text('sentiment', { enum: ['champion', 'supportive', 'neutral', 'skeptical', 'blocker'] }),
+		notes: text('notes')
 	},
 	(t) => [primaryKey({ columns: [t.opportunityId, t.contactId] })]
 );
@@ -1274,3 +1280,207 @@ export const calendarIntegrations = sqliteTable('calendar_integrations', {
 	createdAt: integer('created_at', { mode: 'number' }).notNull(),
 	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 });
+
+// ─── Gmail Integration ───────────────────────────────────────────────────────
+
+export const gmailIntegrations = sqliteTable('gmail_integrations', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.unique()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	email: text('email').notNull(),
+	accessToken: text('access_token').notNull(),
+	refreshToken: text('refresh_token').notNull(),
+	tokenExpiry: integer('token_expiry', { mode: 'number' }).notNull(),
+	historyId: text('history_id'),
+	lastSyncAt: integer('last_sync_at', { mode: 'number' }),
+	createdAt: integer('created_at', { mode: 'number' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+});
+
+export const gmailThreads = sqliteTable(
+	'gmail_threads',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		subject: text('subject').notNull(),
+		snippet: text('snippet'),
+		lastMessageAt: integer('last_message_at', { mode: 'number' }).notNull(),
+		messageCount: integer('message_count').notNull().default(1),
+		isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+		isStarred: integer('is_starred', { mode: 'boolean' }).notNull().default(false),
+		labels: text('labels'),
+		category: text('category', {
+			enum: ['inbox', 'sent', 'draft', 'archived', 'trash']
+		}).notNull().default('inbox'),
+		syncedAt: integer('synced_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_gmail_threads_user').on(t.userId, t.lastMessageAt),
+		index('idx_gmail_threads_category').on(t.userId, t.category)
+	]
+);
+
+export const gmailMessages = sqliteTable(
+	'gmail_messages',
+	{
+		id: text('id').primaryKey(),
+		threadId: text('thread_id')
+			.notNull()
+			.references(() => gmailThreads.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		fromEmail: text('from_email').notNull(),
+		fromName: text('from_name'),
+		toEmails: text('to_emails').notNull(),
+		ccEmails: text('cc_emails'),
+		bccEmails: text('bcc_emails'),
+		subject: text('subject').notNull(),
+		bodyHtml: text('body_html'),
+		bodyText: text('body_text'),
+		snippet: text('snippet'),
+		internalDate: integer('internal_date', { mode: 'number' }).notNull(),
+		labelIds: text('label_ids'),
+		isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+		hasAttachments: integer('has_attachments', { mode: 'boolean' }).notNull().default(false),
+		syncedAt: integer('synced_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_gmail_msgs_thread').on(t.threadId),
+		index('idx_gmail_msgs_user_date').on(t.userId, t.internalDate),
+		index('idx_gmail_msgs_from').on(t.fromEmail)
+	]
+);
+
+export const gmailAttachments = sqliteTable(
+	'gmail_attachments',
+	{
+		id: text('id').primaryKey(),
+		messageId: text('message_id')
+			.notNull()
+			.references(() => gmailMessages.id, { onDelete: 'cascade' }),
+		gmailAttachmentId: text('gmail_attachment_id').notNull(),
+		filename: text('filename').notNull(),
+		mimeType: text('mime_type').notNull(),
+		size: integer('size').notNull()
+	},
+	(t) => [index('idx_gmail_attachments_msg').on(t.messageId)]
+);
+
+export const gmailEntityLinks = sqliteTable(
+	'gmail_entity_links',
+	{
+		id: text('id').primaryKey(),
+		threadId: text('thread_id')
+			.notNull()
+			.references(() => gmailThreads.id, { onDelete: 'cascade' }),
+		contactId: text('contact_id').references(() => crmContacts.id, { onDelete: 'cascade' }),
+		companyId: text('company_id').references(() => crmCompanies.id, { onDelete: 'cascade' }),
+		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, { onDelete: 'cascade' }),
+		linkType: text('link_type', { enum: ['auto', 'manual'] }).notNull().default('auto'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_gmail_links_thread').on(t.threadId),
+		index('idx_gmail_links_contact').on(t.contactId),
+		index('idx_gmail_links_company').on(t.companyId),
+		index('idx_gmail_links_opp').on(t.opportunityId)
+	]
+);
+
+// ─── CRM Custom Fields ──────────────────────────────────────────────────────
+
+export const crmCustomFieldDefs = sqliteTable(
+	'crm_custom_field_defs',
+	{
+		id: text('id').primaryKey(),
+		entityType: text('entity_type', { enum: ['company', 'contact', 'opportunity'] }).notNull(),
+		fieldName: text('field_name').notNull(),
+		label: text('label').notNull(),
+		fieldType: text('field_type', {
+			enum: ['text', 'number', 'date', 'select', 'multi_select', 'boolean', 'url', 'email', 'currency']
+		}).notNull(),
+		options: text('options'), // JSON array for select/multi_select
+		required: integer('required', { mode: 'boolean' }).notNull().default(false),
+		position: integer('position').notNull().default(0),
+		showInList: integer('show_in_list', { mode: 'boolean' }).notNull().default(false),
+		showInCard: integer('show_in_card', { mode: 'boolean' }).notNull().default(false),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_cfd_entity').on(t.entityType, t.position),
+		uniqueIndex('idx_crm_cfd_unique_name').on(t.entityType, t.fieldName)
+	]
+);
+
+export const crmCustomFieldValues = sqliteTable(
+	'crm_custom_field_values',
+	{
+		id: text('id').primaryKey(),
+		fieldDefId: text('field_def_id')
+			.notNull()
+			.references(() => crmCustomFieldDefs.id, { onDelete: 'cascade' }),
+		entityId: text('entity_id').notNull(),
+		value: text('value'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		uniqueIndex('idx_crm_cfv_field_entity').on(t.fieldDefId, t.entityId),
+		index('idx_crm_cfv_entity').on(t.entityId)
+	]
+);
+
+// ─── CRM Automations ────────────────────────────────────────────────────────
+
+export const crmAutomationRules = sqliteTable(
+	'crm_automation_rules',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		description: text('description'),
+		entityType: text('entity_type', {
+			enum: ['opportunity', 'contact', 'company', 'activity']
+		}).notNull(),
+		trigger: text('trigger').notNull(), // JSON: { event, config? }
+		conditions: text('conditions'), // JSON: [{ field, operator, value }]
+		actions: text('actions').notNull(), // JSON: [{ type, ...config }]
+		enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_auto_rules_entity').on(t.entityType, t.enabled)]
+);
+
+export const crmAutomationExecutions = sqliteTable(
+	'crm_automation_executions',
+	{
+		id: text('id').primaryKey(),
+		ruleId: text('rule_id')
+			.notNull()
+			.references(() => crmAutomationRules.id, { onDelete: 'cascade' }),
+		entityType: text('entity_type').notNull(),
+		entityId: text('entity_id').notNull(),
+		triggerEvent: text('trigger_event').notNull(),
+		status: text('status', { enum: ['success', 'error', 'skipped'] }).notNull(),
+		actionsRun: text('actions_run'), // JSON
+		error: text('error'),
+		durationMs: integer('duration_ms'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_auto_exec_rule').on(t.ruleId, t.createdAt),
+		index('idx_crm_auto_exec_entity').on(t.entityType, t.entityId)
+	]
+);

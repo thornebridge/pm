@@ -12,7 +12,9 @@ import {
 	crmActivities,
 	crmProposals,
 	crmTasks,
-	users
+	users,
+	gmailEntityLinks,
+	gmailThreads
 } from '$lib/server/db/schema.js';
 import { eq, desc, asc } from 'drizzle-orm';
 
@@ -48,6 +50,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		.select({
 			contactId: crmOpportunityContacts.contactId,
 			role: crmOpportunityContacts.role,
+			influence: crmOpportunityContacts.influence,
+			sentiment: crmOpportunityContacts.sentiment,
+			notes: crmOpportunityContacts.notes,
 			firstName: crmContacts.firstName,
 			lastName: crmContacts.lastName,
 			email: crmContacts.email,
@@ -131,6 +136,35 @@ export const load: PageServerLoad = async ({ params }) => {
 		.orderBy(asc(crmOpportunityItems.position))
 		.all();
 
+	// Get linked email threads
+	const emailLinks = db.select({ threadId: gmailEntityLinks.threadId })
+		.from(gmailEntityLinks)
+		.where(eq(gmailEntityLinks.opportunityId, params.opportunityId))
+		.all();
+	const emailThreadIds = [...new Set(emailLinks.map((l) => l.threadId))];
+	const emails = emailThreadIds.flatMap((tid) => {
+		const t = db.select().from(gmailThreads).where(eq(gmailThreads.id, tid)).get();
+		return t ? [t] : [];
+	}).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+
+	// Compute deal health metrics
+	const now = Date.now();
+	const lastActivity = activities.length > 0 ? activities[0].createdAt : null;
+	const daysSinceLastActivity = lastActivity ? Math.floor((now - lastActivity) / 86400000) : null;
+	const daysInStage = opp.stageEnteredAt ? Math.floor((now - opp.stageEnteredAt) / 86400000) : null;
+
+	let nextStepStatus: 'on_track' | 'due_soon' | 'overdue' | 'not_set' = 'not_set';
+	if (opp.nextStep) {
+		if (!opp.nextStepDueDate) {
+			nextStepStatus = 'on_track';
+		} else {
+			const daysUntilDue = Math.ceil((opp.nextStepDueDate - now) / 86400000);
+			if (daysUntilDue < 0) nextStepStatus = 'overdue';
+			else if (daysUntilDue <= 1) nextStepStatus = 'due_soon';
+			else nextStepStatus = 'on_track';
+		}
+	}
+
 	return {
 		opportunity: opp,
 		stage,
@@ -142,6 +176,14 @@ export const load: PageServerLoad = async ({ params }) => {
 		proposals,
 		tasks,
 		companyContacts,
-		opportunityItems
+		opportunityItems,
+		emails,
+		dealHealth: {
+			daysSinceLastActivity,
+			daysInStage,
+			nextStepStatus,
+			isStale: daysSinceLastActivity !== null && daysSinceLastActivity >= 7,
+			isAging: daysSinceLastActivity !== null && daysSinceLastActivity >= 3
+		}
 	};
 };

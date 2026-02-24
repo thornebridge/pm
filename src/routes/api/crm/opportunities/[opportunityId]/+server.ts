@@ -15,6 +15,8 @@ import {
 } from '$lib/server/db/schema.js';
 import { eq, count, desc, sql } from 'drizzle-orm';
 import { createRevenueJournalEntry } from '$lib/server/financials/crm-sync.js';
+import { emitCrmAutomationEvent } from '$lib/server/crm-automations/emit.js';
+import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
@@ -115,7 +117,9 @@ export const PATCH: RequestHandler = async (event) => {
 		'source',
 		'description',
 		'lostReason',
-		'ownerId'
+		'ownerId',
+		'nextStep',
+		'nextStepDueDate'
 	];
 	for (const f of fields) {
 		if (f in body) updates[f] = body[f];
@@ -125,6 +129,7 @@ export const PATCH: RequestHandler = async (event) => {
 	let stageIsWon = false;
 	if ('stageId' in body && body.stageId !== existing.stageId) {
 		updates.stageId = body.stageId;
+		updates.stageEnteredAt = Date.now();
 
 		const newStage = db
 			.select()
@@ -184,6 +189,32 @@ export const PATCH: RequestHandler = async (event) => {
 		.from(crmOpportunities)
 		.where(eq(crmOpportunities.id, opportunityId))
 		.get();
+
+	if (updated) indexDocument('opportunities', { id: updated.id, title: updated.title, description: updated.description, value: updated.value, currency: updated.currency, priority: updated.priority, source: updated.source, companyId: updated.companyId, stageId: updated.stageId, ownerId: updated.ownerId, nextStep: updated.nextStep, expectedCloseDate: updated.expectedCloseDate, updatedAt: updated.updatedAt });
+
+	// Emit CRM automation events
+	if (updated) {
+		const updatedEntity = updated as unknown as Record<string, unknown>;
+		if ('stageId' in body && body.stageId !== existing.stageId) {
+			const newStage = db.select().from(crmPipelineStages).where(eq(crmPipelineStages.id, body.stageId)).get();
+			if (newStage?.isWon) {
+				emitCrmAutomationEvent({ event: 'opportunity.won', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: body, userId: user.id });
+			} else if (newStage?.isClosed && !newStage?.isWon) {
+				emitCrmAutomationEvent({ event: 'opportunity.lost', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: body, userId: user.id });
+			}
+			emitCrmAutomationEvent({ event: 'opportunity.stage_changed', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: { stageId: body.stageId }, userId: user.id });
+		}
+		if ('priority' in body && body.priority !== existing.priority) {
+			emitCrmAutomationEvent({ event: 'opportunity.priority_changed', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: { priority: body.priority }, userId: user.id });
+		}
+		if ('ownerId' in body && body.ownerId !== existing.ownerId) {
+			emitCrmAutomationEvent({ event: 'opportunity.owner_changed', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: { ownerId: body.ownerId }, userId: user.id });
+		}
+		if ('value' in body && body.value !== existing.value) {
+			emitCrmAutomationEvent({ event: 'opportunity.value_changed', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: { value: body.value }, userId: user.id });
+		}
+	}
+
 	return json(updated);
 };
 
@@ -199,5 +230,6 @@ export const DELETE: RequestHandler = async (event) => {
 	if (!existing) return json({ error: 'Opportunity not found' }, { status: 404 });
 
 	db.delete(crmOpportunities).where(eq(crmOpportunities.id, opportunityId)).run();
+	removeDocument('opportunities', opportunityId);
 	return json({ ok: true });
 };

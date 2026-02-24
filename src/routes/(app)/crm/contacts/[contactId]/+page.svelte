@@ -5,11 +5,12 @@
 	import { formatCurrency } from '$lib/utils/currency.js';
 	import ContactForm from '$lib/components/crm/ContactForm.svelte';
 	import ClickToCall from '$lib/components/crm/ClickToCall.svelte';
+	import CustomFieldsPanel from '$lib/components/crm/CustomFieldsPanel.svelte';
 
 	let { data } = $props();
 
 	let showEdit = $state(false);
-	let tab = $state<'details' | 'opportunities' | 'activities'>('details');
+	let tab = $state<'details' | 'opportunities' | 'activities' | 'emails'>('details');
 
 	async function deleteContact() {
 		if (!confirm('Delete this contact?')) return;
@@ -110,7 +111,7 @@
 
 	<!-- Tabs -->
 	<div class="mb-4 flex gap-4 border-b border-surface-300 dark:border-surface-800">
-		{#each [{ key: 'opportunities', label: `Opportunities (${data.opportunities.length})` }, { key: 'activities', label: `Activities (${data.activities.length})` }] as t}
+		{#each [{ key: 'details', label: 'Details' }, { key: 'opportunities', label: `Opportunities (${data.opportunities.length})` }, { key: 'activities', label: `Activities (${data.activities.length})` }, { key: 'emails', label: `Emails (${data.emails.length})` }] as t}
 			<button
 				onclick={() => (tab = t.key as typeof tab)}
 				class="border-b-2 px-1 pb-2 text-sm font-medium transition {tab === t.key ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'}"
@@ -119,6 +120,13 @@
 			</button>
 		{/each}
 	</div>
+
+	{#if tab === 'details'}
+		<div class="rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
+			<h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-500">Custom Fields</h3>
+			<CustomFieldsPanel entityType="contact" entityId={data.contact.id} />
+		</div>
+	{/if}
 
 	{#if tab === 'opportunities'}
 		{#if data.opportunities.length === 0}
@@ -164,6 +172,37 @@
 							<p class="mt-1 text-[10px] text-surface-500">{activity.userName} &middot; {relativeTime(activity.createdAt)}</p>
 						</div>
 					</div>
+				{/each}
+			</div>
+		{/if}
+	{/if}
+
+	{#if tab === 'emails'}
+		{#if data.emails.length === 0}
+			<p class="text-sm text-surface-500">No linked emails for this contact yet.</p>
+		{:else}
+			<div class="space-y-2">
+				{#each data.emails as email (email.id)}
+					<a
+						href="/crm/email"
+						class="flex items-center justify-between rounded-lg border border-surface-300 bg-surface-50 p-3 transition hover:bg-surface-100 dark:border-surface-800 dark:bg-surface-900 dark:hover:bg-surface-800/50"
+					>
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								{#if !email.isRead}
+									<div class="h-2 w-2 shrink-0 rounded-full bg-brand-500"></div>
+								{/if}
+								<p class="truncate text-sm font-medium text-surface-900 dark:text-surface-100">{email.subject}</p>
+								{#if email.messageCount > 1}
+									<span class="shrink-0 rounded bg-surface-200 px-1 text-[10px] text-surface-600 dark:bg-surface-800 dark:text-surface-400">{email.messageCount}</span>
+								{/if}
+							</div>
+							<p class="mt-0.5 truncate text-xs text-surface-500">{email.snippet || ''}</p>
+						</div>
+						<span class="ml-2 shrink-0 text-[10px] text-surface-500">
+							{new Date(email.lastMessageAt).toLocaleDateString()}
+						</span>
+					</a>
 				{/each}
 			</div>
 		{/if}
