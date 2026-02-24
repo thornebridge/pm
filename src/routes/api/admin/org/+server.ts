@@ -5,6 +5,11 @@ import { db } from '$lib/server/db/index.js';
 import { orgSettings } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 
+function maskSecret(value: string | null): string | null {
+	if (!value) return null;
+	return `${'•'.repeat(Math.max(0, value.length - 4))}${value.slice(-4)}`;
+}
+
 function getOrgSettings() {
 	let settings = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
 	if (!settings) {
@@ -16,15 +21,15 @@ function getOrgSettings() {
 	return settings;
 }
 
-/** GET — read org settings (mask API key) */
+/** GET — read org settings (mask secrets) */
 export const GET: RequestHandler = async (event) => {
 	requireAdmin(event);
 	const settings = getOrgSettings();
 	return json({
 		...settings,
-		telnyxApiKey: settings.telnyxApiKey
-			? `${'•'.repeat(Math.max(0, settings.telnyxApiKey.length - 4))}${settings.telnyxApiKey.slice(-4)}`
-			: null
+		telnyxApiKey: maskSecret(settings.telnyxApiKey),
+		googleClientSecret: maskSecret(settings.googleClientSecret),
+		resendApiKey: maskSecret(settings.resendApiKey)
 	});
 };
 
@@ -51,10 +56,8 @@ export const PUT: RequestHandler = async (event) => {
 	const telnyxCredentialId = typeof body.telnyxCredentialId === 'string'
 		? (body.telnyxCredentialId.trim() || null)
 		: current.telnyxCredentialId;
-	// telnyxCallerNumber stores a JSON array of numbers
 	let telnyxCallerNumber = current.telnyxCallerNumber;
 	if (typeof body.telnyxCallerNumbers === 'string') {
-		// Parse lines/commas into a JSON array
 		const numbers = body.telnyxCallerNumbers
 			.split(/[\n,]+/)
 			.map((n: string) => n.trim())
@@ -68,6 +71,25 @@ export const PUT: RequestHandler = async (event) => {
 		? body.telnyxRecordCalls
 		: current.telnyxRecordCalls;
 
+	// Google Calendar fields
+	const googleClientId = typeof body.googleClientId === 'string'
+		? (body.googleClientId.trim() || null)
+		: current.googleClientId;
+	const googleClientSecret = typeof body.googleClientSecret === 'string' && !body.googleClientSecret.startsWith('•')
+		? (body.googleClientSecret.trim() || null)
+		: current.googleClientSecret;
+
+	// Email fields
+	const emailProvider = typeof body.emailProvider === 'string'
+		? (body.emailProvider || null)
+		: current.emailProvider;
+	const emailFromAddress = typeof body.emailFromAddress === 'string'
+		? (body.emailFromAddress.trim() || null)
+		: current.emailFromAddress;
+	const resendApiKey = typeof body.resendApiKey === 'string' && !body.resendApiKey.startsWith('•')
+		? (body.resendApiKey.trim() || null)
+		: current.resendApiKey;
+
 	db.update(orgSettings)
 		.set({
 			platformName,
@@ -77,6 +99,11 @@ export const PUT: RequestHandler = async (event) => {
 			telnyxCredentialId,
 			telnyxCallerNumber,
 			telnyxRecordCalls,
+			googleClientId,
+			googleClientSecret,
+			emailProvider,
+			emailFromAddress,
+			resendApiKey,
 			updatedAt: Date.now()
 		})
 		.where(eq(orgSettings.id, 'default'))
@@ -86,12 +113,15 @@ export const PUT: RequestHandler = async (event) => {
 		...current,
 		platformName,
 		telnyxEnabled,
-		telnyxApiKey: telnyxApiKey
-			? `${'•'.repeat(Math.max(0, telnyxApiKey.length - 4))}${telnyxApiKey.slice(-4)}`
-			: null,
+		telnyxApiKey: maskSecret(telnyxApiKey),
 		telnyxConnectionId,
 		telnyxCredentialId,
 		telnyxCallerNumber,
-		telnyxRecordCalls
+		telnyxRecordCalls,
+		googleClientId,
+		googleClientSecret: maskSecret(googleClientSecret),
+		emailProvider,
+		emailFromAddress,
+		resendApiKey: maskSecret(resendApiKey)
 	});
 };

@@ -902,6 +902,13 @@ export const orgSettings = sqliteTable('org_settings', {
 	telnyxCredentialId: text('telnyx_credential_id'),
 	telnyxCallerNumber: text('telnyx_caller_number'),
 	telnyxRecordCalls: integer('telnyx_record_calls', { mode: 'boolean' }).notNull().default(false),
+	// Google Calendar OAuth
+	googleClientId: text('google_client_id'),
+	googleClientSecret: text('google_client_secret'),
+	// Email provider
+	emailProvider: text('email_provider'), // 'resend' | null
+	emailFromAddress: text('email_from_address'),
+	resendApiKey: text('resend_api_key'),
 	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 });
 
@@ -1200,3 +1207,70 @@ export const finReconciliations = sqliteTable(
 		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
 	}
 );
+
+// ─── Bookings ────────────────────────────────────────────────────────────────
+
+export const bookingEventTypes = sqliteTable(
+	'booking_event_types',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		title: text('title').notNull(),
+		slug: text('slug').notNull().unique(),
+		description: text('description'),
+		durationMinutes: integer('duration_minutes').notNull().default(30),
+		color: text('color').notNull().default('#6366f1'),
+		location: text('location'),
+		bufferMinutes: integer('buffer_minutes').notNull().default(0),
+		minNoticeHours: integer('min_notice_hours').notNull().default(4),
+		maxDaysOut: integer('max_days_out').notNull().default(60),
+		isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_booking_event_types_user').on(t.userId),
+		index('idx_booking_event_types_slug').on(t.slug)
+	]
+);
+
+export const bookings = sqliteTable(
+	'bookings',
+	{
+		id: text('id').primaryKey(),
+		eventTypeId: text('event_type_id')
+			.notNull()
+			.references(() => bookingEventTypes.id, { onDelete: 'cascade' }),
+		inviteeName: text('invitee_name').notNull(),
+		inviteeEmail: text('invitee_email').notNull(),
+		startTime: integer('start_time', { mode: 'number' }).notNull(),
+		endTime: integer('end_time', { mode: 'number' }).notNull(),
+		timezone: text('timezone').notNull().default('America/New_York'),
+		status: text('status', { enum: ['confirmed', 'cancelled'] }).notNull().default('confirmed'),
+		notes: text('notes'),
+		googleEventId: text('google_event_id'),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_bookings_event_type').on(t.eventTypeId),
+		index('idx_bookings_start_time').on(t.startTime),
+		index('idx_bookings_status').on(t.status)
+	]
+);
+
+export const calendarIntegrations = sqliteTable('calendar_integrations', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.unique()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	provider: text('provider', { enum: ['google'] }).notNull().default('google'),
+	accessToken: text('access_token').notNull(),
+	refreshToken: text('refresh_token').notNull(),
+	tokenExpiry: integer('token_expiry', { mode: 'number' }).notNull(),
+	calendarId: text('calendar_id').notNull().default('primary'),
+	createdAt: integer('created_at', { mode: 'number' }).notNull(),
+	updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+});

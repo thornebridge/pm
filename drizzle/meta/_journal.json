@@ -134,6 +134,20 @@
       "when": 1771900432668,
       "tag": "0018_colorful_bloodstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1771905291936,
+      "tag": "0019_crazy_lila_cheney",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1771940547440,
+      "tag": "0020_jazzy_cerebro",
+      "breakpoints": true
     }
   ]
 }

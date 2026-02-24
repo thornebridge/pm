@@ -7,7 +7,7 @@
 
 	let { data } = $props();
 
-	let tab = $state<'org' | 'telephony' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
+	let tab = $state<'org' | 'telephony' | 'calendar' | 'email' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
 
 	// Org settings state
 	let orgPlatformName = $state('');
@@ -26,6 +26,19 @@
 	let telnyxTestResult = $state<{ valid: boolean; error?: string } | null>(null);
 	let showApiKey = $state(false);
 
+	// Google Calendar state
+	let googleClientId = $state('');
+	let googleClientSecret = $state('');
+	let savingCalendar = $state(false);
+	let showGoogleSecret = $state(false);
+
+	// Email state
+	let emailProvider = $state('');
+	let emailFromAddress = $state('');
+	let resendApiKey = $state('');
+	let savingEmail = $state(false);
+	let showResendKey = $state(false);
+
 	$effect(() => {
 		api<{
 			platformName: string;
@@ -33,8 +46,13 @@
 			telnyxApiKey: string | null;
 			telnyxConnectionId: string | null;
 			telnyxCredentialId: string | null;
-			telnyxCallerNumber: string | null; // JSON array stored in DB
+			telnyxCallerNumber: string | null;
 			telnyxRecordCalls: boolean;
+			googleClientId: string | null;
+			googleClientSecret: string | null;
+			emailProvider: string | null;
+			emailFromAddress: string | null;
+			resendApiKey: string | null;
 		}>('/api/admin/org')
 			.then((org) => {
 				orgPlatformName = org.platformName;
@@ -42,7 +60,6 @@
 				telnyxApiKey = org.telnyxApiKey || '';
 				telnyxConnectionId = org.telnyxConnectionId || '';
 				telnyxCredentialId = org.telnyxCredentialId || '';
-				// Parse JSON array to newline-separated for textarea
 				if (org.telnyxCallerNumber) {
 					try {
 						const nums = JSON.parse(org.telnyxCallerNumber);
@@ -54,6 +71,11 @@
 					telnyxCallerNumbers = '';
 				}
 				telnyxRecordCalls = org.telnyxRecordCalls;
+				googleClientId = org.googleClientId || '';
+				googleClientSecret = org.googleClientSecret || '';
+				emailProvider = org.emailProvider || '';
+				emailFromAddress = org.emailFromAddress || '';
+				resendApiKey = org.resendApiKey || '';
 				orgLoaded = true;
 			})
 			.catch(() => { orgLoaded = true; });
@@ -115,6 +137,40 @@
 			telnyxTestResult = { valid: false, error: 'Connection test failed' };
 		} finally {
 			testingTelnyx = false;
+		}
+	}
+
+	async function saveCalendarSettings() {
+		savingCalendar = true;
+		try {
+			const payload: Record<string, unknown> = { googleClientId };
+			if (googleClientSecret && !googleClientSecret.startsWith('•')) {
+				payload.googleClientSecret = googleClientSecret;
+			}
+			await api('/api/admin/org', { method: 'PUT', body: JSON.stringify(payload) });
+			await invalidateAll();
+			showToast('Calendar settings saved');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
+		} finally {
+			savingCalendar = false;
+		}
+	}
+
+	async function saveEmailSettings() {
+		savingEmail = true;
+		try {
+			const payload: Record<string, unknown> = { emailProvider, emailFromAddress };
+			if (resendApiKey && !resendApiKey.startsWith('•')) {
+				payload.resendApiKey = resendApiKey;
+			}
+			await api('/api/admin/org', { method: 'PUT', body: JSON.stringify(payload) });
+			await invalidateAll();
+			showToast('Email settings saved');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
+		} finally {
+			savingEmail = false;
 		}
 	}
 
@@ -304,7 +360,7 @@
 
 	<!-- Tabs -->
 	<div class="mb-6 flex gap-1 overflow-x-auto border-b border-surface-300 dark:border-surface-800">
-		{#each [['org', 'Organization'], ['telephony', 'Telephony'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
+		{#each [['org', 'Organization'], ['telephony', 'Telephony'], ['calendar', 'Calendar'], ['email', 'Email'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
 			<button
 				onclick={() => (tab = key as typeof tab)}
 				class="whitespace-nowrap px-3 py-2 text-sm font-medium transition {tab === key ? 'border-b-2 border-brand-500 text-brand-600 dark:text-brand-400' : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100'}"
@@ -437,6 +493,131 @@
 						disabled={savingTelnyx}
 						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
 					>{savingTelnyx ? 'Saving...' : 'Save'}</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-sm text-surface-400">Loading...</p>
+		{/if}
+
+	{:else if tab === 'calendar'}
+		{#if orgLoaded}
+			<div class="space-y-5">
+				<p class="text-sm text-surface-600 dark:text-surface-400">
+					Connect Google Calendar to enable real-time availability checking and automatic event creation for bookings.
+				</p>
+
+				<div>
+					<label for="google-client-id" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Client ID</label>
+					<input
+						id="google-client-id"
+						bind:value={googleClientId}
+						placeholder="xxxxx.apps.googleusercontent.com"
+						class="w-full max-w-md rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+					/>
+					<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Found in Google Cloud Console → APIs & Services → Credentials.</p>
+				</div>
+
+				<div>
+					<label for="google-client-secret" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Client Secret</label>
+					<div class="relative max-w-md">
+						<input
+							id="google-client-secret"
+							type={showGoogleSecret ? 'text' : 'password'}
+							bind:value={googleClientSecret}
+							placeholder="GOCSPX-..."
+							class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 pr-16 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						/>
+						<button
+							type="button"
+							onclick={() => (showGoogleSecret = !showGoogleSecret)}
+							class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+						>{showGoogleSecret ? 'Hide' : 'Show'}</button>
+					</div>
+					<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Keep this secret. Only update if you're changing credentials.</p>
+				</div>
+
+				<div class="rounded-md border border-surface-200 bg-surface-50 px-4 py-3 dark:border-surface-800 dark:bg-surface-800/50">
+					<p class="text-xs font-medium text-surface-600 dark:text-surface-400">Redirect URI</p>
+					<p class="mt-1 font-mono text-xs text-surface-900 dark:text-surface-100">{window.location.origin}/api/bookings/calendar/callback</p>
+					<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Add this as an Authorized redirect URI in your Google OAuth client configuration.</p>
+				</div>
+
+				<div>
+					<button
+						onclick={saveCalendarSettings}
+						disabled={savingCalendar}
+						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+					>{savingCalendar ? 'Saving...' : 'Save'}</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-sm text-surface-400">Loading...</p>
+		{/if}
+
+	{:else if tab === 'email'}
+		{#if orgLoaded}
+			<div class="space-y-5">
+				<div>
+					<label for="email-provider" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Email Provider</label>
+					<select
+						id="email-provider"
+						bind:value={emailProvider}
+						class="w-full max-w-xs rounded-md border border-surface-300 bg-surface-50 px-2 py-2 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+					>
+						<option value="">None</option>
+						<option value="resend">Resend</option>
+						<option value="sendgrid" disabled>SendGrid (coming soon)</option>
+						<option value="mailgun" disabled>Mailgun (coming soon)</option>
+					</select>
+					<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Used for booking confirmations, notifications, and invites.</p>
+				</div>
+
+				{#if emailProvider === 'resend'}
+					<div>
+						<label for="email-from" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">From Address</label>
+						<input
+							id="email-from"
+							bind:value={emailFromAddress}
+							placeholder="PM <notifications@yourdomain.com>"
+							class="w-full max-w-md rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						/>
+						<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Must be a verified domain in your Resend account.</p>
+					</div>
+
+					<div>
+						<label for="resend-api-key" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">API Key</label>
+						<div class="relative max-w-md">
+							<input
+								id="resend-api-key"
+								type={showResendKey ? 'text' : 'password'}
+								bind:value={resendApiKey}
+								placeholder="re_..."
+								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 pr-16 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							/>
+							<button
+								type="button"
+								onclick={() => (showResendKey = !showResendKey)}
+								class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+							>{showResendKey ? 'Hide' : 'Show'}</button>
+						</div>
+						<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Get your API key from resend.com/api-keys.</p>
+					</div>
+				{:else if emailProvider === 'sendgrid'}
+					<div class="rounded-md border border-surface-200 bg-surface-50 px-4 py-6 text-center dark:border-surface-800 dark:bg-surface-800/50">
+						<p class="text-sm text-surface-500">SendGrid support coming soon.</p>
+					</div>
+				{:else if emailProvider === 'mailgun'}
+					<div class="rounded-md border border-surface-200 bg-surface-50 px-4 py-6 text-center dark:border-surface-800 dark:bg-surface-800/50">
+						<p class="text-sm text-surface-500">Mailgun support coming soon.</p>
+					</div>
+				{/if}
+
+				<div>
+					<button
+						onclick={saveEmailSettings}
+						disabled={savingEmail}
+						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+					>{savingEmail ? 'Saving...' : 'Save'}</button>
 				</div>
 			</div>
 		{:else}

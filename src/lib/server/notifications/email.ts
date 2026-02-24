@@ -1,24 +1,43 @@
 import { Resend } from 'resend';
 import { env } from '$env/dynamic/private';
+import { db } from '$lib/server/db/index.js';
+import { orgSettings } from '$lib/server/db/schema.js';
+import { eq } from 'drizzle-orm';
 
-const FROM = 'PM <notifications@thornebridge.tech>';
+const DEFAULT_FROM = 'PM <notifications@thornebridge.tech>';
 
 let resend: Resend | null = null;
+let lastApiKey: string | null = null;
+
+function getEmailConfig(): { apiKey: string | null; from: string } {
+	const org = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
+	const apiKey = org?.resendApiKey || env.RESEND_API_KEY || null;
+	const from = org?.emailFromAddress || DEFAULT_FROM;
+	return { apiKey, from };
+}
 
 function getClient(): Resend | null {
-	if (resend) return resend;
-	const key = env.RESEND_API_KEY;
-	if (!key) return null;
-	resend = new Resend(key);
+	const { apiKey } = getEmailConfig();
+	if (!apiKey) return null;
+	// Recreate client if API key changed (e.g. updated in admin)
+	if (resend && lastApiKey === apiKey) return resend;
+	resend = new Resend(apiKey);
+	lastApiKey = apiKey;
 	return resend;
 }
 
-export async function sendEmail(to: string, subject: string, html: string) {
+export function getFromAddress(): string {
+	return getEmailConfig().from;
+}
+
+export async function sendEmail(to: string, subject: string, html: string, attachments?: Array<{ filename: string; content: Buffer }>) {
 	const client = getClient();
 	if (!client) return;
 
+	const { from } = getEmailConfig();
+
 	try {
-		await client.emails.send({ from: FROM, to, subject, html });
+		await client.emails.send({ from, to, subject, html, attachments });
 	} catch (err) {
 		console.error('[email] Failed to send:', err);
 	}
