@@ -124,6 +124,7 @@
 		collapsed={sidebarCollapsed}
 		ontogglecollapse={toggleSidebarCollapse}
 		platformName={data.platformName}
+		telnyxEnabled={data.telnyxEnabled}
 	/>
 
 	<!-- Main content -->

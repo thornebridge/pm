@@ -1111,6 +1111,76 @@ export const finBudgets = sqliteTable(
 	]
 );
 
+// ─── Dial Sessions ───────────────────────────────────────────────────────────
+
+export const dialSessions = sqliteTable(
+	'dial_sessions',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		status: text('status', { enum: ['active', 'paused', 'completed'] }).notNull().default('active'),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id),
+		totalContacts: integer('total_contacts').notNull().default(0),
+		completedContacts: integer('completed_contacts').notNull().default(0),
+		totalConnected: integer('total_connected').notNull().default(0),
+		totalNoAnswer: integer('total_no_answer').notNull().default(0),
+		totalDurationSeconds: integer('total_duration_seconds').notNull().default(0),
+		startedAt: integer('started_at', { mode: 'number' }),
+		endedAt: integer('ended_at', { mode: 'number' }),
+		createdAt: integer('created_at', { mode: 'number' }).notNull(),
+		updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_dial_sessions_user').on(t.userId, t.createdAt),
+		index('idx_dial_sessions_status').on(t.status)
+	]
+);
+
+export const dialQueueItems = sqliteTable(
+	'dial_queue_items',
+	{
+		id: text('id').primaryKey(),
+		sessionId: text('session_id')
+			.notNull()
+			.references(() => dialSessions.id, { onDelete: 'cascade' }),
+		contactId: text('contact_id')
+			.notNull()
+			.references(() => crmContacts.id, { onDelete: 'cascade' }),
+		position: real('position').notNull(),
+		status: text('status', {
+			enum: ['pending', 'calling', 'completed', 'skipped']
+		}).notNull().default('pending'),
+		disposition: text('disposition', {
+			enum: [
+				'connected_interested', 'connected_not_interested',
+				'connected_callback', 'connected_left_voicemail',
+				'connected_wrong_number', 'connected_do_not_call',
+				'no_answer', 'busy',
+				'voicemail_left_message', 'voicemail_no_message'
+			]
+		}),
+		notes: text('notes'),
+		callbackAt: integer('callback_at', { mode: 'number' }),
+		callLogId: text('call_log_id')
+			.references(() => telnyxCallLogs.id, { onDelete: 'set null' }),
+		crmActivityId: text('crm_activity_id')
+			.references(() => crmActivities.id, { onDelete: 'set null' }),
+		callDurationSeconds: integer('call_duration_seconds'),
+		dialedAt: integer('dialed_at', { mode: 'number' }),
+		completedAt: integer('completed_at', { mode: 'number' }),
+		createdAt: integer('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_dial_queue_session').on(t.sessionId, t.position),
+		index('idx_dial_queue_contact').on(t.contactId),
+		index('idx_dial_queue_status').on(t.sessionId, t.status)
+	]
+);
+
+// ─── Financials ──────────────────────────────────────────────────────────────
+
 export const finReconciliations = sqliteTable(
 	'fin_reconciliations',
 	{

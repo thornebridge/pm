@@ -17,7 +17,7 @@
 		destroy
 	} from '$lib/stores/dialer.svelte.js';
 
-	const state = getDialerState();
+	const dialer = getDialerState();
 
 	let dialInput = $state('');
 	let showKeypad = $state(false);
@@ -31,9 +31,9 @@
 	];
 
 	let mode = $derived(
-		state.incomingCall ? 'incoming' :
-		state.callState !== 'idle' ? 'incall' :
-		state.dialerOpen ? 'dialer' : 'minimized'
+		dialer.incomingCall ? 'incoming' :
+		dialer.callState !== 'idle' ? 'incall' :
+		dialer.dialerOpen ? 'dialer' : 'minimized'
 	);
 
 	onMount(() => {
@@ -53,7 +53,7 @@
 	}
 
 	function handleKeypadPress(key: string) {
-		if (state.callState === 'active') {
+		if (dialer.callState === 'active') {
 			sendDtmf(key);
 		} else {
 			dialInput += key;
@@ -88,7 +88,7 @@
 		<div class="flex items-center justify-between border-b border-surface-200 px-4 py-3 dark:border-surface-800">
 			<span class="text-sm font-medium text-surface-900 dark:text-surface-100">Dialer</span>
 			<div class="flex items-center gap-2">
-				{#if state.clientReady}
+				{#if dialer.clientReady}
 					<span class="h-2 w-2 rounded-full bg-green-500" title="Connected"></span>
 				{:else}
 					<span class="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" title="Connecting..."></span>
@@ -131,14 +131,14 @@
 				</div>
 			{/if}
 
-			{#if state.error}
-				<p class="mt-2 text-xs text-red-500">{state.error}</p>
+			{#if dialer.error}
+				<p class="mt-2 text-xs text-red-500">{dialer.error}</p>
 			{/if}
 
 			<!-- Call button -->
 			<button
 				onclick={handleDial}
-				disabled={!dialInput.trim() || !state.clientReady}
+				disabled={!dialInput.trim() || !dialer.clientReady}
 				class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-500 disabled:opacity-50"
 			>
 				<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -151,7 +151,7 @@
 {/if}
 
 <!-- Incoming call -->
-{#if mode === 'incoming' && state.incomingCall}
+{#if mode === 'incoming' && dialer.incomingCall}
 	<div
 		class="fixed bottom-6 right-6 z-[60] w-80 rounded-xl border border-surface-300 bg-surface-50 shadow-2xl dark:border-surface-700 dark:bg-surface-900"
 		transition:fly={{ y: 20, duration: 200 }}
@@ -166,10 +166,10 @@
 
 			<p class="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">Incoming Call</p>
 			<p class="mt-1 text-lg font-semibold text-surface-900 dark:text-surface-100">
-				{state.incomingCall.contactName || formatPhoneNumber(state.incomingCall.callerNumber)}
+				{dialer.incomingCall.contactName || formatPhoneNumber(dialer.incomingCall.callerNumber)}
 			</p>
-			{#if state.incomingCall.contactName}
-				<p class="text-sm text-surface-500">{formatPhoneNumber(state.incomingCall.callerNumber)}</p>
+			{#if dialer.incomingCall.contactName}
+				<p class="text-sm text-surface-500">{formatPhoneNumber(dialer.incomingCall.callerNumber)}</p>
 			{/if}
 
 			<div class="mt-4 flex gap-3">
@@ -204,38 +204,38 @@
 	>
 		<div class="p-5 text-center">
 			<!-- Call state indicator -->
-			{#if state.callState === 'connecting'}
+			{#if dialer.callState === 'connecting'}
 				<p class="text-xs font-medium uppercase tracking-wider text-yellow-600 dark:text-yellow-400">Connecting...</p>
-			{:else if state.callState === 'ringing'}
+			{:else if dialer.callState === 'ringing'}
 				<p class="text-xs font-medium uppercase tracking-wider text-blue-600 dark:text-blue-400">Ringing...</p>
-			{:else if state.callState === 'active'}
-				<p class="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{formatCallDuration(state.callDuration)}</p>
-			{:else if state.callState === 'ending'}
+			{:else if dialer.callState === 'active'}
+				<p class="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{formatCallDuration(dialer.callDuration)}</p>
+			{:else if dialer.callState === 'ending'}
 				<p class="text-xs font-medium uppercase tracking-wider text-surface-400">Call ended</p>
 			{/if}
 
 			<!-- Contact info -->
 			<p class="mt-1 text-lg font-semibold text-surface-900 dark:text-surface-100">
-				{state.currentContactName || formatPhoneNumber(state.currentNumber)}
+				{dialer.currentContactName || formatPhoneNumber(dialer.currentNumber)}
 			</p>
-			{#if state.currentContactName}
-				<p class="text-sm text-surface-500">{formatPhoneNumber(state.currentNumber)}</p>
+			{#if dialer.currentContactName}
+				<p class="text-sm text-surface-500">{formatPhoneNumber(dialer.currentNumber)}</p>
 			{/if}
 
-			{#if state.error}
-				<p class="mt-2 text-xs text-red-500">{state.error}</p>
+			{#if dialer.error}
+				<p class="mt-2 text-xs text-red-500">{dialer.error}</p>
 			{/if}
 
 			<!-- Controls -->
-			{#if state.callState !== 'ending'}
+			{#if dialer.callState !== 'ending'}
 				<div class="mt-4 flex items-center justify-center gap-3">
 					<!-- Mute -->
 					<button
 						onclick={toggleMute}
-						class="flex h-10 w-10 items-center justify-center rounded-full transition-colors {state.isMuted ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-surface-100 text-surface-600 hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700'}"
-						title={state.isMuted ? 'Unmute' : 'Mute'}
+						class="flex h-10 w-10 items-center justify-center rounded-full transition-colors {dialer.isMuted ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-surface-100 text-surface-600 hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700'}"
+						title={dialer.isMuted ? 'Unmute' : 'Mute'}
 					>
-						{#if state.isMuted}
+						{#if dialer.isMuted}
 							<svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 								<path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd" />
 							</svg>

@@ -53,7 +53,8 @@ export function getDialerState() {
 		get currentCompanyId() { return currentCompanyId; },
 		get incomingCall() { return incomingCall; },
 		get error() { return error; },
-		get callerNumbers() { return callerNumbers; }
+		get callerNumbers() { return callerNumbers; },
+		get localCallLogId() { return localCallLogId; }
 	};
 }
 
