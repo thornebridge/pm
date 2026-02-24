@@ -24,6 +24,11 @@ let pollInterval: ReturnType<typeof setInterval> | null = null;
 export function startGmailSyncPoller(intervalMs = 120_000): void {
 	if (pollInterval) return;
 
+	// Run immediately on startup
+	pollAllUsers().catch((err) => {
+		console.error('[gmail/sync] Poller error:', err);
+	});
+
 	pollInterval = setInterval(() => {
 		pollAllUsers().catch((err) => {
 			console.error('[gmail/sync] Poller error:', err);
@@ -120,8 +125,10 @@ export async function incrementalSync(userId: string): Promise<void> {
 						const fullMsg = await getMessage(userId, message.id);
 						await upsertMessage(userId, fullMsg);
 						addedThreadIds.add(fullMsg.threadId);
-					} catch {
-						// Message may have been deleted already
+					} catch (err) {
+						// 404 = message was deleted between history fetch and getMessage — safe to skip
+						if (err instanceof Error && err.message.includes('(404)')) continue;
+						console.error(`[gmail/sync] Failed to sync message ${message.id}:`, err);
 					}
 				}
 			}
@@ -142,8 +149,9 @@ export async function incrementalSync(userId: string): Promise<void> {
 					try {
 						const fullMsg = await getMessage(userId, message.id);
 						await upsertMessage(userId, fullMsg);
-					} catch {
-						// Message may have been deleted
+					} catch (err) {
+						if (err instanceof Error && err.message.includes('(404)')) continue;
+						console.error(`[gmail/sync] Failed to update labels for message ${message.id}:`, err);
 					}
 				}
 			}

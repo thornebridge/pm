@@ -96,10 +96,11 @@ export async function listHistory(
 	userId: string,
 	startHistoryId: string
 ): Promise<{ history: GmailHistoryRecord[]; historyId: string }> {
-	const params = new URLSearchParams({
-		startHistoryId,
-		historyTypes: 'messageAdded,messageDeleted,labelAdded,labelRemoved'
-	});
+	const params = new URLSearchParams({ startHistoryId });
+	params.append('historyTypes', 'messageAdded');
+	params.append('historyTypes', 'messageDeleted');
+	params.append('historyTypes', 'labelAdded');
+	params.append('historyTypes', 'labelRemoved');
 
 	const allHistory: GmailHistoryRecord[] = [];
 	let pageToken: string | undefined;

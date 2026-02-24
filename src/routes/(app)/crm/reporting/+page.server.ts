@@ -169,7 +169,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				lte(crmOpportunities.createdAt, toMs)
 			)
 		)
-		.groupBy(crmOpportunities.ownerId);
+		.groupBy(crmOpportunities.ownerId, users.name);
 
 	// Activity counts per rep
 	const repActivityCounts = await db
