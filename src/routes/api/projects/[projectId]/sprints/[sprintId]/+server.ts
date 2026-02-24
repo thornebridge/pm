@@ -16,28 +16,25 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { projectId, sprintId } = event.params;
 
-	const sprint = db
+	const [sprint] = await db
 		.select()
 		.from(sprints)
-		.where(and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId)))
-		.get();
+		.where(and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId)));
 
 	if (!sprint) {
 		return json({ error: 'Sprint not found' }, { status: 404 });
 	}
 
-	const sprintTasks = db
+	const sprintTasks = await db
 		.select()
 		.from(tasks)
-		.where(eq(tasks.sprintId, sprintId))
-		.all();
+		.where(eq(tasks.sprintId, sprintId));
 
-	const statuses = db
+	const statuses = await db
 		.select()
 		.from(taskStatuses)
 		.where(eq(taskStatuses.projectId, projectId))
-		.orderBy(taskStatuses.position)
-		.all();
+		.orderBy(taskStatuses.position);
 
 	return json({ sprint, tasks: sprintTasks, statuses });
 };
@@ -54,7 +51,7 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.endDate !== undefined) updates.endDate = body.endDate;
 
 	if (body.status !== undefined) {
-		const sprint = db.select().from(sprints).where(eq(sprints.id, sprintId)).get();
+		const [sprint] = await db.select().from(sprints).where(eq(sprints.id, sprintId));
 		if (!sprint) return json({ error: 'Sprint not found' }, { status: 404 });
 		const allowed = VALID_TRANSITIONS[sprint.status] ?? [];
 		if (!allowed.includes(body.status)) {
@@ -64,13 +61,12 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	if (Object.keys(updates).length > 0) {
-		db.update(sprints)
+		await db.update(sprints)
 			.set(updates)
-			.where(and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId)))
-			.run();
+			.where(and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId)));
 	}
 
-	const updated = db.select().from(sprints).where(eq(sprints.id, sprintId)).get();
+	const [updated] = await db.select().from(sprints).where(eq(sprints.id, sprintId));
 
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'sprint:updated', sprint: updated });
@@ -87,14 +83,12 @@ export const DELETE: RequestHandler = async (event) => {
 	const { projectId, sprintId } = event.params;
 
 	// Unassign tasks from sprint
-	db.update(tasks)
+	await db.update(tasks)
 		.set({ sprintId: null })
-		.where(eq(tasks.sprintId, sprintId))
-		.run();
+		.where(eq(tasks.sprintId, sprintId));
 
-	db.delete(sprints)
-		.where(and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId)))
-		.run();
+	await db.delete(sprints)
+		.where(and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId)));
 
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'sprint:deleted', sprintId });

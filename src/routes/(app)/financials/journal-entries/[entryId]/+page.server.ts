@@ -5,17 +5,16 @@ import { finJournalEntries, finJournalLines, finAccounts } from '$lib/server/db/
 import { eq, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const entry = db
+	const [entry] = await db
 		.select()
 		.from(finJournalEntries)
-		.where(eq(finJournalEntries.id, params.entryId))
-		.get();
+		.where(eq(finJournalEntries.id, params.entryId));
 
 	if (!entry) {
 		throw error(404, 'Journal entry not found');
 	}
 
-	const lines = db
+	const lines = await db
 		.select({
 			id: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -32,20 +31,18 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(finJournalLines)
 		.innerJoin(finAccounts, eq(finJournalLines.accountId, finAccounts.id))
 		.where(eq(finJournalLines.journalEntryId, params.entryId))
-		.orderBy(asc(finJournalLines.position))
-		.all();
+		.orderBy(asc(finJournalLines.position));
 
 	// If voided, try to find the reversal entry
 	let reversalEntry: { id: string; entryNumber: number } | null = null;
 	if (entry.status === 'voided') {
-		const reversal = db
+		const [reversal] = await db
 			.select({
 				id: finJournalEntries.id,
 				entryNumber: finJournalEntries.entryNumber
 			})
 			.from(finJournalEntries)
-			.where(eq(finJournalEntries.voidedEntryId, params.entryId))
-			.get();
+			.where(eq(finJournalEntries.voidedEntryId, params.entryId));
 		reversalEntry = reversal ?? null;
 	}
 

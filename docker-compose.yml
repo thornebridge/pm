@@ -19,6 +19,16 @@ services:
       MEILI_ENV: development
     volumes: ["msdata:/meili_data"]
 
+  app:
+    build: .
+    ports: ["3000:3000"]
+    depends_on: [postgres, redis, meilisearch]
+    environment:
+      DATABASE_URL: postgres://pm:pm@postgres:5432/pm
+      REDIS_URL: redis://redis:6379
+      MEILISEARCH_HOST: http://meilisearch:7700
+    profiles: ["production"]
+
 volumes:
   pgdata:
   msdata:

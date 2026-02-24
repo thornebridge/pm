@@ -44,7 +44,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(and(...conditions)) as typeof query;
 	}
 
-	const budgets = query.all();
+	const budgets = await query;
 	return json(budgets);
 };
 
@@ -75,7 +75,7 @@ export const POST: RequestHandler = async (event) => {
 			updatedAt: now
 		};
 
-		db.insert(finBudgets).values(budget).run();
+		await db.insert(finBudgets).values(budget);
 		created.push(budget);
 	}
 

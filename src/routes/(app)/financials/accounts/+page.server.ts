@@ -5,7 +5,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const { accounts } = await parent();
 
 	const accountIds = accounts.map((a) => a.id);
-	const balances = getAccountBalances(accountIds);
+	const balances = await getAccountBalances(accountIds);
 
 	const accountsWithBalances = accounts.map((a) => ({
 		...a,

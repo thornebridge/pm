@@ -1,4 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { finAccounts, finJournalEntries, finJournalLines } from '$lib/server/db/schema.js';
@@ -15,11 +16,10 @@ export const GET: RequestHandler = async (event) => {
 	const offset = parseInt(url.searchParams.get('offset') || '0');
 
 	// Verify account exists
-	const account = db
+	const [account] = await db
 		.select()
 		.from(finAccounts)
-		.where(eq(finAccounts.id, accountId))
-		.get();
+		.where(eq(finAccounts.id, accountId));
 
 	if (!account) {
 		return json({ error: 'Account not found' }, { status: 404 });
@@ -42,17 +42,16 @@ export const GET: RequestHandler = async (event) => {
 	const where = and(...conditions);
 
 	// Get total count
-	const totalResult = db
+	const [totalResult] = await db
 		.select({ n: count() })
 		.from(finJournalLines)
 		.innerJoin(finJournalEntries, eq(finJournalLines.journalEntryId, finJournalEntries.id))
-		.where(where)
-		.get();
+		.where(where);
 
 	const total = totalResult?.n ?? 0;
 
 	// Get paginated results
-	const lines = db
+	const lines = await db
 		.select({
 			lineId: finJournalLines.id,
 			date: finJournalEntries.date,
@@ -68,8 +67,7 @@ export const GET: RequestHandler = async (event) => {
 		.where(where)
 		.orderBy(asc(finJournalEntries.date), asc(finJournalEntries.entryNumber))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
 	return json({
 		accountId,

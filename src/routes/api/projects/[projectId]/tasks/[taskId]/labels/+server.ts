@@ -16,12 +16,11 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'labelId is required' }, { status: 400 });
 	}
 
-	db.insert(taskLabelAssignments)
+	await db.insert(taskLabelAssignments)
 		.values({ taskId: event.params.taskId, labelId })
-		.onConflictDoNothing()
-		.run();
+		.onConflictDoNothing();
 
-	db.insert(activityLog)
+	await db.insert(activityLog)
 		.values({
 			id: nanoid(12),
 			taskId: event.params.taskId,
@@ -29,10 +28,9 @@ export const POST: RequestHandler = async (event) => {
 			action: 'label_added',
 			detail: JSON.stringify({ labelId }),
 			createdAt: Date.now()
-		})
-		.run();
+		});
 
-	const task = db.select().from(tasks).where(eq(tasks.id, event.params.taskId)).get();
+	const [task] = await db.select().from(tasks).where(eq(tasks.id, event.params.taskId));
 	if (task) {
 		emitAutomationEvent({ event: 'label.added', projectId: event.params.projectId, taskId: event.params.taskId, task: task as unknown as Record<string, unknown>, changes: { labelId }, userId: user.id });
 	}
@@ -49,16 +47,15 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'labelId is required' }, { status: 400 });
 	}
 
-	db.delete(taskLabelAssignments)
+	await db.delete(taskLabelAssignments)
 		.where(
 			and(
 				eq(taskLabelAssignments.taskId, event.params.taskId),
 				eq(taskLabelAssignments.labelId, labelId)
 			)
-		)
-		.run();
+		);
 
-	db.insert(activityLog)
+	await db.insert(activityLog)
 		.values({
 			id: nanoid(12),
 			taskId: event.params.taskId,
@@ -66,10 +63,9 @@ export const DELETE: RequestHandler = async (event) => {
 			action: 'label_removed',
 			detail: JSON.stringify({ labelId }),
 			createdAt: Date.now()
-		})
-		.run();
+		});
 
-	const taskForRemove = db.select().from(tasks).where(eq(tasks.id, event.params.taskId)).get();
+	const [taskForRemove] = await db.select().from(tasks).where(eq(tasks.id, event.params.taskId));
 	if (taskForRemove) {
 		emitAutomationEvent({ event: 'label.removed', projectId: event.params.projectId, taskId: event.params.taskId, task: taskForRemove as unknown as Record<string, unknown>, changes: { labelId }, userId: user.id });
 	}

@@ -16,7 +16,7 @@ function slugify(text: string): string {
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
-	const all = db.select().from(folders).orderBy(folders.position).all();
+	const all = await db.select().from(folders).orderBy(folders.position);
 	return json(all);
 };
 
@@ -40,7 +40,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(folders).values(folder).run();
+	await db.insert(folders).values(folder);
 	broadcastFolderChanged('created');
 	return json(folder, { status: 201 });
 };
@@ -63,10 +63,10 @@ export const PATCH: RequestHandler = async (event) => {
 	if (position !== undefined) updates.position = position;
 
 	if (Object.keys(updates).length > 0) {
-		db.update(folders).set(updates).where(eq(folders.id, id)).run();
+		await db.update(folders).set(updates).where(eq(folders.id, id));
 	}
 
-	const updated = db.select().from(folders).where(eq(folders.id, id)).get();
+	const [updated] = await db.select().from(folders).where(eq(folders.id, id));
 	broadcastFolderChanged('updated');
 	return json(updated);
 };
@@ -79,7 +79,7 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'id is required' }, { status: 400 });
 	}
 
-	db.delete(folders).where(eq(folders.id, id)).run();
+	await db.delete(folders).where(eq(folders.id, id));
 	broadcastFolderChanged('deleted');
 	return json({ ok: true });
 };

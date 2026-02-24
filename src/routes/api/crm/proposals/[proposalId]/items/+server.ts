@@ -10,12 +10,11 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId } = event.params;
 
-	const items = db
+	const items = await db
 		.select()
 		.from(crmProposalItems)
 		.where(eq(crmProposalItems.proposalId, proposalId))
-		.orderBy(asc(crmProposalItems.position))
-		.all();
+		.orderBy(asc(crmProposalItems.position));
 
 	return json(items);
 };
@@ -41,11 +40,10 @@ export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId } = event.params;
 
-	const proposal = db
+	const [proposal] = await db
 		.select()
 		.from(crmProposals)
-		.where(eq(crmProposals.id, proposalId))
-		.get();
+		.where(eq(crmProposals.id, proposalId));
 	if (!proposal) return json({ error: 'Proposal not found' }, { status: 404 });
 	if (proposal.status !== 'draft') {
 		return json({ error: 'Can only add items to draft proposals' }, { status: 400 });
@@ -56,11 +54,10 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'productName is required' }, { status: 400 });
 	}
 
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ max: sql<number>`COALESCE(MAX(position), -1)` })
 		.from(crmProposalItems)
-		.where(eq(crmProposalItems.proposalId, proposalId))
-		.get();
+		.where(eq(crmProposalItems.proposalId, proposalId));
 
 	const now = Date.now();
 	const lineTotal = computeLineTotal({
@@ -90,23 +87,21 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: now
 	};
 
-	db.insert(crmProposalItems).values(item).run();
+	await db.insert(crmProposalItems).values(item);
 
 	// Update proposal amount
-	updateProposalAmount(proposalId);
+	await updateProposalAmount(proposalId);
 
 	return json(item, { status: 201 });
 };
 
-function updateProposalAmount(proposalId: string) {
-	const result = db
+async function updateProposalAmount(proposalId: string) {
+	const [result] = await db
 		.select({ total: sql<number>`COALESCE(SUM(line_total), 0)` })
 		.from(crmProposalItems)
-		.where(eq(crmProposalItems.proposalId, proposalId))
-		.get();
+		.where(eq(crmProposalItems.proposalId, proposalId));
 
-	db.update(crmProposals)
+	await db.update(crmProposals)
 		.set({ amount: result?.total ?? 0, updatedAt: Date.now() })
-		.where(eq(crmProposals.id, proposalId))
-		.run();
+		.where(eq(crmProposals.id, proposalId));
 }

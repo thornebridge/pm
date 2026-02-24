@@ -15,26 +15,23 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { companyId } = event.params;
 
-	const company = db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId)).get();
+	const [company] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId));
 	if (!company) return json({ error: 'Company not found' }, { status: 404 });
 
-	const contactCount = db
+	const [contactCount] = await db
 		.select({ n: count() })
 		.from(crmContacts)
-		.where(eq(crmContacts.companyId, companyId))
-		.get();
+		.where(eq(crmContacts.companyId, companyId));
 
-	const oppCount = db
+	const [oppCount] = await db
 		.select({ n: count() })
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.companyId, companyId))
-		.get();
+		.where(eq(crmOpportunities.companyId, companyId));
 
-	const activityCount = db
+	const [activityCount] = await db
 		.select({ n: count() })
 		.from(crmActivities)
-		.where(eq(crmActivities.companyId, companyId))
-		.get();
+		.where(eq(crmActivities.companyId, companyId));
 
 	return json({
 		...company,
@@ -48,7 +45,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { companyId } = event.params;
 
-	const existing = db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId)).get();
+	const [existing] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId));
 	if (!existing) return json({ error: 'Company not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -75,8 +72,8 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'Company name is required' }, { status: 400 });
 	}
 
-	db.update(crmCompanies).set(updates).where(eq(crmCompanies.id, companyId)).run();
-	const updated = db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId)).get();
+	await db.update(crmCompanies).set(updates).where(eq(crmCompanies.id, companyId));
+	const [updated] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId));
 	if (updated) indexDocument('companies', { id: updated.id, name: updated.name, website: updated.website, industry: updated.industry, size: updated.size, phone: updated.phone, city: updated.city, state: updated.state, ownerId: updated.ownerId, notes: updated.notes, updatedAt: updated.updatedAt });
 	return json(updated);
 };
@@ -85,10 +82,10 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { companyId } = event.params;
 
-	const existing = db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId)).get();
+	const [existing] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, companyId));
 	if (!existing) return json({ error: 'Company not found' }, { status: 404 });
 
-	db.delete(crmCompanies).where(eq(crmCompanies.id, companyId)).run();
+	await db.delete(crmCompanies).where(eq(crmCompanies.id, companyId));
 	removeDocument('companies', companyId);
 	return json({ ok: true });
 };

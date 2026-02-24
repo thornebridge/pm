@@ -9,7 +9,7 @@ import {
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const opportunities = db
+	const opportunities = await db
 		.select({
 			id: crmOpportunities.id,
 			title: crmOpportunities.title,
@@ -33,8 +33,7 @@ export const load: PageServerLoad = async () => {
 		.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
 		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
 		.leftJoin(users, eq(crmOpportunities.ownerId, users.id))
-		.orderBy(desc(crmOpportunities.createdAt))
-		.all();
+		.orderBy(desc(crmOpportunities.createdAt));
 
 	return { opportunities };
 };

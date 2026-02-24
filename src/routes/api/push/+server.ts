@@ -15,19 +15,17 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Upsert by endpoint
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(pushSubscriptions)
-		.where(eq(pushSubscriptions.endpoint, endpoint))
-		.get();
+		.where(eq(pushSubscriptions.endpoint, endpoint));
 
 	if (existing) {
-		db.update(pushSubscriptions)
+		await db.update(pushSubscriptions)
 			.set({ keysP256dh: keys.p256dh, keysAuth: keys.auth, userId: user.id })
-			.where(eq(pushSubscriptions.id, existing.id))
-			.run();
+			.where(eq(pushSubscriptions.id, existing.id));
 	} else {
-		db.insert(pushSubscriptions)
+		await db.insert(pushSubscriptions)
 			.values({
 				id: nanoid(12),
 				userId: user.id,
@@ -35,8 +33,7 @@ export const POST: RequestHandler = async (event) => {
 				keysP256dh: keys.p256dh,
 				keysAuth: keys.auth,
 				createdAt: Date.now()
-			})
-			.run();
+			});
 	}
 
 	return json({ ok: true });
@@ -50,9 +47,8 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'endpoint is required' }, { status: 400 });
 	}
 
-	db.delete(pushSubscriptions)
-		.where(and(eq(pushSubscriptions.userId, user.id), eq(pushSubscriptions.endpoint, endpoint)))
-		.run();
+	await db.delete(pushSubscriptions)
+		.where(and(eq(pushSubscriptions.userId, user.id), eq(pushSubscriptions.endpoint, endpoint)));
 
 	return json({ ok: true });
 };

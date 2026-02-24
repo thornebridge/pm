@@ -26,7 +26,7 @@ export const GET: RequestHandler = async (event) => {
 		redirect(302, '/bookings?error=oauth_invalid');
 	}
 
-	const config = getGoogleConfig();
+	const config = await getGoogleConfig();
 	if (!config) {
 		redirect(302, '/bookings?error=not_configured');
 	}
@@ -37,8 +37,8 @@ export const GET: RequestHandler = async (event) => {
 		const now = Date.now();
 
 		// Upsert: delete existing then insert
-		db.delete(calendarIntegrations).where(eq(calendarIntegrations.userId, user.id)).run();
-		db.insert(calendarIntegrations)
+		await db.delete(calendarIntegrations).where(eq(calendarIntegrations.userId, user.id));
+		await db.insert(calendarIntegrations)
 			.values({
 				id: nanoid(12),
 				userId: user.id,
@@ -49,8 +49,7 @@ export const GET: RequestHandler = async (event) => {
 				calendarId: 'primary',
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 
 		redirect(302, '/bookings?success=calendar_connected');
 	} catch (err) {

@@ -9,11 +9,10 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { stageId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.id, stageId))
-		.get();
+		.where(eq(crmPipelineStages.id, stageId));
 	if (!existing) return json({ error: 'Stage not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -26,12 +25,11 @@ export const PATCH: RequestHandler = async (event) => {
 	if ('isWon' in body) updates.isWon = body.isWon;
 	if ('probability' in body) updates.probability = body.probability;
 
-	db.update(crmPipelineStages).set(updates).where(eq(crmPipelineStages.id, stageId)).run();
-	const updated = db
+	await db.update(crmPipelineStages).set(updates).where(eq(crmPipelineStages.id, stageId));
+	const [updated] = await db
 		.select()
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.id, stageId))
-		.get();
+		.where(eq(crmPipelineStages.id, stageId));
 	return json(updated);
 };
 
@@ -39,11 +37,10 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { stageId } = event.params;
 
-	const oppCount = db
+	const [oppCount] = await db
 		.select({ n: count() })
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.stageId, stageId))
-		.get();
+		.where(eq(crmOpportunities.stageId, stageId));
 
 	if (oppCount && oppCount.n > 0) {
 		return json(
@@ -52,6 +49,6 @@ export const DELETE: RequestHandler = async (event) => {
 		);
 	}
 
-	db.delete(crmPipelineStages).where(eq(crmPipelineStages.id, stageId)).run();
+	await db.delete(crmPipelineStages).where(eq(crmPipelineStages.id, stageId));
 	return json({ ok: true });
 };

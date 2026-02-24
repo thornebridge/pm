@@ -14,7 +14,7 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'Cannot change your own role' }, { status: 400 });
 	}
 
-	const existing = db.select().from(users).where(eq(users.id, userId)).get();
+	const [existing] = await db.select().from(users).where(eq(users.id, userId));
 	if (!existing) return json({ error: 'User not found' }, { status: 404 });
 
 	const updates: Record<string, unknown> = { updatedAt: Date.now() };
@@ -30,7 +30,7 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.name = body.name.trim();
 	}
 
-	db.update(users).set(updates).where(eq(users.id, userId)).run();
+	await db.update(users).set(updates).where(eq(users.id, userId));
 
 	return json({ ok: true });
 };
@@ -44,8 +44,8 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	// Delete all sessions first
-	db.delete(sessions).where(eq(sessions.userId, userId)).run();
-	db.delete(users).where(eq(users.id, userId)).run();
+	await db.delete(sessions).where(eq(sessions.userId, userId));
+	await db.delete(users).where(eq(users.id, userId));
 
 	return json({ ok: true });
 };

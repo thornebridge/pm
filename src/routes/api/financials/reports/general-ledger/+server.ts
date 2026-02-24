@@ -13,20 +13,19 @@ interface LedgerEntry {
 	balance: number;
 }
 
-function getLedgerForAccount(accountId: string, from: number, to: number): LedgerEntry[] {
+async function getLedgerForAccount(accountId: string, from: number, to: number): Promise<LedgerEntry[]> {
 	// Get the account's normal balance direction
-	const account = db
+	const [account] = await db
 		.select({ normalBalance: finAccounts.normalBalance })
 		.from(finAccounts)
-		.where(eq(finAccounts.id, accountId))
-		.get();
+		.where(eq(finAccounts.id, accountId));
 
 	if (!account) return [];
 
 	const isDebitNormal = account.normalBalance === 'debit';
 
 	// Get opening balance (all posted lines before `from`)
-	const openingResult = db
+	const [openingResult] = await db
 		.select({
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 			totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -39,15 +38,14 @@ function getLedgerForAccount(accountId: string, from: number, to: number): Ledge
 				eq(finJournalEntries.status, 'posted'),
 				sql`${finJournalEntries.date} < ${from}`
 			)
-		)
-		.get();
+		);
 
 	let runningBalance = isDebitNormal
 		? (openingResult?.totalDebit ?? 0) - (openingResult?.totalCredit ?? 0)
 		: (openingResult?.totalCredit ?? 0) - (openingResult?.totalDebit ?? 0);
 
 	// Get all lines in the date range
-	const lines = db
+	const lines = await db
 		.select({
 			date: finJournalEntries.date,
 			entryNumber: finJournalEntries.entryNumber,
@@ -65,8 +63,7 @@ function getLedgerForAccount(accountId: string, from: number, to: number): Ledge
 				lte(finJournalEntries.date, to)
 			)
 		)
-		.orderBy(asc(finJournalEntries.date), asc(finJournalEntries.entryNumber))
-		.all();
+		.orderBy(asc(finJournalEntries.date), asc(finJournalEntries.entryNumber));
 
 	const entries: LedgerEntry[] = [];
 	for (const line of lines) {
@@ -110,34 +107,32 @@ export const GET: RequestHandler = async (event) => {
 
 	if (accountId) {
 		// Single account mode
-		const account = db
+		const [account] = await db
 			.select()
 			.from(finAccounts)
-			.where(eq(finAccounts.id, accountId))
-			.get();
+			.where(eq(finAccounts.id, accountId));
 
 		if (!account) {
 			return json({ error: 'Account not found' }, { status: 404 });
 		}
 
-		const entries = getLedgerForAccount(accountId, from, to);
+		const entries = await getLedgerForAccount(accountId, from, to);
 		return json({ accountId, from, to, entries });
 	}
 
 	// All accounts mode: grouped by account
-	const accounts = db
+	const accounts = await db
 		.select()
 		.from(finAccounts)
-		.orderBy(asc(finAccounts.accountNumber))
-		.all();
+		.orderBy(asc(finAccounts.accountNumber));
 
-	const grouped = accounts.map((account) => ({
+	const grouped = await Promise.all(accounts.map(async (account) => ({
 		accountId: account.id,
 		accountNumber: account.accountNumber,
 		name: account.name,
 		accountType: account.accountType,
-		entries: getLedgerForAccount(account.id, from, to)
-	}));
+		entries: await getLedgerForAccount(account.id, from, to)
+	})));
 
 	// Filter out accounts with no entries
 	const filtered = grouped.filter((g) => g.entries.length > 0);

@@ -8,7 +8,7 @@ import { eq } from 'drizzle-orm';
 export const GET: RequestHandler = async (event) => {
 	requireAdmin(event);
 
-	const result = db
+	const result = await db
 		.select({
 			id: users.id,
 			name: users.name,
@@ -17,8 +17,7 @@ export const GET: RequestHandler = async (event) => {
 			createdAt: users.createdAt
 		})
 		.from(users)
-		.orderBy(users.createdAt)
-		.all();
+		.orderBy(users.createdAt);
 
 	return json(result);
 };

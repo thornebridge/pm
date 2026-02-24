@@ -11,14 +11,14 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const startOfMonthTs = startOfMonth.getTime();
 
 	// Helper: sum balances from posted journal lines for accounts in a number range
-	function sumBalancesForRange(minNum: number, maxNum: number) {
+	async function sumBalancesForRange(minNum: number, maxNum: number) {
 		const rangeAccountIds = accounts
 			.filter((a) => a.accountNumber >= minNum && a.accountNumber < maxNum)
 			.map((a) => a.id);
 
 		if (rangeAccountIds.length === 0) return 0;
 
-		const result = db
+		const [result] = await db
 			.select({
 				totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 				totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -30,19 +30,18 @@ export const load: PageServerLoad = async ({ parent }) => {
 					eq(finJournalEntries.status, 'posted'),
 					sql`${finJournalLines.accountId} IN (${sql.join(rangeAccountIds.map((id) => sql`${id}`), sql`,`)})`
 				)
-			)
-			.get();
+			);
 
 		return (result?.totalDebit ?? 0) - (result?.totalCredit ?? 0);
 	}
 
 	// Helper: sum activity this month for accounts of a given type
-	function sumMonthActivity(accountType: 'revenue' | 'expense') {
+	async function sumMonthActivity(accountType: 'revenue' | 'expense') {
 		const typeAccountIds = accounts.filter((a) => a.accountType === accountType).map((a) => a.id);
 
 		if (typeAccountIds.length === 0) return 0;
 
-		const result = db
+		const [result] = await db
 			.select({
 				totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 				totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -55,8 +54,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 					gte(finJournalEntries.date, startOfMonthTs),
 					sql`${finJournalLines.accountId} IN (${sql.join(typeAccountIds.map((id) => sql`${id}`), sql`,`)})`
 				)
-			)
-			.get();
+			);
 
 		const totalDebit = result?.totalDebit ?? 0;
 		const totalCredit = result?.totalCredit ?? 0;
@@ -66,10 +64,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}
 
 	// Cash balance: asset accounts 1000-1099 (debit-normal)
-	const cashBalance = sumBalancesForRange(1000, 1100);
+	const cashBalance = await sumBalancesForRange(1000, 1100);
 
 	// AR balance: accounts 1100-1299 (debit-normal)
-	const arBalance = sumBalancesForRange(1100, 1300);
+	const arBalance = await sumBalancesForRange(1100, 1300);
 
 	// AP balance: accounts 2000-2099 (credit-normal, so negate for display as positive liability)
 	const apAccountIds = accounts
@@ -78,7 +76,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 
 	let apBalance = 0;
 	if (apAccountIds.length > 0) {
-		const apResult = db
+		const [apResult] = await db
 			.select({
 				totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 				totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -90,22 +88,20 @@ export const load: PageServerLoad = async ({ parent }) => {
 					eq(finJournalEntries.status, 'posted'),
 					sql`${finJournalLines.accountId} IN (${sql.join(apAccountIds.map((id) => sql`${id}`), sql`,`)})`
 				)
-			)
-			.get();
+			);
 		// AP is credit-normal: balance = credit - debit
 		apBalance = (apResult?.totalCredit ?? 0) - (apResult?.totalDebit ?? 0);
 	}
 
-	const revenueMTD = sumMonthActivity('revenue');
-	const expensesMTD = sumMonthActivity('expense');
+	const revenueMTD = await sumMonthActivity('revenue');
+	const expensesMTD = await sumMonthActivity('expense');
 
 	// Recent 10 journal entries with lines
-	const recentEntries = db
+	const recentEntries = await db
 		.select()
 		.from(finJournalEntries)
 		.orderBy(desc(finJournalEntries.date), desc(finJournalEntries.entryNumber))
-		.limit(10)
-		.all();
+		.limit(10);
 
 	let recentWithLines: Array<
 		(typeof recentEntries)[0] & {
@@ -123,7 +119,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 
 	if (recentEntries.length > 0) {
 		const entryIds = recentEntries.map((e) => e.id);
-		const lines = db
+		const lines = await db
 			.select({
 				id: finJournalLines.id,
 				journalEntryId: finJournalLines.journalEntryId,
@@ -140,8 +136,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			.where(
 				sql`${finJournalLines.journalEntryId} IN (${sql.join(entryIds.map((id) => sql`${id}`), sql`,`)})`
 			)
-			.orderBy(asc(finJournalLines.position))
-			.all();
+			.orderBy(asc(finJournalLines.position));
 
 		const linesByEntry = new Map<string, typeof lines>();
 		for (const line of lines) {

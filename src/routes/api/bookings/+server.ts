@@ -10,17 +10,16 @@ export const GET: RequestHandler = async (event) => {
 
 	const filter = event.url.searchParams.get('filter') || 'upcoming'; // upcoming | past | all
 
-	const userEventTypes = db
+	const userEventTypeRows = await db
 		.select({ id: bookingEventTypes.id })
 		.from(bookingEventTypes)
-		.where(eq(bookingEventTypes.userId, user.id))
-		.all()
-		.map((et) => et.id);
+		.where(eq(bookingEventTypes.userId, user.id));
+	const userEventTypes = userEventTypeRows.map((et) => et.id);
 
 	if (userEventTypes.length === 0) return json([]);
 
 	const now = Date.now();
-	const rows = db
+	const rows = await db
 		.select({
 			id: bookings.id,
 			eventTypeId: bookings.eventTypeId,
@@ -46,8 +45,7 @@ export const GET: RequestHandler = async (event) => {
 			)
 		)
 		.orderBy(filter === 'upcoming' ? bookings.startTime : desc(bookings.startTime))
-		.limit(100)
-		.all();
+		.limit(100);
 
 	return json(rows);
 };

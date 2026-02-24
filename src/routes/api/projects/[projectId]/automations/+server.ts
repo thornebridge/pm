@@ -12,17 +12,16 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const projectId = event.params.projectId;
 
-	const rules = db
+	const rules = await db
 		.select()
 		.from(automationRules)
 		.where(eq(automationRules.projectId, projectId))
-		.orderBy(desc(automationRules.createdAt))
-		.all();
+		.orderBy(desc(automationRules.createdAt));
 
 	// Get execution counts and last run per rule
 	const ruleIds = rules.map((r) => r.id);
 	const execStats = ruleIds.length > 0
-		? db
+		? await db
 			.select({
 				ruleId: automationExecutions.ruleId,
 				count: sql<number>`count(*)`,
@@ -31,7 +30,6 @@ export const GET: RequestHandler = async (event) => {
 			})
 			.from(automationExecutions)
 			.groupBy(automationExecutions.ruleId)
-			.all()
 		: [];
 
 	const statsMap = new Map(execStats.map((s) => [s.ruleId, s]));
@@ -79,7 +77,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(automationRules).values(rule).run();
+	await db.insert(automationRules).values(rule);
 	broadcastAutomationChanged(event.params.projectId, user.id);
 
 	return json({

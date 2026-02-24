@@ -9,11 +9,12 @@ export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
 	// Collect thread IDs before deleting for search index cleanup
-	const threadIds = db.select({ id: gmailThreads.id }).from(gmailThreads).where(eq(gmailThreads.userId, user.id)).all().map((t) => t.id);
+	const threadRows = await db.select({ id: gmailThreads.id }).from(gmailThreads).where(eq(gmailThreads.userId, user.id));
+	const threadIds = threadRows.map((t) => t.id);
 
 	// Delete all synced data for this user (cascades handle messages/attachments/links via thread FK)
-	db.delete(gmailThreads).where(eq(gmailThreads.userId, user.id)).run();
-	db.delete(gmailIntegrations).where(eq(gmailIntegrations.userId, user.id)).run();
+	await db.delete(gmailThreads).where(eq(gmailThreads.userId, user.id));
+	await db.delete(gmailIntegrations).where(eq(gmailIntegrations.userId, user.id));
 
 	// Remove from search index
 	if (threadIds.length > 0) {

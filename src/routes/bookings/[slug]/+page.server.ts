@@ -4,7 +4,7 @@ import { bookingEventTypes, users } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const eventType = db
+	const [eventType] = await db
 		.select({
 			id: bookingEventTypes.id,
 			title: bookingEventTypes.title,
@@ -17,14 +17,13 @@ export const load: PageServerLoad = async ({ params }) => {
 			userId: bookingEventTypes.userId
 		})
 		.from(bookingEventTypes)
-		.where(and(eq(bookingEventTypes.slug, params.slug), eq(bookingEventTypes.isActive, true)))
-		.get();
+		.where(and(eq(bookingEventTypes.slug, params.slug), eq(bookingEventTypes.isActive, true)));
 
 	if (!eventType) {
 		return { notFound: true, eventType: null, ownerName: null };
 	}
 
-	const owner = db.select({ name: users.name }).from(users).where(eq(users.id, eventType.userId)).get();
+	const [owner] = await db.select({ name: users.name }).from(users).where(eq(users.id, eventType.userId));
 
 	return {
 		notFound: false,

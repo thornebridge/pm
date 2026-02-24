@@ -20,7 +20,7 @@ function getUploadDir(): string {
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const result = db
+	const result = await db
 		.select({
 			id: attachments.id,
 			filename: attachments.filename,
@@ -33,8 +33,7 @@ export const GET: RequestHandler = async (event) => {
 		})
 		.from(attachments)
 		.innerJoin(users, eq(attachments.uploadedBy, users.id))
-		.where(eq(attachments.taskId, event.params.taskId))
-		.all();
+		.where(eq(attachments.taskId, event.params.taskId));
 
 	return json(result);
 };
@@ -80,7 +79,7 @@ export const POST: RequestHandler = async (event) => {
 	const id = nanoid(12);
 	const timestamp = Date.now();
 
-	db.insert(attachments)
+	await db.insert(attachments)
 		.values({
 			id,
 			taskId: event.params.taskId,
@@ -91,10 +90,9 @@ export const POST: RequestHandler = async (event) => {
 			storagePath,
 			uploadedBy: user.id,
 			createdAt: timestamp
-		})
-		.run();
+		});
 
-	db.insert(activityLog)
+	await db.insert(activityLog)
 		.values({
 			id: nanoid(12),
 			taskId: event.params.taskId,
@@ -102,8 +100,7 @@ export const POST: RequestHandler = async (event) => {
 			action: 'attachment_added',
 			detail: JSON.stringify({ attachmentId: id, filename: file.name }),
 			createdAt: timestamp
-		})
-		.run();
+		});
 
 	const result = {
 		id,

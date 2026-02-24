@@ -24,11 +24,10 @@ const VALID_EMAIL_MODES = ['off', 'each', 'daily', 'weekly'] as const;
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const prefs = db
+	const [prefs] = await db
 		.select()
 		.from(notificationPreferences)
-		.where(eq(notificationPreferences.userId, user.id))
-		.get();
+		.where(eq(notificationPreferences.userId, user.id));
 
 	return json(prefs || DEFAULTS);
 };
@@ -50,14 +49,13 @@ export const PUT: RequestHandler = async (event) => {
 		return json({ error: 'digestHour must be 0-23' }, { status: 400 });
 	}
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(notificationPreferences)
-		.where(eq(notificationPreferences.userId, user.id))
-		.get();
+		.where(eq(notificationPreferences.userId, user.id));
 
 	if (existing) {
-		db.update(notificationPreferences)
+		await db.update(notificationPreferences)
 			.set({
 				onAssigned: body.onAssigned ?? existing.onAssigned,
 				onStatusChange: body.onStatusChange ?? existing.onStatusChange,
@@ -70,10 +68,9 @@ export const PUT: RequestHandler = async (event) => {
 				digestDay: body.digestDay ?? existing.digestDay,
 				digestHour: body.digestHour ?? existing.digestHour
 			})
-			.where(eq(notificationPreferences.userId, user.id))
-			.run();
+			.where(eq(notificationPreferences.userId, user.id));
 	} else {
-		db.insert(notificationPreferences)
+		await db.insert(notificationPreferences)
 			.values({
 				id: nanoid(12),
 				userId: user.id,
@@ -87,8 +84,7 @@ export const PUT: RequestHandler = async (event) => {
 				dueDateEmailMode: body.dueDateEmailMode ?? DEFAULTS.dueDateEmailMode,
 				digestDay: body.digestDay ?? DEFAULTS.digestDay,
 				digestHour: body.digestHour ?? DEFAULTS.digestHour
-			})
-			.run();
+			});
 	}
 
 	return json({ ok: true });

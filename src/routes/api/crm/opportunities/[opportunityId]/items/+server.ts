@@ -15,7 +15,7 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId } = event.params;
 
-	const items = db
+	const items = await db
 		.select({
 			id: crmOpportunityItems.id,
 			opportunityId: crmOpportunityItems.opportunityId,
@@ -37,8 +37,7 @@ export const GET: RequestHandler = async (event) => {
 		.from(crmOpportunityItems)
 		.innerJoin(crmProducts, eq(crmOpportunityItems.productId, crmProducts.id))
 		.where(eq(crmOpportunityItems.opportunityId, opportunityId))
-		.orderBy(asc(crmOpportunityItems.position))
-		.all();
+		.orderBy(asc(crmOpportunityItems.position));
 
 	return json(items);
 };
@@ -47,11 +46,10 @@ export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId } = event.params;
 
-	const opp = db
+	const [opp] = await db
 		.select()
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.id, opportunityId))
-		.get();
+		.where(eq(crmOpportunities.id, opportunityId));
 	if (!opp) return json({ error: 'Opportunity not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -59,29 +57,26 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'productId is required' }, { status: 400 });
 	}
 
-	const product = db
+	const [product] = await db
 		.select()
 		.from(crmProducts)
-		.where(eq(crmProducts.id, body.productId))
-		.get();
+		.where(eq(crmProducts.id, body.productId));
 	if (!product) return json({ error: 'Product not found' }, { status: 404 });
 
 	// If a priceTierId is given, copy defaults from it
 	let tier = null;
 	if (body.priceTierId) {
-		tier = db
+		[tier] = await db
 			.select()
 			.from(crmPriceTiers)
-			.where(eq(crmPriceTiers.id, body.priceTierId))
-			.get();
+			.where(eq(crmPriceTiers.id, body.priceTierId));
 	}
 
 	// Get next position
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ max: sql<number>`COALESCE(MAX(position), -1)` })
 		.from(crmOpportunityItems)
-		.where(eq(crmOpportunityItems.opportunityId, opportunityId))
-		.get();
+		.where(eq(crmOpportunityItems.opportunityId, opportunityId));
 
 	const now = Date.now();
 	const item = {
@@ -102,6 +97,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmOpportunityItems).values(item).run();
+	await db.insert(crmOpportunityItems).values(item);
 	return json({ ...item, productName: product.name, productSku: product.sku }, { status: 201 });
 };

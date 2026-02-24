@@ -1,4 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { finRecurringRules } from '$lib/server/db/schema.js';
@@ -7,11 +8,10 @@ import { eq } from 'drizzle-orm';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const rule = db
+	const [rule] = await db
 		.select()
 		.from(finRecurringRules)
-		.where(eq(finRecurringRules.id, event.params.ruleId))
-		.get();
+		.where(eq(finRecurringRules.id, event.params.ruleId));
 
 	if (!rule) {
 		return json({ error: 'Rule not found' }, { status: 404 });
@@ -24,11 +24,10 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const body = await event.request.json();
 
-	const rule = db
+	const [rule] = await db
 		.select()
 		.from(finRecurringRules)
-		.where(eq(finRecurringRules.id, event.params.ruleId))
-		.get();
+		.where(eq(finRecurringRules.id, event.params.ruleId));
 
 	if (!rule) {
 		return json({ error: 'Rule not found' }, { status: 404 });
@@ -48,31 +47,28 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.templateLines = JSON.stringify(lines);
 	}
 
-	db.update(finRecurringRules)
+	await db.update(finRecurringRules)
 		.set(updates)
-		.where(eq(finRecurringRules.id, event.params.ruleId))
-		.run();
+		.where(eq(finRecurringRules.id, event.params.ruleId));
 
-	const updated = db.select().from(finRecurringRules).where(eq(finRecurringRules.id, event.params.ruleId)).get();
+	const [updated] = await db.select().from(finRecurringRules).where(eq(finRecurringRules.id, event.params.ruleId));
 	return json(updated);
 };
 
 export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const rule = db
+	const [rule] = await db
 		.select()
 		.from(finRecurringRules)
-		.where(eq(finRecurringRules.id, event.params.ruleId))
-		.get();
+		.where(eq(finRecurringRules.id, event.params.ruleId));
 
 	if (!rule) {
 		return json({ error: 'Rule not found' }, { status: 404 });
 	}
 
-	db.delete(finRecurringRules)
-		.where(eq(finRecurringRules.id, event.params.ruleId))
-		.run();
+	await db.delete(finRecurringRules)
+		.where(eq(finRecurringRules.id, event.params.ruleId));
 
 	return json({ success: true });
 };

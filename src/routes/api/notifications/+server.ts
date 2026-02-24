@@ -11,18 +11,17 @@ export const GET: RequestHandler = async (event) => {
 	const countOnly = event.url.searchParams.get('countOnly');
 
 	if (countOnly) {
-		const result = db
+		const [result] = await db
 			.select({ count: sql<number>`count(*)` })
 			.from(notifications)
-			.where(and(eq(notifications.userId, user.id), eq(notifications.read, false)))
-			.get();
+			.where(and(eq(notifications.userId, user.id), eq(notifications.read, false)));
 		return json({ count: result?.count ?? 0 });
 	}
 
 	const limit = Math.min(parseInt(event.url.searchParams.get('limit') || '50'), 100);
 	const offset = parseInt(event.url.searchParams.get('offset') || '0');
 
-	const all = db
+	const all = await db
 		.select({
 			id: notifications.id,
 			type: notifications.type,
@@ -38,14 +37,12 @@ export const GET: RequestHandler = async (event) => {
 		.where(eq(notifications.userId, user.id))
 		.orderBy(desc(notifications.createdAt))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
-	const total = db
+	const [total] = await db
 		.select({ count: sql<number>`count(*)` })
 		.from(notifications)
-		.where(eq(notifications.userId, user.id))
-		.get();
+		.where(eq(notifications.userId, user.id));
 
 	return json({ items: all, total: total?.count ?? 0, limit, offset });
 };
@@ -55,19 +52,17 @@ export const PATCH: RequestHandler = async (event) => {
 	const { action, id } = await event.request.json();
 
 	if (action === 'mark_all_read') {
-		db.update(notifications)
+		await db.update(notifications)
 			.set({ read: true })
-			.where(and(eq(notifications.userId, user.id), eq(notifications.read, false)))
-			.run();
+			.where(and(eq(notifications.userId, user.id), eq(notifications.read, false)));
 		broadcastNotificationChanged();
 		return json({ ok: true });
 	}
 
 	if (action === 'mark_read' && id) {
-		db.update(notifications)
+		await db.update(notifications)
 			.set({ read: true })
-			.where(and(eq(notifications.id, id), eq(notifications.userId, user.id)))
-			.run();
+			.where(and(eq(notifications.id, id), eq(notifications.userId, user.id)));
 		broadcastNotificationChanged();
 		return json({ ok: true });
 	}

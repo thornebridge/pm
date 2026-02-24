@@ -9,12 +9,12 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { projectId } = event.params;
 
-	const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
+	const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
 	if (!project) {
 		return json({ error: 'Project not found' }, { status: 404 });
 	}
 
-	const allTasks = db
+	const allTasks = await db
 		.select({
 			number: tasks.number,
 			title: tasks.title,
@@ -32,8 +32,7 @@ export const GET: RequestHandler = async (event) => {
 		.leftJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
 		.leftJoin(users, eq(tasks.assigneeId, users.id))
 		.where(eq(tasks.projectId, projectId))
-		.orderBy(tasks.number)
-		.all();
+		.orderBy(tasks.number);
 
 	const headers = ['Number', 'Title', 'Description', 'Priority', 'Status', 'Assignee', 'Due Date', 'Start Date', 'Estimate Points', 'Created', 'Updated'];
 

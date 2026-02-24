@@ -16,7 +16,7 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	// Verify ownership through event type
-	const booking = db
+	const [booking] = await db
 		.select({
 			id: bookings.id,
 			eventTypeId: bookings.eventTypeId,
@@ -31,13 +31,12 @@ export const PATCH: RequestHandler = async (event) => {
 		})
 		.from(bookings)
 		.innerJoin(bookingEventTypes, eq(bookings.eventTypeId, bookingEventTypes.id))
-		.where(and(eq(bookings.id, event.params.id), eq(bookingEventTypes.userId, user.id)))
-		.get();
+		.where(and(eq(bookings.id, event.params.id), eq(bookingEventTypes.userId, user.id)));
 
 	if (!booking) return json({ error: 'Not found' }, { status: 404 });
 	if (booking.status === 'cancelled') return json({ error: 'Already cancelled' }, { status: 400 });
 
-	db.update(bookings).set({ status: 'cancelled' }).where(eq(bookings.id, event.params.id)).run();
+	await db.update(bookings).set({ status: 'cancelled' }).where(eq(bookings.id, event.params.id));
 
 	// Remove from Google Calendar if present
 	if (booking.googleEventId) {
@@ -47,13 +46,12 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	// Send cancellation email
-	const eventType = db
+	const [eventType] = await db
 		.select({ title: bookingEventTypes.title, durationMinutes: bookingEventTypes.durationMinutes, location: bookingEventTypes.location })
 		.from(bookingEventTypes)
-		.where(eq(bookingEventTypes.id, booking.eventTypeId))
-		.get();
+		.where(eq(bookingEventTypes.id, booking.eventTypeId));
 
-	const owner = db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, user.id)).get();
+	const [owner] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, user.id));
 
 	if (eventType && owner) {
 		sendBookingCancellation(booking, eventType, owner).catch((err) =>

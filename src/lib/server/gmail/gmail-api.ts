@@ -6,7 +6,7 @@ import { getGoogleConfig, refreshAccessToken } from '$lib/server/google-auth.js'
 const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 export async function getValidGmailToken(userId: string): Promise<string | null> {
-	const config = getGoogleConfig();
+	const config = await getGoogleConfig();
 	if (!config) return null;
 
 	const [integration] = await db

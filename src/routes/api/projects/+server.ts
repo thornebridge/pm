@@ -10,7 +10,7 @@ import { indexDocument } from '$lib/server/search/meilisearch.js';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
-	const all = db.select().from(projects).orderBy(desc(projects.updatedAt)).all();
+	const all = await db.select().from(projects).orderBy(desc(projects.updatedAt));
 	return json(all);
 };
 
@@ -51,19 +51,18 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(projects).values(project).run();
+	await db.insert(projects).values(project);
 
 	if (templateProjectId) {
 		// Clone statuses from template project
-		const templateStatuses = db
+		const templateStatuses = await db
 			.select()
 			.from(taskStatuses)
 			.where(eq(taskStatuses.projectId, templateProjectId))
-			.orderBy(asc(taskStatuses.position))
-			.all();
+			.orderBy(asc(taskStatuses.position));
 
 		for (const s of templateStatuses) {
-			db.insert(taskStatuses)
+			await db.insert(taskStatuses)
 				.values({
 					id: nanoid(12),
 					projectId: id,
@@ -72,38 +71,34 @@ export const POST: RequestHandler = async (event) => {
 					position: s.position,
 					isClosed: s.isClosed,
 					createdAt: now
-				})
-				.run();
+				});
 		}
 
 		// Clone labels from template project
-		const templateLabels = db
+		const templateLabels = await db
 			.select()
 			.from(taskLabels)
-			.where(eq(taskLabels.projectId, templateProjectId))
-			.all();
+			.where(eq(taskLabels.projectId, templateProjectId));
 
 		for (const l of templateLabels) {
-			db.insert(taskLabels)
+			await db.insert(taskLabels)
 				.values({
 					id: nanoid(12),
 					projectId: id,
 					name: l.name,
 					color: l.color,
 					createdAt: now
-				})
-				.run();
+				});
 		}
 
 		// Clone task templates
-		const templates = db
+		const templates = await db
 			.select()
 			.from(taskTemplates)
-			.where(eq(taskTemplates.projectId, templateProjectId))
-			.all();
+			.where(eq(taskTemplates.projectId, templateProjectId));
 
 		for (const t of templates) {
-			db.insert(taskTemplates)
+			await db.insert(taskTemplates)
 				.values({
 					id: nanoid(12),
 					projectId: id,
@@ -112,24 +107,21 @@ export const POST: RequestHandler = async (event) => {
 					description: t.description,
 					priority: t.priority,
 					createdAt: now
-				})
-				.run();
+				});
 		}
 
 		// If no statuses were copied (template had none), add defaults
 		if (templateStatuses.length === 0) {
 			for (const s of DEFAULT_STATUSES) {
-				db.insert(taskStatuses)
-					.values({ id: nanoid(12), projectId: id, ...s, createdAt: now })
-					.run();
+				await db.insert(taskStatuses)
+					.values({ id: nanoid(12), projectId: id, ...s, createdAt: now });
 			}
 		}
 	} else {
 		// Create default statuses
 		for (const s of DEFAULT_STATUSES) {
-			db.insert(taskStatuses)
-				.values({ id: nanoid(12), projectId: id, ...s, createdAt: now })
-				.run();
+			await db.insert(taskStatuses)
+				.values({ id: nanoid(12), projectId: id, ...s, createdAt: now });
 		}
 	}
 

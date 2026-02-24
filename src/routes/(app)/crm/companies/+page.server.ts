@@ -4,7 +4,7 @@ import { crmCompanies, crmContacts, crmOpportunities, crmPipelineStages, users }
 import { eq, desc, count, and, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const companies = db
+	const companies = await db
 		.select({
 			id: crmCompanies.id,
 			name: crmCompanies.name,
@@ -20,30 +20,27 @@ export const load: PageServerLoad = async () => {
 		})
 		.from(crmCompanies)
 		.leftJoin(users, eq(crmCompanies.ownerId, users.id))
-		.orderBy(desc(crmCompanies.createdAt))
-		.all();
+		.orderBy(desc(crmCompanies.createdAt));
 
 	// Get contact counts per company
-	const contactCounts = db
+	const contactCounts = await db
 		.select({
 			companyId: crmContacts.companyId,
 			n: count()
 		})
 		.from(crmContacts)
-		.groupBy(crmContacts.companyId)
-		.all();
+		.groupBy(crmContacts.companyId);
 
 	// Get open opportunity counts per company
-	const openStages = db
+	const openStagesRows = await db
 		.select({ id: crmPipelineStages.id })
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.isClosed, false))
-		.all()
-		.map((s) => s.id);
+		.where(eq(crmPipelineStages.isClosed, false));
+	const openStages = openStagesRows.map((s) => s.id);
 
 	let oppCounts: { companyId: string; n: number }[] = [];
 	if (openStages.length > 0) {
-		oppCounts = db
+		oppCounts = await db
 			.select({
 				companyId: crmOpportunities.companyId,
 				n: count()
@@ -55,8 +52,7 @@ export const load: PageServerLoad = async () => {
 					sql`,`
 				)})`
 			)
-			.groupBy(crmOpportunities.companyId)
-			.all();
+			.groupBy(crmOpportunities.companyId);
 	}
 
 	const contactMap = new Map(contactCounts.map((c) => [c.companyId, c.n]));

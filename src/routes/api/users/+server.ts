@@ -7,15 +7,14 @@ import { users } from '$lib/server/db/schema.js';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const result = db
+	const result = await db
 		.select({
 			id: users.id,
 			email: users.email,
 			name: users.name,
 			role: users.role
 		})
-		.from(users)
-		.all();
+		.from(users);
 
 	return json(result);
 };

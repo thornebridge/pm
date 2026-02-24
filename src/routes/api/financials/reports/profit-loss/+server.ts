@@ -23,7 +23,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	// Revenue accounts: total = SUM(credit) - SUM(debit) for each
-	const revenueAccounts = db
+	const revenueAccounts = await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -46,7 +46,7 @@ export const GET: RequestHandler = async (event) => {
 		)
 		.where(eq(finAccounts.accountType, 'revenue'))
 		.groupBy(finAccounts.id)
-		.all();
+		;
 
 	const revenue = revenueAccounts.map((r) => ({
 		accountId: r.accountId,
@@ -56,7 +56,7 @@ export const GET: RequestHandler = async (event) => {
 	}));
 
 	// Expense accounts: total = SUM(debit) - SUM(credit) for each
-	const expenseAccounts = db
+	const expenseAccounts = await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -79,7 +79,7 @@ export const GET: RequestHandler = async (event) => {
 		)
 		.where(eq(finAccounts.accountType, 'expense'))
 		.groupBy(finAccounts.id)
-		.all();
+		;
 
 	const expenses = expenseAccounts.map((r) => ({
 		accountId: r.accountId,

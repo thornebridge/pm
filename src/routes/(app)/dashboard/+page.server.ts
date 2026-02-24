@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const weekFromNow = now + 7 * 86400000;
 
 	// My assigned tasks (across all projects)
-	const myTasks = db
+	const myTasks = await db
 		.select({
 			id: tasks.id,
 			number: tasks.number,
@@ -29,18 +29,16 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.where(and(eq(tasks.assigneeId, user.id), isNull(tasks.parentId)))
-		.orderBy(tasks.priority, desc(tasks.updatedAt))
-		.all();
+		.orderBy(tasks.priority, desc(tasks.updatedAt));
 
 	// Project summaries
-	const allProjects = db
+	const allProjects = await db
 		.select()
 		.from(projects)
-		.orderBy(desc(projects.updatedAt))
-		.all();
+		.orderBy(desc(projects.updatedAt));
 
 	// Recent activity (last 10 entries for dashboard)
-	const recentActivity = db
+	const recentActivity = await db
 		.select({
 			id: activityLog.id,
 			action: activityLog.action,
@@ -58,8 +56,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.innerJoin(users, eq(activityLog.userId, users.id))
 		.orderBy(desc(activityLog.createdAt))
-		.limit(10)
-		.all();
+		.limit(10);
 
 	// Overdue tasks assigned to me (open only)
 	const overdueTasks = myTasks.filter((t) => t.dueDate && t.dueDate < now && !t.statusIsClosed);
@@ -80,7 +77,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.slice(0, 10);
 
 	// Active sprints with progress
-	const activeSprints = db
+	const activeSprints = await db
 		.select({
 			id: sprints.id,
 			name: sprints.name,
@@ -91,25 +88,23 @@ export const load: PageServerLoad = async ({ parent }) => {
 		})
 		.from(sprints)
 		.innerJoin(projects, eq(sprints.projectId, projects.id))
-		.where(eq(sprints.status, 'active'))
-		.all();
+		.where(eq(sprints.status, 'active'));
 
-	const sprintSummaries = activeSprints.map((s) => {
-		const sprintTasks = db
+	const sprintSummaries = await Promise.all(activeSprints.map(async (s) => {
+		const sprintTasks = await db
 			.select({
 				isClosed: taskStatuses.isClosed
 			})
 			.from(tasks)
 			.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
-			.where(eq(tasks.sprintId, s.id))
-			.all();
+			.where(eq(tasks.sprintId, s.id));
 
 		return {
 			...s,
 			totalTasks: sprintTasks.length,
 			completedTasks: sprintTasks.filter((t) => t.isClosed).length
 		};
-	});
+	}));
 
 	return {
 		myTasks,

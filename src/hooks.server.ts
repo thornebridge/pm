@@ -7,11 +7,16 @@ import { startAutomationPoller } from '$lib/server/automations/polling.js';
 import { startCrmAutomationPoller } from '$lib/server/crm-automations/polling.js';
 import { startGmailSyncPoller } from '$lib/server/gmail/sync.js';
 import { initSearchIndexes } from '$lib/server/search/reindex.js';
+import { startSnapshotPoller } from '$lib/server/jobs/snapshots.js';
+import { startReminderPoller } from '$lib/server/jobs/reminders.js';
+import { startDigestPoller } from '$lib/server/jobs/digests.js';
+import { startRecurringTaskPoller } from '$lib/server/jobs/recurring.js';
 import { db } from '$lib/server/db/index.js';
 import { users, userThemes } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { getBuiltinTheme } from '$lib/server/theme/builtins.js';
 import { reportError } from '@thornebridge/watchtower-client';
+import { connectRedis } from '$lib/server/redis/index.js';
 
 // Run seed on first request
 let seeded = false;
@@ -20,11 +25,16 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (!seeded) {
+		await connectRedis();
 		await seed();
 		initSearchIndexes().catch(() => {});
 		startAutomationPoller(60_000);
 		startCrmAutomationPoller(60_000);
 		startGmailSyncPoller(120_000);
+		startSnapshotPoller();
+		startReminderPoller();
+		startDigestPoller();
+		startRecurringTaskPoller();
 		seeded = true;
 	}
 

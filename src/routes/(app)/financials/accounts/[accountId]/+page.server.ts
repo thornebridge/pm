@@ -6,16 +6,16 @@ import { eq, and, asc, desc, sql } from 'drizzle-orm';
 import { getAccountBalance } from '$lib/server/financials/balance.js';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const account = db.select().from(finAccounts).where(eq(finAccounts.id, params.accountId)).get();
+	const [account] = await db.select().from(finAccounts).where(eq(finAccounts.id, params.accountId));
 
 	if (!account) {
 		throw error(404, 'Account not found');
 	}
 
-	const balance = getAccountBalance(params.accountId);
+	const balance = await getAccountBalance(params.accountId);
 
 	// Recent 50 journal lines for this account, joined with entries
-	const activity = db
+	const activity = await db
 		.select({
 			lineId: finJournalLines.id,
 			entryId: finJournalEntries.id,
@@ -36,8 +36,7 @@ export const load: PageServerLoad = async ({ params }) => {
 			)
 		)
 		.orderBy(asc(finJournalEntries.date), asc(finJournalEntries.entryNumber))
-		.limit(50)
-		.all();
+		.limit(50);
 
 	return {
 		account,

@@ -7,6 +7,6 @@ import { eq } from 'drizzle-orm';
 
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	db.delete(calendarIntegrations).where(eq(calendarIntegrations.userId, user.id)).run();
+	await db.delete(calendarIntegrations).where(eq(calendarIntegrations.userId, user.id));
 	return json({ success: true });
 };

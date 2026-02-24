@@ -19,34 +19,31 @@ import {
 import { eq, desc, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const opp = db
+	const [opp] = await db
 		.select()
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.id, params.opportunityId))
-		.get();
+		.where(eq(crmOpportunities.id, params.opportunityId));
 	if (!opp) throw error(404, 'Opportunity not found');
 
-	const stage = db
+	const [stage] = await db
 		.select()
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.id, opp.stageId))
-		.get();
+		.where(eq(crmPipelineStages.id, opp.stageId));
 
-	const company = db
+	const [company] = await db
 		.select()
 		.from(crmCompanies)
-		.where(eq(crmCompanies.id, opp.companyId))
-		.get();
+		.where(eq(crmCompanies.id, opp.companyId));
 
 	const contact = opp.contactId
-		? db.select().from(crmContacts).where(eq(crmContacts.id, opp.contactId)).get()
+		? (await db.select().from(crmContacts).where(eq(crmContacts.id, opp.contactId)))[0]
 		: null;
 
 	const owner = opp.ownerId
-		? db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, opp.ownerId)).get()
+		? (await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, opp.ownerId)))[0]
 		: null;
 
-	const linkedContacts = db
+	const linkedContacts = await db
 		.select({
 			contactId: crmOpportunityContacts.contactId,
 			role: crmOpportunityContacts.role,
@@ -60,10 +57,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		})
 		.from(crmOpportunityContacts)
 		.innerJoin(crmContacts, eq(crmOpportunityContacts.contactId, crmContacts.id))
-		.where(eq(crmOpportunityContacts.opportunityId, params.opportunityId))
-		.all();
+		.where(eq(crmOpportunityContacts.opportunityId, params.opportunityId));
 
-	const activities = db
+	const activities = await db
 		.select({
 			id: crmActivities.id,
 			type: crmActivities.type,
@@ -76,17 +72,15 @@ export const load: PageServerLoad = async ({ params }) => {
 		.innerJoin(users, eq(crmActivities.userId, users.id))
 		.where(eq(crmActivities.opportunityId, params.opportunityId))
 		.orderBy(desc(crmActivities.createdAt))
-		.limit(20)
-		.all();
+		.limit(20);
 
-	const proposals = db
+	const proposals = await db
 		.select()
 		.from(crmProposals)
 		.where(eq(crmProposals.opportunityId, params.opportunityId))
-		.orderBy(desc(crmProposals.createdAt))
-		.all();
+		.orderBy(desc(crmProposals.createdAt));
 
-	const tasks = db
+	const tasks = await db
 		.select({
 			id: crmTasks.id,
 			title: crmTasks.title,
@@ -98,20 +92,18 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(crmTasks)
 		.leftJoin(users, eq(crmTasks.assigneeId, users.id))
 		.where(eq(crmTasks.opportunityId, params.opportunityId))
-		.orderBy(desc(crmTasks.createdAt))
-		.all();
+		.orderBy(desc(crmTasks.createdAt));
 
 	// Get all contacts for this company (for linking)
 	const companyContacts = company
-		? db
+		? await db
 				.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName })
 				.from(crmContacts)
 				.where(eq(crmContacts.companyId, company.id))
-				.all()
 		: [];
 
 	// Get opportunity line items with product info
-	const opportunityItems = db
+	const opportunityItems = await db
 		.select({
 			id: crmOpportunityItems.id,
 			opportunityId: crmOpportunityItems.opportunityId,
@@ -133,19 +125,19 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(crmOpportunityItems)
 		.innerJoin(crmProducts, eq(crmOpportunityItems.productId, crmProducts.id))
 		.where(eq(crmOpportunityItems.opportunityId, params.opportunityId))
-		.orderBy(asc(crmOpportunityItems.position))
-		.all();
+		.orderBy(asc(crmOpportunityItems.position));
 
 	// Get linked email threads
-	const emailLinks = db.select({ threadId: gmailEntityLinks.threadId })
+	const emailLinks = await db.select({ threadId: gmailEntityLinks.threadId })
 		.from(gmailEntityLinks)
-		.where(eq(gmailEntityLinks.opportunityId, params.opportunityId))
-		.all();
+		.where(eq(gmailEntityLinks.opportunityId, params.opportunityId));
 	const emailThreadIds = [...new Set(emailLinks.map((l) => l.threadId))];
-	const emails = emailThreadIds.flatMap((tid) => {
-		const t = db.select().from(gmailThreads).where(eq(gmailThreads.id, tid)).get();
-		return t ? [t] : [];
-	}).sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+	const emails: Array<typeof gmailThreads.$inferSelect> = [];
+	for (const tid of emailThreadIds) {
+		const [t] = await db.select().from(gmailThreads).where(eq(gmailThreads.id, tid));
+		if (t) emails.push(t);
+	}
+	emails.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
 
 	// Compute deal health metrics
 	const now = Date.now();

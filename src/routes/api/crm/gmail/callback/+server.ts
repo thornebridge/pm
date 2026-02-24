@@ -27,7 +27,7 @@ export const GET: RequestHandler = async (event) => {
 		redirect(302, '/crm/email?error=oauth_invalid');
 	}
 
-	const config = getGoogleConfig();
+	const config = await getGoogleConfig();
 	if (!config) {
 		redirect(302, '/crm/email?error=not_configured');
 	}
@@ -38,9 +38,9 @@ export const GET: RequestHandler = async (event) => {
 		const now = Date.now();
 
 		// Upsert: delete existing then insert
-		db.delete(gmailIntegrations).where(eq(gmailIntegrations.userId, user.id)).run();
+		await db.delete(gmailIntegrations).where(eq(gmailIntegrations.userId, user.id));
 		const integrationId = nanoid(12);
-		db.insert(gmailIntegrations)
+		await db.insert(gmailIntegrations)
 			.values({
 				id: integrationId,
 				userId: user.id,
@@ -50,16 +50,14 @@ export const GET: RequestHandler = async (event) => {
 				tokenExpiry: now + tokens.expiresIn * 1000,
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 
 		// Fetch Gmail profile to get the user's email address
 		try {
 			const profile = await getProfile(user.id);
-			db.update(gmailIntegrations)
+			await db.update(gmailIntegrations)
 				.set({ email: profile.email, historyId: profile.historyId, updatedAt: Date.now() })
-				.where(eq(gmailIntegrations.userId, user.id))
-				.run();
+				.where(eq(gmailIntegrations.userId, user.id));
 		} catch (err) {
 			console.error('[gmail] Failed to fetch profile:', err);
 		}

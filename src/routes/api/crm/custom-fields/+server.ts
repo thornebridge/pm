@@ -19,7 +19,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(eq(crmCustomFieldDefs.entityType, entityType as 'company' | 'contact' | 'opportunity')) as typeof query;
 	}
 
-	return json(query.all());
+	return json(await query);
 };
 
 export const POST: RequestHandler = async (event) => {
@@ -31,11 +31,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const now = Date.now();
-	const maxPos = db
+	const maxPos = await db
 		.select()
 		.from(crmCustomFieldDefs)
-		.where(eq(crmCustomFieldDefs.entityType, body.entityType))
-		.all();
+		.where(eq(crmCustomFieldDefs.entityType, body.entityType));
 
 	const field = {
 		id: nanoid(12),
@@ -53,6 +52,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmCustomFieldDefs).values(field).run();
+	await db.insert(crmCustomFieldDefs).values(field);
 	return json(field, { status: 201 });
 };

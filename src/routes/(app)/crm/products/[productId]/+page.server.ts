@@ -5,29 +5,27 @@ import { crmProducts, crmPriceTiers, crmPriceBrackets } from '$lib/server/db/sch
 import { eq, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const product = db
+	const [product] = await db
 		.select()
 		.from(crmProducts)
-		.where(eq(crmProducts.id, params.productId))
-		.get();
+		.where(eq(crmProducts.id, params.productId));
 	if (!product) throw error(404, 'Product not found');
 
-	const tiers = db
+	const tiers = await db
 		.select()
 		.from(crmPriceTiers)
 		.where(eq(crmPriceTiers.productId, params.productId))
-		.orderBy(asc(crmPriceTiers.position))
-		.all();
+		.orderBy(asc(crmPriceTiers.position));
 
-	const tiersWithBrackets = tiers.map((tier) => {
-		const brackets = db
+	const tiersWithBrackets = [];
+	for (const tier of tiers) {
+		const brackets = await db
 			.select()
 			.from(crmPriceBrackets)
 			.where(eq(crmPriceBrackets.priceTierId, tier.id))
-			.orderBy(asc(crmPriceBrackets.position))
-			.all();
-		return { ...tier, brackets };
-	});
+			.orderBy(asc(crmPriceBrackets.position));
+		tiersWithBrackets.push({ ...tier, brackets });
+	}
 
 	return { product, tiers: tiersWithBrackets };
 };

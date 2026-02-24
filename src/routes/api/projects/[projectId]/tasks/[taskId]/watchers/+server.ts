@@ -9,12 +9,11 @@ import { broadcastWatcherChanged } from '$lib/server/ws/handlers.js';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const watchers = db
+	const watchers = await db
 		.select({ userId: taskWatchers.userId, userName: users.name })
 		.from(taskWatchers)
 		.innerJoin(users, eq(taskWatchers.userId, users.id))
-		.where(eq(taskWatchers.taskId, event.params.taskId))
-		.all();
+		.where(eq(taskWatchers.taskId, event.params.taskId));
 
 	return json(watchers);
 };
@@ -23,23 +22,21 @@ export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const now = Date.now();
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(taskWatchers)
-		.where(and(eq(taskWatchers.taskId, event.params.taskId), eq(taskWatchers.userId, user.id)))
-		.get();
+		.where(and(eq(taskWatchers.taskId, event.params.taskId), eq(taskWatchers.userId, user.id)));
 
 	if (existing) {
 		return json({ watching: true });
 	}
 
-	db.insert(taskWatchers)
+	await db.insert(taskWatchers)
 		.values({
 			taskId: event.params.taskId,
 			userId: user.id,
 			createdAt: now
-		})
-		.run();
+		});
 
 	broadcastWatcherChanged(event.params.projectId, user.id);
 	return json({ watching: true }, { status: 201 });
@@ -48,9 +45,8 @@ export const POST: RequestHandler = async (event) => {
 export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	db.delete(taskWatchers)
-		.where(and(eq(taskWatchers.taskId, event.params.taskId), eq(taskWatchers.userId, user.id)))
-		.run();
+	await db.delete(taskWatchers)
+		.where(and(eq(taskWatchers.taskId, event.params.taskId), eq(taskWatchers.userId, user.id)));
 
 	broadcastWatcherChanged(event.params.projectId, user.id);
 	return json({ watching: false });

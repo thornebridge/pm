@@ -5,38 +5,35 @@ import { projects, taskStatuses, taskLabels, tasks, users, taskLabelAssignments,
 import { eq, and, or, asc, inArray, sql, isNull } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async ({ params, parent }) => {
-	const project = db.select().from(projects).where(eq(projects.slug, params.slug)).get();
+	const [project] = await db.select().from(projects).where(eq(projects.slug, params.slug));
 
 	if (!project) {
 		throw error(404, 'Project not found');
 	}
 
-	const statuses = db
+	const statuses = await db
 		.select()
 		.from(taskStatuses)
 		.where(eq(taskStatuses.projectId, project.id))
-		.orderBy(asc(taskStatuses.position))
-		.all();
+		.orderBy(asc(taskStatuses.position));
 
-	const labels = db
+	const labels = await db
 		.select()
 		.from(taskLabels)
-		.where(eq(taskLabels.projectId, project.id))
-		.all();
+		.where(eq(taskLabels.projectId, project.id));
 
 	// Only fetch top-level tasks (no subtasks on board/list)
-	const allTasks = db
+	const allTasks = await db
 		.select()
 		.from(tasks)
-		.where(eq(tasks.projectId, project.id))
-		.all();
+		.where(eq(tasks.projectId, project.id));
 
 	const taskIds = allTasks.map((t) => t.id);
 
 	// Label assignments
 	let labelMap = new Map<string, Array<{ labelId: string; name: string; color: string }>>();
 	if (taskIds.length > 0) {
-		const assigns = db
+		const assigns = await db
 			.select({
 				taskId: taskLabelAssignments.taskId,
 				labelId: taskLabelAssignments.labelId,
@@ -45,8 +42,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 			})
 			.from(taskLabelAssignments)
 			.innerJoin(taskLabels, eq(taskLabelAssignments.labelId, taskLabels.id))
-			.where(inArray(taskLabelAssignments.taskId, taskIds))
-			.all();
+			.where(inArray(taskLabelAssignments.taskId, taskIds));
 
 		for (const a of assigns) {
 			const arr = labelMap.get(a.taskId) || [];
@@ -58,7 +54,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 	// Checklist summary per task
 	let checklistMap = new Map<string, { total: number; done: number }>();
 	if (taskIds.length > 0) {
-		const checklistSummary = db
+		const checklistSummary = await db
 			.select({
 				taskId: checklistItems.taskId,
 				total: sql<number>`count(*)`,
@@ -66,8 +62,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 			})
 			.from(checklistItems)
 			.where(inArray(checklistItems.taskId, taskIds))
-			.groupBy(checklistItems.taskId)
-			.all();
+			.groupBy(checklistItems.taskId);
 
 		for (const c of checklistSummary) {
 			checklistMap.set(c.taskId, { total: c.total, done: c.done });
@@ -77,15 +72,14 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 	// Comment count per task
 	let commentCountMap = new Map<string, number>();
 	if (taskIds.length > 0) {
-		const commentCounts = db
+		const commentCounts = await db
 			.select({
 				taskId: comments.taskId,
 				count: sql<number>`count(*)`
 			})
 			.from(comments)
 			.where(inArray(comments.taskId, taskIds))
-			.groupBy(comments.taskId)
-			.all();
+			.groupBy(comments.taskId);
 
 		for (const c of commentCounts) {
 			commentCountMap.set(c.taskId, c.count);
@@ -95,7 +89,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 	// Subtask count per parent task
 	let subtaskMap = new Map<string, { total: number; done: number }>();
 	if (taskIds.length > 0) {
-		const subtaskSummary = db
+		const subtaskSummary = await db
 			.select({
 				parentId: tasks.parentId,
 				total: sql<number>`count(*)`,
@@ -104,8 +98,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 			.from(tasks)
 			.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
 			.where(inArray(tasks.parentId, taskIds))
-			.groupBy(tasks.parentId)
-			.all();
+			.groupBy(tasks.parentId);
 
 		for (const s of subtaskSummary) {
 			if (s.parentId) subtaskMap.set(s.parentId, { total: s.total, done: s.done });
@@ -113,10 +106,9 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 	}
 
 	// Member name lookup
-	const members = db
+	const members = await db
 		.select({ id: users.id, name: users.name, email: users.email })
-		.from(users)
-		.all();
+		.from(users);
 
 	const memberMap = new Map(members.map((m) => [m.id, m.name]));
 
@@ -135,7 +127,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 	const parentData = await parent();
 	const userId = parentData.user?.id;
 	const views = userId
-		? db
+		? await db
 				.select()
 				.from(savedViews)
 				.where(
@@ -145,7 +137,6 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 					)
 				)
 				.orderBy(asc(savedViews.createdAt))
-				.all()
 		: [];
 
 	return { project, statuses, labels, tasks: tasksWithExtras, members, views };

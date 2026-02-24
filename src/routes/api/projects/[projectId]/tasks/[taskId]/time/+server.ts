@@ -11,7 +11,7 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { taskId } = event.params;
 
-	const entries = db
+	const entries = await db
 		.select({
 			id: timeEntries.id,
 			description: timeEntries.description,
@@ -23,8 +23,7 @@ export const GET: RequestHandler = async (event) => {
 		.from(timeEntries)
 		.innerJoin(users, eq(timeEntries.userId, users.id))
 		.where(eq(timeEntries.taskId, taskId))
-		.orderBy(desc(timeEntries.startedAt))
-		.all();
+		.orderBy(desc(timeEntries.startedAt));
 
 	return json(entries);
 };
@@ -48,7 +47,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: now
 	};
 
-	db.insert(timeEntries).values(entry).run();
+	await db.insert(timeEntries).values(entry);
 	broadcastTimeEntryChanged(event.params.projectId, user.id);
 	return json(entry, { status: 201 });
 };

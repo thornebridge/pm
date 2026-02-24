@@ -10,7 +10,7 @@ export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId } = event.params;
 
-	const product = db.select().from(crmProducts).where(eq(crmProducts.id, productId)).get();
+	const [product] = await db.select().from(crmProducts).where(eq(crmProducts.id, productId));
 	if (!product) return json({ error: 'Product not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -19,11 +19,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Get next position
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ max: sql<number>`COALESCE(MAX(position), -1)` })
 		.from(crmPriceTiers)
-		.where(eq(crmPriceTiers.productId, productId))
-		.get();
+		.where(eq(crmPriceTiers.productId, productId));
 
 	const now = Date.now();
 	const tierId = nanoid(12);
@@ -46,13 +45,13 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmPriceTiers).values(tier).run();
+	await db.insert(crmPriceTiers).values(tier);
 
 	// Insert brackets if provided
 	if (Array.isArray(body.brackets)) {
 		for (let i = 0; i < body.brackets.length; i++) {
 			const b = body.brackets[i];
-			db.insert(crmPriceBrackets)
+			await db.insert(crmPriceBrackets)
 				.values({
 					id: nanoid(12),
 					priceTierId: tierId,
@@ -61,8 +60,7 @@ export const POST: RequestHandler = async (event) => {
 					unitAmount: b.unitAmount,
 					flatAmount: b.flatAmount ?? null,
 					position: i
-				})
-				.run();
+				});
 		}
 	}
 

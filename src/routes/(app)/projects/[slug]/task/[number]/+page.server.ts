@@ -18,25 +18,23 @@ import { eq, and, asc, sql, inArray } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { user } = await parent();
-	const project = db.select().from(projects).where(eq(projects.slug, params.slug)).get();
+	const [project] = await db.select().from(projects).where(eq(projects.slug, params.slug));
 	if (!project) throw error(404, 'Project not found');
 
-	const task = db
+	const [task] = await db
 		.select()
 		.from(tasks)
-		.where(and(eq(tasks.projectId, project.id), eq(tasks.number, parseInt(params.number))))
-		.get();
+		.where(and(eq(tasks.projectId, project.id), eq(tasks.number, parseInt(params.number))));
 
 	if (!task) throw error(404, 'Task not found');
 
-	const labels = db
+	const labels = await db
 		.select({ id: taskLabels.id, name: taskLabels.name, color: taskLabels.color })
 		.from(taskLabelAssignments)
 		.innerJoin(taskLabels, eq(taskLabelAssignments.labelId, taskLabels.id))
-		.where(eq(taskLabelAssignments.taskId, task.id))
-		.all();
+		.where(eq(taskLabelAssignments.taskId, task.id));
 
-	const activity = db
+	const activity = await db
 		.select({
 			id: activityLog.id,
 			action: activityLog.action,
@@ -47,10 +45,9 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		.from(activityLog)
 		.innerJoin(users, eq(activityLog.userId, users.id))
 		.where(eq(activityLog.taskId, task.id))
-		.orderBy(asc(activityLog.createdAt))
-		.all();
+		.orderBy(asc(activityLog.createdAt));
 
-	const taskComments = db
+	const taskComments = await db
 		.select({
 			id: comments.id,
 			body: comments.body,
@@ -61,13 +58,12 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		.from(comments)
 		.innerJoin(users, eq(comments.userId, users.id))
 		.where(eq(comments.taskId, task.id))
-		.orderBy(asc(comments.createdAt))
-		.all();
+		.orderBy(asc(comments.createdAt));
 
 	// Load reactions for all comments
 	const commentIds = taskComments.map((c) => c.id);
 	const reactions = commentIds.length > 0
-		? db
+		? await db
 			.select({
 				commentId: commentReactions.commentId,
 				userId: commentReactions.userId,
@@ -77,7 +73,6 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 			.from(commentReactions)
 			.innerJoin(users, eq(commentReactions.userId, users.id))
 			.where(inArray(commentReactions.commentId, commentIds))
-			.all()
 		: [];
 
 	// Group reactions by comment
@@ -93,31 +88,28 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		reactions: reactionsByComment.get(c.id) || []
 	}));
 
-	const statuses = db
+	const statuses = await db
 		.select()
 		.from(taskStatuses)
 		.where(eq(taskStatuses.projectId, project.id))
-		.orderBy(asc(taskStatuses.position))
-		.all();
+		.orderBy(asc(taskStatuses.position));
 
-	const checklist = db
+	const checklist = await db
 		.select()
 		.from(checklistItems)
 		.where(eq(checklistItems.taskId, task.id))
-		.orderBy(asc(checklistItems.position))
-		.all();
+		.orderBy(asc(checklistItems.position));
 
-	const watcherRows = db
+	const watcherRows = await db
 		.select({ userId: taskWatchers.userId, userName: users.name })
 		.from(taskWatchers)
 		.innerJoin(users, eq(taskWatchers.userId, users.id))
-		.where(eq(taskWatchers.taskId, task.id))
-		.all();
+		.where(eq(taskWatchers.taskId, task.id));
 
 	const isWatching = user ? watcherRows.some((w) => w.userId === user.id) : false;
 
 	// Subtasks
-	const subtasks = db
+	const subtasks = await db
 		.select({
 			id: tasks.id,
 			number: tasks.number,
@@ -129,23 +121,21 @@ export const load: PageServerLoad = async ({ params, parent }) => {
 		})
 		.from(tasks)
 		.where(eq(tasks.parentId, task.id))
-		.orderBy(asc(tasks.createdAt))
-		.all();
+		.orderBy(asc(tasks.createdAt));
 
 	// Parent info (if this is a subtask)
 	let parentTask = null;
 	if (task.parentId) {
-		parentTask = db
+		const [pt] = await db
 			.select({ id: tasks.id, number: tasks.number, title: tasks.title })
 			.from(tasks)
-			.where(eq(tasks.id, task.parentId))
-			.get() || null;
+			.where(eq(tasks.id, task.parentId));
+		parentTask = pt || null;
 	}
 
-	const members = db
+	const members = await db
 		.select({ id: users.id, name: users.name })
-		.from(users)
-		.all();
+		.from(users);
 
 	return {
 		task,

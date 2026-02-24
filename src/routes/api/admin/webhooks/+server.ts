@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 
 export const GET: RequestHandler = async (event) => {
 	requireAdmin(event);
-	const all = db.select().from(webhooks).orderBy(webhooks.createdAt).all();
+	const all = await db.select().from(webhooks).orderBy(webhooks.createdAt);
 	return json(all);
 };
 
@@ -32,7 +32,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(webhooks).values(webhook).run();
+	await db.insert(webhooks).values(webhook);
 	return json(webhook, { status: 201 });
 };
 
@@ -42,13 +42,13 @@ export const PATCH: RequestHandler = async (event) => {
 
 	if (!id) return json({ error: 'ID is required' }, { status: 400 });
 
-	db.update(webhooks).set({ active }).where(eq(webhooks.id, id)).run();
+	await db.update(webhooks).set({ active }).where(eq(webhooks.id, id));
 	return json({ ok: true });
 };
 
 export const DELETE: RequestHandler = async (event) => {
 	requireAdmin(event);
 	const { id } = await event.request.json();
-	db.delete(webhooks).where(eq(webhooks.id, id)).run();
+	await db.delete(webhooks).where(eq(webhooks.id, id));
 	return json({ ok: true });
 };

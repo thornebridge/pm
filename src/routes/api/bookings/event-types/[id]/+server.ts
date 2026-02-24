@@ -8,11 +8,10 @@ import { eq, and } from 'drizzle-orm';
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const row = db
+	const [row] = await db
 		.select()
 		.from(bookingEventTypes)
-		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)))
-		.get();
+		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)));
 
 	if (!row) return json({ error: 'Not found' }, { status: 404 });
 	return json(row);
@@ -29,11 +28,10 @@ export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const body = await event.request.json();
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(bookingEventTypes)
-		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)))
-		.get();
+		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)));
 
 	if (!existing) return json({ error: 'Not found' }, { status: 404 });
 
@@ -41,11 +39,10 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.slug !== undefined) {
 		const slug = slugify(body.slug.trim());
 		if (slug && slug !== existing.slug) {
-			const conflict = db
+			const [conflict] = await db
 				.select({ id: bookingEventTypes.id })
 				.from(bookingEventTypes)
-				.where(eq(bookingEventTypes.slug, slug))
-				.get();
+				.where(eq(bookingEventTypes.slug, slug));
 			if (conflict) {
 				return json({ error: 'This URL slug is already taken' }, { status: 409 });
 			}
@@ -64,23 +61,22 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.maxDaysOut !== undefined) updates.maxDaysOut = body.maxDaysOut;
 	if (body.isActive !== undefined) updates.isActive = body.isActive;
 
-	db.update(bookingEventTypes).set(updates).where(eq(bookingEventTypes.id, event.params.id)).run();
+	await db.update(bookingEventTypes).set(updates).where(eq(bookingEventTypes.id, event.params.id));
 
-	const updated = db.select().from(bookingEventTypes).where(eq(bookingEventTypes.id, event.params.id)).get();
+	const [updated] = await db.select().from(bookingEventTypes).where(eq(bookingEventTypes.id, event.params.id));
 	return json(updated);
 };
 
 export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const existing = db
+	const [existingDel] = await db
 		.select({ id: bookingEventTypes.id })
 		.from(bookingEventTypes)
-		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)))
-		.get();
+		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)));
 
-	if (!existing) return json({ error: 'Not found' }, { status: 404 });
+	if (!existingDel) return json({ error: 'Not found' }, { status: 404 });
 
-	db.delete(bookingEventTypes).where(eq(bookingEventTypes.id, event.params.id)).run();
+	await db.delete(bookingEventTypes).where(eq(bookingEventTypes.id, event.params.id));
 	return json({ success: true });
 };

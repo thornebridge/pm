@@ -14,11 +14,10 @@ export const GET: RequestHandler = async (event) => {
 		return json({ error: 'date parameter required (YYYY-MM-DD)' }, { status: 400 });
 	}
 
-	const eventType = db
+	const [eventType] = await db
 		.select({ id: bookingEventTypes.id, isActive: bookingEventTypes.isActive })
 		.from(bookingEventTypes)
-		.where(and(eq(bookingEventTypes.slug, slug), eq(bookingEventTypes.isActive, true)))
-		.get();
+		.where(and(eq(bookingEventTypes.slug, slug), eq(bookingEventTypes.isActive, true)));
 
 	if (!eventType) {
 		return json({ error: 'Not found' }, { status: 404 });

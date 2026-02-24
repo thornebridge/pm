@@ -11,7 +11,7 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { sessionId } = event.params;
 
-	const items = db
+	const items = await db
 		.select({
 			id: dialQueueItems.id,
 			sessionId: dialQueueItems.sessionId,
@@ -39,8 +39,7 @@ export const GET: RequestHandler = async (event) => {
 		.innerJoin(crmContacts, eq(dialQueueItems.contactId, crmContacts.id))
 		.leftJoin(crmCompanies, eq(crmContacts.companyId, crmCompanies.id))
 		.where(eq(dialQueueItems.sessionId, sessionId))
-		.orderBy(asc(dialQueueItems.position))
-		.all();
+		.orderBy(asc(dialQueueItems.position));
 
 	return json(items);
 };
@@ -56,25 +55,23 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'contactIds array is required' }, { status: 400 });
 	}
 
-	const session = db.select().from(dialSessions).where(eq(dialSessions.id, sessionId)).get();
+	const [session] = await db.select().from(dialSessions).where(eq(dialSessions.id, sessionId));
 	if (!session) {
 		return json({ error: 'Session not found' }, { status: 404 });
 	}
 
 	// Get existing contacts in this session to deduplicate
-	const existing = db
+	const existing = await db
 		.select({ contactId: dialQueueItems.contactId })
 		.from(dialQueueItems)
-		.where(eq(dialQueueItems.sessionId, sessionId))
-		.all();
+		.where(eq(dialQueueItems.sessionId, sessionId));
 	const existingSet = new Set(existing.map((e) => e.contactId));
 
 	// Get current max position
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ maxP: sql<number>`coalesce(max(${dialQueueItems.position}), 0)` })
 		.from(dialQueueItems)
-		.where(eq(dialQueueItems.sessionId, sessionId))
-		.get();
+		.where(eq(dialQueueItems.sessionId, sessionId));
 	let nextPosition = (maxPos?.maxP ?? 0) + 1;
 
 	const now = Date.now();
@@ -83,7 +80,7 @@ export const POST: RequestHandler = async (event) => {
 	for (const contactId of contactIds) {
 		if (existingSet.has(contactId)) continue;
 
-		db.insert(dialQueueItems)
+		await db.insert(dialQueueItems)
 			.values({
 				id: nanoid(12),
 				sessionId,
@@ -91,20 +88,18 @@ export const POST: RequestHandler = async (event) => {
 				position: nextPosition++,
 				status: 'pending',
 				createdAt: now
-			})
-			.run();
+			});
 		added++;
 	}
 
 	// Update session totalContacts
 	if (added > 0) {
-		db.update(dialSessions)
+		await db.update(dialSessions)
 			.set({
 				totalContacts: session.totalContacts + added,
 				updatedAt: Date.now()
 			})
-			.where(eq(dialSessions.id, sessionId))
-			.run();
+			.where(eq(dialSessions.id, sessionId));
 	}
 
 	return json({ added, total: session.totalContacts + added }, { status: 201 });

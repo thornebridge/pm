@@ -27,21 +27,19 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-	const totalResult = db
+	const [totalResult] = await db
 		.select({ n: count() })
 		.from(finJournalEntries)
-		.where(where)
-		.get();
+		.where(where);
 	const total = totalResult?.n ?? 0;
 
-	const entries = db
+	const entries = await db
 		.select()
 		.from(finJournalEntries)
 		.where(where)
 		.orderBy(desc(finJournalEntries.date), desc(finJournalEntries.entryNumber))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
 	let entriesWithLines: Array<
 		(typeof entries)[0] & {
@@ -61,7 +59,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	if (entries.length > 0) {
 		const entryIds = entries.map((e) => e.id);
-		const lines = db
+		const lines = await db
 			.select({
 				id: finJournalLines.id,
 				journalEntryId: finJournalLines.journalEntryId,
@@ -78,8 +76,7 @@ export const load: PageServerLoad = async ({ url }) => {
 			.where(
 				sql`${finJournalLines.journalEntryId} IN (${sql.join(entryIds.map((id) => sql`${id}`), sql`,`)})`
 			)
-			.orderBy(asc(finJournalLines.position))
-			.all();
+			.orderBy(asc(finJournalLines.position));
 
 		const linesByEntry = new Map<string, typeof lines>();
 		for (const line of lines) {

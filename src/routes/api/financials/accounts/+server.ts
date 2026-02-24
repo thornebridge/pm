@@ -24,15 +24,14 @@ export const GET: RequestHandler = async (event) => {
 
 	const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-	const rows = db
+	const rows = await db
 		.select()
 		.from(finAccounts)
 		.where(where)
-		.orderBy(asc(finAccounts.accountNumber))
-		.all();
+		.orderBy(asc(finAccounts.accountNumber));
 
 	const accountIds = rows.map((r) => r.id);
-	const balances = getAccountBalances(accountIds);
+	const balances = await getAccountBalances(accountIds);
 
 	const result = rows.map((row) => ({
 		...row,
@@ -60,11 +59,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Check for duplicate account number
-	const existing = db
+	const [existing] = await db
 		.select({ id: finAccounts.id })
 		.from(finAccounts)
-		.where(eq(finAccounts.accountNumber, body.accountNumber))
-		.get();
+		.where(eq(finAccounts.accountNumber, body.accountNumber));
 
 	if (existing) {
 		return json({ error: 'An account with this number already exists' }, { status: 409 });
@@ -88,6 +86,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(finAccounts).values(account).run();
+	await db.insert(finAccounts).values(account);
 	return json(account, { status: 201 });
 };

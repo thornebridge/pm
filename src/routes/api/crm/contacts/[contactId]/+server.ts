@@ -10,7 +10,7 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { contactId } = event.params;
 
-	const contact = db.select().from(crmContacts).where(eq(crmContacts.id, contactId)).get();
+	const [contact] = await db.select().from(crmContacts).where(eq(crmContacts.id, contactId));
 	if (!contact) return json({ error: 'Contact not found' }, { status: 404 });
 
 	return json(contact);
@@ -20,7 +20,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { contactId } = event.params;
 
-	const existing = db.select().from(crmContacts).where(eq(crmContacts.id, contactId)).get();
+	const [existing] = await db.select().from(crmContacts).where(eq(crmContacts.id, contactId));
 	if (!existing) return json({ error: 'Contact not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -49,8 +49,8 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'Last name is required' }, { status: 400 });
 	}
 
-	db.update(crmContacts).set(updates).where(eq(crmContacts.id, contactId)).run();
-	const updated = db.select().from(crmContacts).where(eq(crmContacts.id, contactId)).get();
+	await db.update(crmContacts).set(updates).where(eq(crmContacts.id, contactId));
+	const [updated] = await db.select().from(crmContacts).where(eq(crmContacts.id, contactId));
 	if (updated) indexDocument('contacts', { id: updated.id, firstName: updated.firstName, lastName: updated.lastName, email: updated.email, phone: updated.phone, title: updated.title, source: updated.source, companyId: updated.companyId, ownerId: updated.ownerId, notes: updated.notes, updatedAt: updated.updatedAt });
 	return json(updated);
 };
@@ -59,10 +59,10 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { contactId } = event.params;
 
-	const existing = db.select().from(crmContacts).where(eq(crmContacts.id, contactId)).get();
+	const [existing] = await db.select().from(crmContacts).where(eq(crmContacts.id, contactId));
 	if (!existing) return json({ error: 'Contact not found' }, { status: 404 });
 
-	db.delete(crmContacts).where(eq(crmContacts.id, contactId)).run();
+	await db.delete(crmContacts).where(eq(crmContacts.id, contactId));
 	removeDocument('contacts', contactId);
 	return json({ ok: true });
 };

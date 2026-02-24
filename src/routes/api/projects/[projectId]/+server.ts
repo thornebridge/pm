@@ -10,7 +10,7 @@ import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
-	const project = db.select().from(projects).where(eq(projects.id, event.params.projectId)).get();
+	const [project] = await db.select().from(projects).where(eq(projects.id, event.params.projectId));
 
 	if (!project) {
 		return json({ error: 'Project not found' }, { status: 404 });
@@ -31,17 +31,17 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.readme !== undefined) updates.readme = body.readme?.trim() || null;
 	if (body.defaultAssigneeId !== undefined) updates.defaultAssigneeId = body.defaultAssigneeId || null;
 
-	const result = db
+	const result = await db
 		.update(projects)
 		.set(updates)
 		.where(eq(projects.id, event.params.projectId))
-		.run();
+		.returning({ id: projects.id });
 
-	if (result.changes === 0) {
+	if (result.length === 0) {
 		return json({ error: 'Project not found' }, { status: 404 });
 	}
 
-	const updated = db.select().from(projects).where(eq(projects.id, event.params.projectId)).get();
+	const [updated] = await db.select().from(projects).where(eq(projects.id, event.params.projectId));
 	if (updated) indexDocument('projects', { id: updated.id, name: updated.name, slug: updated.slug, description: updated.description, archived: updated.archived, updatedAt: updated.updatedAt });
 	broadcastProjectChanged('updated');
 	return json(updated);
@@ -51,14 +51,13 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 
 	// Collect attachment file paths before cascading delete
-	const files = db
+	const files = await db
 		.select({ path: attachments.storagePath })
 		.from(attachments)
 		.innerJoin(tasks, eq(attachments.taskId, tasks.id))
-		.where(eq(tasks.projectId, event.params.projectId))
-		.all();
+		.where(eq(tasks.projectId, event.params.projectId));
 
-	db.delete(projects).where(eq(projects.id, event.params.projectId)).run();
+	await db.delete(projects).where(eq(projects.id, event.params.projectId));
 	removeDocument('projects', event.params.projectId);
 
 	// Clean up files after DB delete (non-blocking)

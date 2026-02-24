@@ -6,16 +6,16 @@ import { eq, and, sql, desc } from 'drizzle-orm';
 export const load: PageServerLoad = async ({ parent }) => {
 	const { project } = await parent();
 
-	const allSprints = db
+	const allSprints = await db
 		.select()
 		.from(sprints)
 		.where(eq(sprints.projectId, project.id))
-		.orderBy(desc(sprints.createdAt))
-		.all();
+		.orderBy(desc(sprints.createdAt));
 
 	// Count tasks per sprint with completion info
-	const sprintStats = allSprints.map((sprint) => {
-		const sprintTasks = db
+	const sprintStats = [];
+	for (const sprint of allSprints) {
+		const sprintTasks = await db
 			.select({
 				id: tasks.id,
 				isClosed: taskStatuses.isClosed,
@@ -23,16 +23,15 @@ export const load: PageServerLoad = async ({ parent }) => {
 			})
 			.from(tasks)
 			.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
-			.where(eq(tasks.sprintId, sprint.id))
-			.all();
+			.where(eq(tasks.sprintId, sprint.id));
 
 		const total = sprintTasks.length;
 		const done = sprintTasks.filter((t) => t.isClosed).length;
 		const totalPoints = sprintTasks.reduce((sum, t) => sum + (t.estimatePoints || 0), 0);
 		const donePoints = sprintTasks.filter((t) => t.isClosed).reduce((sum, t) => sum + (t.estimatePoints || 0), 0);
 
-		return { ...sprint, total, done, totalPoints, donePoints };
-	});
+		sprintStats.push({ ...sprint, total, done, totalPoints, donePoints });
+	}
 
 	return { sprints: sprintStats };
 };

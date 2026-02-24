@@ -11,22 +11,22 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const ruleId = event.params.ruleId;
 
-	const rule = db.select().from(automationRules).where(eq(automationRules.id, ruleId)).get();
+	const [rule] = await db.select().from(automationRules).where(eq(automationRules.id, ruleId));
 	if (!rule) {
 		return json({ error: 'Automation rule not found' }, { status: 404 });
 	}
 
-	const executions = db
+	const executionsRaw = await db
 		.select()
 		.from(automationExecutions)
 		.where(eq(automationExecutions.ruleId, ruleId))
 		.orderBy(desc(automationExecutions.createdAt))
-		.limit(50)
-		.all()
-		.map((e) => ({
-			...e,
-			actionsRun: e.actionsRun ? JSON.parse(e.actionsRun) : []
-		}));
+		.limit(50);
+
+	const executions = executionsRaw.map((e) => ({
+		...e,
+		actionsRun: e.actionsRun ? JSON.parse(e.actionsRun) : []
+	}));
 
 	return json({
 		...rule,
@@ -42,7 +42,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const ruleId = event.params.ruleId;
 	const body = await event.request.json();
 
-	const existing = db.select().from(automationRules).where(eq(automationRules.id, ruleId)).get();
+	const [existing] = await db.select().from(automationRules).where(eq(automationRules.id, ruleId));
 	if (!existing) {
 		return json({ error: 'Automation rule not found' }, { status: 404 });
 	}
@@ -74,9 +74,9 @@ export const PATCH: RequestHandler = async (event) => {
 		if (body.enabled !== undefined) updates.enabled = body.enabled;
 	}
 
-	db.update(automationRules).set(updates).where(eq(automationRules.id, ruleId)).run();
+	await db.update(automationRules).set(updates).where(eq(automationRules.id, ruleId));
 
-	const updated = db.select().from(automationRules).where(eq(automationRules.id, ruleId)).get();
+	const [updated] = await db.select().from(automationRules).where(eq(automationRules.id, ruleId));
 	broadcastAutomationChanged(event.params.projectId, user.id);
 
 	return json({
@@ -91,12 +91,12 @@ export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const ruleId = event.params.ruleId;
 
-	const existing = db.select().from(automationRules).where(eq(automationRules.id, ruleId)).get();
+	const [existing] = await db.select().from(automationRules).where(eq(automationRules.id, ruleId));
 	if (!existing) {
 		return json({ error: 'Automation rule not found' }, { status: 404 });
 	}
 
-	db.delete(automationRules).where(eq(automationRules.id, ruleId)).run();
+	await db.delete(automationRules).where(eq(automationRules.id, ruleId));
 	broadcastAutomationChanged(event.params.projectId, user.id);
 
 	return json({ ok: true });

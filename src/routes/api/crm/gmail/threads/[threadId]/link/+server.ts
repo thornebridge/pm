@@ -10,10 +10,9 @@ export const POST: RequestHandler = async (event) => {
 	const { threadId } = event.params;
 
 	// Verify thread belongs to user
-	const thread = db.select({ id: gmailThreads.id })
+	const [thread] = await db.select({ id: gmailThreads.id })
 		.from(gmailThreads)
-		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)))
-		.get();
+		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)));
 
 	if (!thread) {
 		return new Response(JSON.stringify({ error: 'Thread not found' }), {
@@ -46,7 +45,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(gmailEntityLinks).values(link).run();
+	await db.insert(gmailEntityLinks).values(link);
 
 	return Response.json({ ok: true, link });
 };
@@ -56,10 +55,9 @@ export const DELETE: RequestHandler = async (event) => {
 	const { threadId } = event.params;
 
 	// Verify thread belongs to user
-	const thread = db.select({ id: gmailThreads.id })
+	const [thread] = await db.select({ id: gmailThreads.id })
 		.from(gmailThreads)
-		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)))
-		.get();
+		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)));
 
 	if (!thread) {
 		return new Response(JSON.stringify({ error: 'Thread not found' }), {
@@ -78,9 +76,8 @@ export const DELETE: RequestHandler = async (event) => {
 		});
 	}
 
-	db.delete(gmailEntityLinks)
-		.where(and(eq(gmailEntityLinks.id, linkId), eq(gmailEntityLinks.threadId, threadId)))
-		.run();
+	await db.delete(gmailEntityLinks)
+		.where(and(eq(gmailEntityLinks.id, linkId), eq(gmailEntityLinks.threadId, threadId)));
 
 	return Response.json({ ok: true });
 };

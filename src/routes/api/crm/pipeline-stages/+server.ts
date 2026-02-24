@@ -8,11 +8,10 @@ import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
-	const stages = db
+	const stages = await db
 		.select()
 		.from(crmPipelineStages)
-		.orderBy(asc(crmPipelineStages.position))
-		.all();
+		.orderBy(asc(crmPipelineStages.position));
 	return json(stages);
 };
 
@@ -24,10 +23,9 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Stage name is required' }, { status: 400 });
 	}
 
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ max: sql<number>`MAX(${crmPipelineStages.position})` })
-		.from(crmPipelineStages)
-		.get();
+		.from(crmPipelineStages);
 
 	const stage = {
 		id: nanoid(12),
@@ -40,6 +38,6 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(crmPipelineStages).values(stage).run();
+	await db.insert(crmPipelineStages).values(stage);
 	return json(stage, { status: 201 });
 };

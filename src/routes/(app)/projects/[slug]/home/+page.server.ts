@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const { project } = await parent();
 
 	// Status distribution (include isClosed + position for summary metrics)
-	const statusDist = db
+	const statusDist = await db
 		.select({
 			name: taskStatuses.name,
 			color: taskStatuses.color,
@@ -19,8 +19,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
 		.where(eq(tasks.projectId, project.id))
 		.groupBy(taskStatuses.id)
-		.orderBy(taskStatuses.position)
-		.all();
+		.orderBy(taskStatuses.position);
 
 	// Derive isFirst: lowest position in this result set
 	const minPosition = statusDist.length > 0 ? Math.min(...statusDist.map((s) => s.position)) : 0;
@@ -30,18 +29,17 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}));
 
 	// Priority breakdown
-	const priorityDist = db
+	const priorityDist = await db
 		.select({
 			priority: tasks.priority,
 			count: sql<number>`count(*)`.as('count')
 		})
 		.from(tasks)
 		.where(eq(tasks.projectId, project.id))
-		.groupBy(tasks.priority)
-		.all();
+		.groupBy(tasks.priority);
 
 	// Team workload (tasks per assignee)
-	const workload = db
+	const workload = await db
 		.select({
 			name: users.name,
 			count: sql<number>`count(*)`.as('count')
@@ -49,12 +47,11 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.from(tasks)
 		.innerJoin(users, eq(tasks.assigneeId, users.id))
 		.where(eq(tasks.projectId, project.id))
-		.groupBy(users.id)
-		.all();
+		.groupBy(users.id);
 
 	// Overdue count: dueDate < now AND status is not closed
 	const now = Date.now();
-	const overdueResult = db
+	const [overdueResult] = await db
 		.select({
 			count: sql<number>`count(*)`.as('count')
 		})
@@ -66,12 +63,11 @@ export const load: PageServerLoad = async ({ parent }) => {
 				lt(tasks.dueDate, now),
 				not(taskStatuses.isClosed)
 			)
-		)
-		.get();
+		);
 	const overdueCount = overdueResult?.count ?? 0;
 
 	// Recently updated tasks (top 8)
-	const recentTasks = db
+	const recentTasks = await db
 		.select({
 			id: tasks.id,
 			number: tasks.number,
@@ -84,40 +80,37 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
 		.where(eq(tasks.projectId, project.id))
 		.orderBy(desc(tasks.updatedAt))
-		.limit(8)
-		.all();
+		.limit(8);
 
 	// Sprint velocity
-	const completedSprints = db
+	const completedSprints = await db
 		.select()
 		.from(sprints)
 		.where(and(eq(sprints.projectId, project.id), eq(sprints.status, 'completed')))
-		.orderBy(sprints.createdAt)
-		.all();
+		.orderBy(sprints.createdAt);
 
-	const sprintVelocity = completedSprints.map((sprint) => {
-		const sprintTasks = db
+	const sprintVelocity = [];
+	for (const sprint of completedSprints) {
+		const sprintTasks = await db
 			.select({
 				estimatePoints: tasks.estimatePoints,
 				isClosed: taskStatuses.isClosed
 			})
 			.from(tasks)
 			.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
-			.where(eq(tasks.sprintId, sprint.id))
-			.all();
+			.where(eq(tasks.sprintId, sprint.id));
 
 		const totalPoints = sprintTasks.reduce((s, t) => s + (t.estimatePoints || 0), 0);
 		const completedPoints = sprintTasks.filter((t) => t.isClosed).reduce((s, t) => s + (t.estimatePoints || 0), 0);
 
-		return { name: sprint.name, totalPoints, completedPoints };
-	});
+		sprintVelocity.push({ name: sprint.name, totalPoints, completedPoints });
+	}
 
 	// Burndown snapshots for active sprint
-	const activeSprint = db
+	const [activeSprint] = await db
 		.select()
 		.from(sprints)
-		.where(and(eq(sprints.projectId, project.id), eq(sprints.status, 'active')))
-		.get();
+		.where(and(eq(sprints.projectId, project.id), eq(sprints.status, 'active')));
 
 	let burndownSnapshots: Array<{
 		date: number;
@@ -128,27 +121,25 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}> = [];
 
 	if (activeSprint) {
-		burndownSnapshots = db
+		burndownSnapshots = await db
 			.select()
 			.from(sprintSnapshots)
 			.where(eq(sprintSnapshots.sprintId, activeSprint.id))
-			.orderBy(sprintSnapshots.date)
-			.all();
+			.orderBy(sprintSnapshots.date);
 	}
 
 	// Daily activity for last 30 days
 	const thirtyDaysAgo = Date.now() - 30 * 86400000;
-	const dailyActivity = db
+	const dailyActivity = await db
 		.select({
-			date: sql<string>`date(${activityLog.createdAt}/1000, 'unixepoch')`.as('date'),
+			date: sql<string>`to_char(to_timestamp(${activityLog.createdAt}::double precision / 1000), 'YYYY-MM-DD')`.as('date'),
 			count: sql<number>`count(*)`.as('count')
 		})
 		.from(activityLog)
 		.innerJoin(tasks, eq(activityLog.taskId, tasks.id))
 		.where(and(eq(tasks.projectId, project.id), gte(activityLog.createdAt, thirtyDaysAgo)))
-		.groupBy(sql`date(${activityLog.createdAt}/1000, 'unixepoch')`)
-		.orderBy(sql`date(${activityLog.createdAt}/1000, 'unixepoch')`)
-		.all();
+		.groupBy(sql`to_char(to_timestamp(${activityLog.createdAt}::double precision / 1000), 'YYYY-MM-DD')`)
+		.orderBy(sql`to_char(to_timestamp(${activityLog.createdAt}::double precision / 1000), 'YYYY-MM-DD')`);
 
 	return {
 		statusDist: statusDistWithFirst,

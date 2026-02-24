@@ -5,11 +5,10 @@ import { eq } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const rule = db
+	const [rule] = await db
 		.select()
 		.from(finRecurringRules)
-		.where(eq(finRecurringRules.id, params.ruleId))
-		.get();
+		.where(eq(finRecurringRules.id, params.ruleId));
 
 	if (!rule) {
 		throw error(404, 'Recurring rule not found');

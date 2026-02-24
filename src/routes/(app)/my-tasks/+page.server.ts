@@ -6,7 +6,7 @@ import { eq, desc } from 'drizzle-orm';
 export const load: PageServerLoad = async ({ parent }) => {
 	const { user } = await parent();
 
-	const myTasks = db
+	const myTasks = await db
 		.select({
 			id: tasks.id,
 			number: tasks.number,
@@ -29,8 +29,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.where(eq(tasks.assigneeId, user.id))
-		.orderBy(tasks.priority, desc(tasks.updatedAt))
-		.all();
+		.orderBy(tasks.priority, desc(tasks.updatedAt));
 
 	return { myTasks };
 };

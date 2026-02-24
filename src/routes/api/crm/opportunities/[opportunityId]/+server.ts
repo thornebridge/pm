@@ -22,38 +22,34 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId } = event.params;
 
-	const opp = db
+	const [opp] = await db
 		.select()
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.id, opportunityId))
-		.get();
+		.where(eq(crmOpportunities.id, opportunityId));
 	if (!opp) return json({ error: 'Opportunity not found' }, { status: 404 });
 
-	const stage = db
+	const [stage] = await db
 		.select()
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.id, opp.stageId))
-		.get();
+		.where(eq(crmPipelineStages.id, opp.stageId));
 
-	const company = db
+	const [company] = await db
 		.select()
 		.from(crmCompanies)
-		.where(eq(crmCompanies.id, opp.companyId))
-		.get();
+		.where(eq(crmCompanies.id, opp.companyId));
 
 	const contact = opp.contactId
-		? db.select().from(crmContacts).where(eq(crmContacts.id, opp.contactId)).get()
+		? (await db.select().from(crmContacts).where(eq(crmContacts.id, opp.contactId)))[0]
 		: null;
 
 	const owner = opp.ownerId
-		? db
+		? (await db
 				.select({ id: users.id, name: users.name })
 				.from(users)
-				.where(eq(users.id, opp.ownerId))
-				.get()
+				.where(eq(users.id, opp.ownerId)))[0]
 		: null;
 
-	const linkedContacts = db
+	const linkedContacts = await db
 		.select({
 			contactId: crmOpportunityContacts.contactId,
 			role: crmOpportunityContacts.role,
@@ -64,20 +60,17 @@ export const GET: RequestHandler = async (event) => {
 		})
 		.from(crmOpportunityContacts)
 		.innerJoin(crmContacts, eq(crmOpportunityContacts.contactId, crmContacts.id))
-		.where(eq(crmOpportunityContacts.opportunityId, opportunityId))
-		.all();
+		.where(eq(crmOpportunityContacts.opportunityId, opportunityId));
 
-	const proposalCount = db
+	const [proposalCount] = await db
 		.select({ n: count() })
 		.from(crmProposals)
-		.where(eq(crmProposals.opportunityId, opportunityId))
-		.get();
+		.where(eq(crmProposals.opportunityId, opportunityId));
 
-	const activityCount = db
+	const [activityCount] = await db
 		.select({ n: count() })
 		.from(crmActivities)
-		.where(eq(crmActivities.opportunityId, opportunityId))
-		.get();
+		.where(eq(crmActivities.opportunityId, opportunityId));
 
 	return json({
 		...opp,
@@ -95,11 +88,10 @@ export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const { opportunityId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.id, opportunityId))
-		.get();
+		.where(eq(crmOpportunities.id, opportunityId));
 	if (!existing) return json({ error: 'Opportunity not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -132,11 +124,10 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.stageId = body.stageId;
 		updates.stageEnteredAt = Date.now();
 
-		const newStage = db
+		const [newStage] = await db
 			.select()
 			.from(crmPipelineStages)
-			.where(eq(crmPipelineStages.id, body.stageId))
-			.get();
+			.where(eq(crmPipelineStages.id, body.stageId));
 
 		if (newStage?.isClosed && !existing.actualCloseDate) {
 			updates.actualCloseDate = Date.now();
@@ -150,11 +141,10 @@ export const PATCH: RequestHandler = async (event) => {
 
 		// Recalculate position in new stage
 		if (!('position' in body)) {
-			const maxPos = db
+			const [maxPos] = await db
 				.select({ max: sql<number>`MAX(${crmOpportunities.position})` })
 				.from(crmOpportunities)
-				.where(eq(crmOpportunities.stageId, body.stageId))
-				.get();
+				.where(eq(crmOpportunities.stageId, body.stageId));
 			updates.position = (maxPos?.max ?? 0) + 1;
 		}
 	}
@@ -163,20 +153,18 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.position = body.position;
 	}
 
-	db.update(crmOpportunities)
+	await db.update(crmOpportunities)
 		.set(updates)
-		.where(eq(crmOpportunities.id, opportunityId))
-		.run();
+		.where(eq(crmOpportunities.id, opportunityId));
 
 	// Auto-sync to Financials when opportunity is won
 	if (stageIsWon && existing.value) {
-		const company = db
+		const [company] = await db
 			.select({ name: crmCompanies.name })
 			.from(crmCompanies)
-			.where(eq(crmCompanies.id, existing.companyId))
-			.get();
+			.where(eq(crmCompanies.id, existing.companyId));
 
-		createRevenueJournalEntry({
+		await createRevenueJournalEntry({
 			opportunityId,
 			companyId: existing.companyId,
 			amount: existing.value,
@@ -185,11 +173,10 @@ export const PATCH: RequestHandler = async (event) => {
 		});
 	}
 
-	const updated = db
+	const [updated] = await db
 		.select()
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.id, opportunityId))
-		.get();
+		.where(eq(crmOpportunities.id, opportunityId));
 
 	if (updated) indexDocument('opportunities', { id: updated.id, title: updated.title, description: updated.description, value: updated.value, currency: updated.currency, priority: updated.priority, source: updated.source, companyId: updated.companyId, stageId: updated.stageId, ownerId: updated.ownerId, nextStep: updated.nextStep, expectedCloseDate: updated.expectedCloseDate, updatedAt: updated.updatedAt });
 
@@ -197,7 +184,7 @@ export const PATCH: RequestHandler = async (event) => {
 	if (updated) {
 		const updatedEntity = updated as unknown as Record<string, unknown>;
 		if ('stageId' in body && body.stageId !== existing.stageId) {
-			const newStage = db.select().from(crmPipelineStages).where(eq(crmPipelineStages.id, body.stageId)).get();
+			const [newStage] = await db.select().from(crmPipelineStages).where(eq(crmPipelineStages.id, body.stageId));
 			if (newStage?.isWon) {
 				emitCrmAutomationEvent({ event: 'opportunity.won', entityType: 'opportunity', entityId: opportunityId, entity: updatedEntity, changes: body, userId: user.id });
 			} else if (newStage?.isClosed && !newStage?.isWon) {
@@ -223,14 +210,13 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.id, opportunityId))
-		.get();
+		.where(eq(crmOpportunities.id, opportunityId));
 	if (!existing) return json({ error: 'Opportunity not found' }, { status: 404 });
 
-	db.delete(crmOpportunities).where(eq(crmOpportunities.id, opportunityId)).run();
+	await db.delete(crmOpportunities).where(eq(crmOpportunities.id, opportunityId));
 	removeDocument('opportunities', opportunityId);
 	return json({ ok: true });
 };

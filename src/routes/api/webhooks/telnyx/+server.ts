@@ -23,21 +23,20 @@ export const POST: RequestHandler = async (event) => {
 	switch (eventType) {
 		case 'call.initiated': {
 			// Check if we already have a record (browser may have created one)
-			const existing = callSessionId
-				? db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId)).get()
-				: null;
+			const [existing] = callSessionId
+				? await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId))
+				: [undefined];
 
 			if (existing) {
 				// Update with Telnyx IDs
-				db.update(telnyxCallLogs)
+				await db.update(telnyxCallLogs)
 					.set({
 						telnyxCallControlId: callControlId,
 						telnyxCallSessionId: callSessionId,
 						status: 'initiated',
 						updatedAt: now
 					})
-					.where(eq(telnyxCallLogs.id, existing.id))
-					.run();
+					.where(eq(telnyxCallLogs.id, existing.id));
 			}
 			// If no existing record and this is inbound, we'll create on call.answered
 			// since we need user context
@@ -45,17 +44,16 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		case 'call.answered': {
-			const record = callSessionId
-				? db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId)).get()
+			const [record] = callSessionId
+				? await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId))
 				: callControlId
-					? db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallControlId, callControlId)).get()
-					: null;
+					? await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallControlId, callControlId))
+					: [undefined];
 
 			if (record) {
-				db.update(telnyxCallLogs)
+				await db.update(telnyxCallLogs)
 					.set({ status: 'answered', answeredAt: now, updatedAt: now })
-					.where(eq(telnyxCallLogs.id, record.id))
-					.run();
+					.where(eq(telnyxCallLogs.id, record.id));
 			}
 
 			// Broadcast via WebSocket
@@ -64,11 +62,11 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		case 'call.hangup': {
-			const record = callSessionId
-				? db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId)).get()
+			const [record] = callSessionId
+				? await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId))
 				: callControlId
-					? db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallControlId, callControlId)).get()
-					: null;
+					? await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallControlId, callControlId))
+					: [undefined];
 
 			if (record) {
 				const answeredAt = record.answeredAt || record.startedAt || now;
@@ -80,15 +78,14 @@ export const POST: RequestHandler = async (event) => {
 					: hangupCause === 'ORIGINATOR_CANCEL' ? 'cancelled'
 					: 'completed';
 
-				db.update(telnyxCallLogs)
+				await db.update(telnyxCallLogs)
 					.set({
 						status: finalStatus,
 						endedAt: now,
 						durationSeconds: record.answeredAt ? durationSeconds : 0,
 						updatedAt: now
 					})
-					.where(eq(telnyxCallLogs.id, record.id))
-					.run();
+					.where(eq(telnyxCallLogs.id, record.id));
 
 				// Auto-create CRM activity if call was answered
 				if (record.answeredAt && durationSeconds > 0) {
@@ -96,7 +93,7 @@ export const POST: RequestHandler = async (event) => {
 					const contactName = record.contactId ? 'contact' : record.toNumber;
 					const activityId = crypto.randomUUID();
 
-					db.insert(crmActivities)
+					await db.insert(crmActivities)
 						.values({
 							id: activityId,
 							type: 'call',
@@ -109,14 +106,12 @@ export const POST: RequestHandler = async (event) => {
 							userId: record.userId,
 							createdAt: now,
 							updatedAt: now
-						})
-						.run();
+						});
 
 					// Link activity to call log
-					db.update(telnyxCallLogs)
+					await db.update(telnyxCallLogs)
 						.set({ crmActivityId: activityId, updatedAt: now })
-						.where(eq(telnyxCallLogs.id, record.id))
-						.run();
+						.where(eq(telnyxCallLogs.id, record.id));
 				}
 			}
 
@@ -127,12 +122,11 @@ export const POST: RequestHandler = async (event) => {
 		case 'call.recording.saved': {
 			const recordingUrl = payload.recording_urls?.mp3;
 			if (recordingUrl && callSessionId) {
-				const record = db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId)).get();
+				const [record] = await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.telnyxCallSessionId, callSessionId));
 				if (record) {
-					db.update(telnyxCallLogs)
+					await db.update(telnyxCallLogs)
 						.set({ recordingUrl, updatedAt: now })
-						.where(eq(telnyxCallLogs.id, record.id))
-						.run();
+						.where(eq(telnyxCallLogs.id, record.id));
 				}
 			}
 			break;

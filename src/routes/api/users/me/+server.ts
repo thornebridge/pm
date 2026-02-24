@@ -22,7 +22,7 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.email !== undefined) {
 		const email = body.email?.trim().toLowerCase();
 		if (!email) return json({ error: 'Email is required' }, { status: 400 });
-		const existing = db.select().from(users).where(eq(users.email, email)).get();
+		const [existing] = await db.select().from(users).where(eq(users.email, email));
 		if (existing && existing.id !== user.id) {
 			return json({ error: 'Email already in use' }, { status: 400 });
 		}
@@ -33,7 +33,7 @@ export const PATCH: RequestHandler = async (event) => {
 		if (!body.currentPassword) {
 			return json({ error: 'Current password is required' }, { status: 400 });
 		}
-		const dbUser = db.select().from(users).where(eq(users.id, user.id)).get();
+		const [dbUser] = await db.select().from(users).where(eq(users.id, user.id));
 		if (!dbUser) return json({ error: 'User not found' }, { status: 404 });
 
 		const valid = await verifyPassword(dbUser.passwordHash, body.currentPassword);
@@ -45,13 +45,12 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.passwordHash = await hashPassword(body.newPassword);
 	}
 
-	db.update(users).set(updates).where(eq(users.id, user.id)).run();
+	await db.update(users).set(updates).where(eq(users.id, user.id));
 
-	const updated = db
+	const [updated] = await db
 		.select({ id: users.id, name: users.name, email: users.email, role: users.role })
 		.from(users)
-		.where(eq(users.id, user.id))
-		.get();
+		.where(eq(users.id, user.id));
 
 	return json(updated);
 };

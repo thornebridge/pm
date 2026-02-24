@@ -10,11 +10,10 @@ export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const body = await event.request.json();
 
-	const item = db
+	const [item] = await db
 		.select()
 		.from(checklistItems)
-		.where(and(eq(checklistItems.id, event.params.itemId), eq(checklistItems.taskId, event.params.taskId)))
-		.get();
+		.where(and(eq(checklistItems.id, event.params.itemId), eq(checklistItems.taskId, event.params.taskId)));
 
 	if (!item) return json({ error: 'Item not found' }, { status: 404 });
 
@@ -23,16 +22,15 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.completed !== undefined) updates.completed = body.completed;
 	if (body.position !== undefined) updates.position = body.position;
 
-	db.update(checklistItems).set(updates).where(eq(checklistItems.id, event.params.itemId)).run();
+	await db.update(checklistItems).set(updates).where(eq(checklistItems.id, event.params.itemId));
 	broadcastChecklistChanged(event.params.projectId, user.id);
 	return json({ ...item, ...updates });
 };
 
 export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	db.delete(checklistItems)
-		.where(and(eq(checklistItems.id, event.params.itemId), eq(checklistItems.taskId, event.params.taskId)))
-		.run();
+	await db.delete(checklistItems)
+		.where(and(eq(checklistItems.id, event.params.itemId), eq(checklistItems.taskId, event.params.taskId)));
 	broadcastChecklistChanged(event.params.projectId, user.id);
 	return json({ ok: true });
 };

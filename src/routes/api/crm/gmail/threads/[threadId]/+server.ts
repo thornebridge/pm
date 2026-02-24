@@ -17,10 +17,9 @@ export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const { threadId } = event.params;
 
-	const thread = db.select()
+	const [thread] = await db.select()
 		.from(gmailThreads)
-		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)))
-		.get();
+		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)));
 
 	if (!thread) {
 		return new Response(JSON.stringify({ error: 'Thread not found' }), {
@@ -29,42 +28,38 @@ export const GET: RequestHandler = async (event) => {
 		});
 	}
 
-	const messages = db.select()
+	const messages = await db.select()
 		.from(gmailMessages)
 		.where(eq(gmailMessages.threadId, threadId))
-		.orderBy(asc(gmailMessages.internalDate))
-		.all();
+		.orderBy(asc(gmailMessages.internalDate));
 
 	// Get attachments for all messages
-	const messagesWithAttachments = messages.map((msg) => {
-		const attachments = db.select()
+	const messagesWithAttachments = [];
+	for (const msg of messages) {
+		const attachments = await db.select()
 			.from(gmailAttachments)
-			.where(eq(gmailAttachments.messageId, msg.id))
-			.all();
-		return { ...msg, attachments };
-	});
+			.where(eq(gmailAttachments.messageId, msg.id));
+		messagesWithAttachments.push({ ...msg, attachments });
+	}
 
 	// Get linked entities
-	const links = db.select()
+	const links = await db.select()
 		.from(gmailEntityLinks)
-		.where(eq(gmailEntityLinks.threadId, threadId))
-		.all();
+		.where(eq(gmailEntityLinks.threadId, threadId));
 
-	const linkedEntities = links.map((link) => {
+	const linkedEntities = [];
+	for (const link of links) {
 		if (link.contactId) {
-			const c = db.select().from(crmContacts).where(eq(crmContacts.id, link.contactId)).get();
-			return c ? { linkId: link.id, type: 'contact', id: c.id, name: `${c.firstName} ${c.lastName}`, linkType: link.linkType } : null;
+			const [c] = await db.select().from(crmContacts).where(eq(crmContacts.id, link.contactId));
+			if (c) linkedEntities.push({ linkId: link.id, type: 'contact', id: c.id, name: `${c.firstName} ${c.lastName}`, linkType: link.linkType });
+		} else if (link.companyId) {
+			const [c] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, link.companyId));
+			if (c) linkedEntities.push({ linkId: link.id, type: 'company', id: c.id, name: c.name, linkType: link.linkType });
+		} else if (link.opportunityId) {
+			const [o] = await db.select().from(crmOpportunities).where(eq(crmOpportunities.id, link.opportunityId));
+			if (o) linkedEntities.push({ linkId: link.id, type: 'opportunity', id: o.id, name: o.title, linkType: link.linkType });
 		}
-		if (link.companyId) {
-			const c = db.select().from(crmCompanies).where(eq(crmCompanies.id, link.companyId)).get();
-			return c ? { linkId: link.id, type: 'company', id: c.id, name: c.name, linkType: link.linkType } : null;
-		}
-		if (link.opportunityId) {
-			const o = db.select().from(crmOpportunities).where(eq(crmOpportunities.id, link.opportunityId)).get();
-			return o ? { linkId: link.id, type: 'opportunity', id: o.id, name: o.title, linkType: link.linkType } : null;
-		}
-		return null;
-	}).filter(Boolean);
+	}
 
 	return Response.json({ thread, messages: messagesWithAttachments, linkedEntities });
 };
@@ -73,10 +68,9 @@ export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const { threadId } = event.params;
 
-	const thread = db.select()
+	const [thread] = await db.select()
 		.from(gmailThreads)
-		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)))
-		.get();
+		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)));
 
 	if (!thread) {
 		return new Response(JSON.stringify({ error: 'Thread not found' }), {
@@ -92,10 +86,9 @@ export const PATCH: RequestHandler = async (event) => {
 	if (typeof body.isRead === 'boolean') {
 		updates.isRead = body.isRead;
 		// Update in Gmail too
-		const messages = db.select({ id: gmailMessages.id })
+		const messages = await db.select({ id: gmailMessages.id })
 			.from(gmailMessages)
-			.where(eq(gmailMessages.threadId, threadId))
-			.all();
+			.where(eq(gmailMessages.threadId, threadId));
 		for (const msg of messages) {
 			if (body.isRead) {
 				modifyMessage(user.id, msg.id, [], ['UNREAD']).catch(() => {});
@@ -108,10 +101,9 @@ export const PATCH: RequestHandler = async (event) => {
 	// Handle star/unstar
 	if (typeof body.isStarred === 'boolean') {
 		updates.isStarred = body.isStarred;
-		const messages = db.select({ id: gmailMessages.id })
+		const messages = await db.select({ id: gmailMessages.id })
 			.from(gmailMessages)
-			.where(eq(gmailMessages.threadId, threadId))
-			.all();
+			.where(eq(gmailMessages.threadId, threadId));
 		const firstMsg = messages[0];
 		if (firstMsg) {
 			if (body.isStarred) {
@@ -125,20 +117,18 @@ export const PATCH: RequestHandler = async (event) => {
 	// Handle archive
 	if (body.archive === true) {
 		updates.category = 'archived';
-		const messages = db.select({ id: gmailMessages.id })
+		const messages = await db.select({ id: gmailMessages.id })
 			.from(gmailMessages)
-			.where(eq(gmailMessages.threadId, threadId))
-			.all();
+			.where(eq(gmailMessages.threadId, threadId));
 		for (const msg of messages) {
 			modifyMessage(user.id, msg.id, [], ['INBOX']).catch(() => {});
 		}
 	}
 
 	if (Object.keys(updates).length > 0) {
-		db.update(gmailThreads)
+		await db.update(gmailThreads)
 			.set(updates)
-			.where(eq(gmailThreads.id, threadId))
-			.run();
+			.where(eq(gmailThreads.id, threadId));
 	}
 
 	return Response.json({ ok: true });

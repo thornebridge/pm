@@ -25,7 +25,7 @@ export const GET: RequestHandler = async (event) => {
 	const yearEnd = new Date(year + 1, 0, 1).getTime() - 1;
 
 	// Get all budgets matching the period type within the year
-	const budgets = db
+	const budgets = await db
 		.select({
 			id: finBudgets.id,
 			accountId: finBudgets.accountId,
@@ -47,11 +47,11 @@ export const GET: RequestHandler = async (event) => {
 				lte(finBudgets.periodEnd, yearEnd)
 			)
 		)
-		.all();
+;
 
 	// For each budget entry, compute the actual spend in that period
-	const items = budgets.map((budget) => {
-		const actualResult = db
+	const items = await Promise.all(budgets.map(async (budget) => {
+		const [actualResult] = await db
 			.select({
 				totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 				totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -65,8 +65,7 @@ export const GET: RequestHandler = async (event) => {
 					gte(finJournalEntries.date, budget.periodStart),
 					lte(finJournalEntries.date, budget.periodEnd)
 				)
-			)
-			.get();
+			);
 
 		// Compute actual based on account type convention:
 		// Expense accounts: actual = SUM(debit) - SUM(credit)
@@ -101,7 +100,7 @@ export const GET: RequestHandler = async (event) => {
 			variance,
 			percentUsed
 		};
-	});
+	}));
 
 	return json({
 		periodType,

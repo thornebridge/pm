@@ -9,7 +9,7 @@ export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { entryId } = event.params;
 
-	const entry = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
+	const [entry] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	if (!entry) return json({ error: 'Journal entry not found' }, { status: 404 });
 
 	if (entry.status !== 'draft') {
@@ -17,15 +17,14 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Re-validate that lines balance
-	const totals = db
+	const [totals] = await db
 		.select({
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 			totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`,
 			lineCount: sql<number>`count(*)`
 		})
 		.from(finJournalLines)
-		.where(eq(finJournalLines.journalEntryId, entryId))
-		.get();
+		.where(eq(finJournalLines.journalEntryId, entryId));
 
 	if (!totals || totals.lineCount < 2) {
 		return json({ error: 'Entry must have at least 2 lines' }, { status: 400 });
@@ -36,11 +35,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	const now = Date.now();
-	db.update(finJournalEntries)
+	await db.update(finJournalEntries)
 		.set({ status: 'posted', updatedAt: now })
-		.where(eq(finJournalEntries.id, entryId))
-		.run();
+		.where(eq(finJournalEntries.id, entryId));
 
-	const updated = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
+	const [updated] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	return json(updated);
 };

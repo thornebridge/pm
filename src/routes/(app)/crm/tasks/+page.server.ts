@@ -12,7 +12,7 @@ import { eq, desc, asc } from 'drizzle-orm';
 export const load: PageServerLoad = async ({ parent }) => {
 	const { user } = await parent();
 
-	const tasks = db
+	const tasks = await db
 		.select({
 			id: crmTasks.id,
 			title: crmTasks.title,
@@ -31,14 +31,13 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.from(crmTasks)
 		.leftJoin(crmCompanies, eq(crmTasks.companyId, crmCompanies.id))
 		.leftJoin(users, eq(crmTasks.assigneeId, users.id))
-		.orderBy(asc(crmTasks.dueDate), desc(crmTasks.createdAt))
-		.all();
+		.orderBy(asc(crmTasks.dueDate), desc(crmTasks.createdAt));
 
 	// Get opportunity titles
 	const oppIds = [...new Set(tasks.filter((t) => t.opportunityId).map((t) => t.opportunityId!))];
 	const oppMap = new Map<string, string>();
 	for (const oId of oppIds) {
-		const o = db.select({ title: crmOpportunities.title }).from(crmOpportunities).where(eq(crmOpportunities.id, oId)).get();
+		const [o] = await db.select({ title: crmOpportunities.title }).from(crmOpportunities).where(eq(crmOpportunities.id, oId));
 		if (o) oppMap.set(oId, o.title);
 	}
 
@@ -46,7 +45,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const contactIds = [...new Set(tasks.filter((t) => t.contactId).map((t) => t.contactId!))];
 	const contactMap = new Map<string, string>();
 	for (const cId of contactIds) {
-		const c = db.select({ firstName: crmContacts.firstName, lastName: crmContacts.lastName }).from(crmContacts).where(eq(crmContacts.id, cId)).get();
+		const [c] = await db.select({ firstName: crmContacts.firstName, lastName: crmContacts.lastName }).from(crmContacts).where(eq(crmContacts.id, cId));
 		if (c) contactMap.set(cId, `${c.firstName} ${c.lastName}`);
 	}
 

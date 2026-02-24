@@ -9,7 +9,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { taskId } = event.params;
 
-	const existing = db.select().from(crmTasks).where(eq(crmTasks.id, taskId)).get();
+	const [existing] = await db.select().from(crmTasks).where(eq(crmTasks.id, taskId));
 	if (!existing) return json({ error: 'Task not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -35,8 +35,8 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.completedAt = body.completed ? Date.now() : null;
 	}
 
-	db.update(crmTasks).set(updates).where(eq(crmTasks.id, taskId)).run();
-	const updated = db.select().from(crmTasks).where(eq(crmTasks.id, taskId)).get();
+	await db.update(crmTasks).set(updates).where(eq(crmTasks.id, taskId));
+	const [updated] = await db.select().from(crmTasks).where(eq(crmTasks.id, taskId));
 	return json(updated);
 };
 
@@ -44,9 +44,9 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { taskId } = event.params;
 
-	const existing = db.select().from(crmTasks).where(eq(crmTasks.id, taskId)).get();
+	const [existing] = await db.select().from(crmTasks).where(eq(crmTasks.id, taskId));
 	if (!existing) return json({ error: 'Task not found' }, { status: 404 });
 
-	db.delete(crmTasks).where(eq(crmTasks.id, taskId)).run();
+	await db.delete(crmTasks).where(eq(crmTasks.id, taskId));
 	return json({ ok: true });
 };

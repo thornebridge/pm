@@ -77,7 +77,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(where) as typeof query;
 	}
 
-	const rows = query.all();
+	const rows = await query;
 	return json(rows);
 };
 
@@ -106,6 +106,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmTasks).values(task).run();
+	await db.insert(crmTasks).values(task);
 	return json(task, { status: 201 });
 };

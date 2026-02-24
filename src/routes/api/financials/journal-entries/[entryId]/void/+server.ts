@@ -11,7 +11,7 @@ export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const { entryId } = event.params;
 
-	const entry = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
+	const [entry] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	if (!entry) return json({ error: 'Journal entry not found' }, { status: 404 });
 
 	if (entry.status !== 'posted') {
@@ -22,16 +22,15 @@ export const POST: RequestHandler = async (event) => {
 	const reason = body.reason || null;
 
 	// Get original lines
-	const originalLines = db
+	const originalLines = await db
 		.select()
 		.from(finJournalLines)
 		.where(eq(finJournalLines.journalEntryId, entryId))
-		.orderBy(asc(finJournalLines.position))
-		.all();
+		.orderBy(asc(finJournalLines.position));
 
 	const now = Date.now();
 	const reversalId = nanoid(12);
-	const reversalEntryNumber = getNextEntryNumber();
+	const reversalEntryNumber = await getNextEntryNumber();
 
 	// Create reversal entry with swapped debits/credits
 	const reversalEntry = {
@@ -52,7 +51,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(finJournalEntries).values(reversalEntry).run();
+	await db.insert(finJournalEntries).values(reversalEntry);
 
 	// Insert reversal lines with swapped debits/credits
 	const reversalLines = originalLines.map((line, i) => ({
@@ -66,21 +65,20 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: now
 	}));
 
-	db.insert(finJournalLines).values(reversalLines).run();
+	await db.insert(finJournalLines).values(reversalLines);
 
 	// Update original entry to voided
-	db.update(finJournalEntries)
+	await db.update(finJournalEntries)
 		.set({
 			status: 'voided',
 			voidedAt: now,
 			voidReason: reason,
 			updatedAt: now
 		})
-		.where(eq(finJournalEntries.id, entryId))
-		.run();
+		.where(eq(finJournalEntries.id, entryId));
 
 	// Return reversal entry with lines and account names
-	const lines = db
+	const lines = await db
 		.select({
 			id: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -95,8 +93,7 @@ export const POST: RequestHandler = async (event) => {
 		.from(finJournalLines)
 		.innerJoin(finAccounts, eq(finJournalLines.accountId, finAccounts.id))
 		.where(eq(finJournalLines.journalEntryId, reversalId))
-		.orderBy(asc(finJournalLines.position))
-		.all();
+		.orderBy(asc(finJournalLines.position));
 
 	return json({ ...reversalEntry, lines }, { status: 201 });
 };

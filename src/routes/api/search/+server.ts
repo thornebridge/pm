@@ -45,7 +45,7 @@ export const GET: RequestHandler = async (event) => {
 	// SQL fallback
 	const pattern = `%${q}%`;
 
-	const matchedTasks = db
+	const matchedTasks = await db
 		.select({
 			id: tasks.id,
 			number: tasks.number,
@@ -58,10 +58,9 @@ export const GET: RequestHandler = async (event) => {
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.where(like(tasks.title, pattern))
 		.orderBy(desc(tasks.updatedAt))
-		.limit(10)
-		.all();
+		.limit(10);
 
-	const matchedProjects = db
+	const matchedProjects = await db
 		.select({
 			id: projects.id,
 			name: projects.name,
@@ -69,10 +68,9 @@ export const GET: RequestHandler = async (event) => {
 		})
 		.from(projects)
 		.where(like(projects.name, pattern))
-		.limit(5)
-		.all();
+		.limit(5);
 
-	const matchedComments = db
+	const matchedComments = await db
 		.select({
 			id: comments.id,
 			body: comments.body,
@@ -86,8 +84,7 @@ export const GET: RequestHandler = async (event) => {
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.where(like(comments.body, pattern))
 		.orderBy(desc(comments.createdAt))
-		.limit(5)
-		.all();
+		.limit(5);
 
 	return json({
 		tasks: matchedTasks,

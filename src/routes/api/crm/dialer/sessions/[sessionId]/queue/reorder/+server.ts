@@ -17,10 +17,9 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	for (const item of items) {
-		db.update(dialQueueItems)
+		await db.update(dialQueueItems)
 			.set({ position: item.position })
-			.where(eq(dialQueueItems.id, item.id))
-			.run();
+			.where(eq(dialQueueItems.id, item.id));
 	}
 
 	return json({ ok: true });

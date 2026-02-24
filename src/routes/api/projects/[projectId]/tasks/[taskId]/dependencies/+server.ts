@@ -12,7 +12,7 @@ export const GET: RequestHandler = async (event) => {
 	const taskId = event.params.taskId;
 
 	// Get all dependencies where this task is involved (both directions)
-	const dependencies = db
+	const dependencies = await db
 		.select({
 			taskId: taskDependencies.taskId,
 			dependsOnTaskId: taskDependencies.dependsOnTaskId,
@@ -24,8 +24,7 @@ export const GET: RequestHandler = async (event) => {
 				eq(taskDependencies.taskId, taskId),
 				eq(taskDependencies.dependsOnTaskId, taskId)
 			)
-		)
-		.all();
+		);
 
 	// Collect related task IDs to fetch their details
 	const relatedIds = new Set<string>();
@@ -35,7 +34,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	const relatedTasks = relatedIds.size > 0
-		? db
+		? await db
 				.select({
 					id: tasks.id,
 					number: tasks.number,
@@ -44,7 +43,6 @@ export const GET: RequestHandler = async (event) => {
 				})
 				.from(tasks)
 				.where(inArray(tasks.id, [...relatedIds]))
-				.all()
 		: [];
 
 	const taskMap = new Map(relatedTasks.map((t) => [t.id, t]));
@@ -82,8 +80,8 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Verify both tasks exist
-	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
-	const dependsOnTask = db.select().from(tasks).where(eq(tasks.id, dependsOnTaskId)).get();
+	const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+	const [dependsOnTask] = await db.select().from(tasks).where(eq(tasks.id, dependsOnTaskId));
 
 	if (!task) {
 		return json({ error: 'Task not found' }, { status: 404 });
@@ -93,7 +91,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Check if dependency already exists
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(taskDependencies)
 		.where(
@@ -101,20 +99,18 @@ export const POST: RequestHandler = async (event) => {
 				eq(taskDependencies.taskId, taskId),
 				eq(taskDependencies.dependsOnTaskId, dependsOnTaskId)
 			)
-		)
-		.get();
+		);
 
 	if (existing) {
 		return json({ error: 'Dependency already exists' }, { status: 409 });
 	}
 
-	db.insert(taskDependencies)
+	await db.insert(taskDependencies)
 		.values({
 			taskId,
 			dependsOnTaskId,
 			type: type || 'blocks'
-		})
-		.run();
+		});
 
 	broadcastDependencyChanged(event.params.projectId, user.id);
 	return json({ taskId, dependsOnTaskId, type: type || 'blocks' }, { status: 201 });
@@ -131,7 +127,7 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'dependsOnTaskId is required' }, { status: 400 });
 	}
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(taskDependencies)
 		.where(
@@ -139,21 +135,19 @@ export const DELETE: RequestHandler = async (event) => {
 				eq(taskDependencies.taskId, taskId),
 				eq(taskDependencies.dependsOnTaskId, dependsOnTaskId)
 			)
-		)
-		.get();
+		);
 
 	if (!existing) {
 		return json({ error: 'Dependency not found' }, { status: 404 });
 	}
 
-	db.delete(taskDependencies)
+	await db.delete(taskDependencies)
 		.where(
 			and(
 				eq(taskDependencies.taskId, taskId),
 				eq(taskDependencies.dependsOnTaskId, dependsOnTaskId)
 			)
-		)
-		.run();
+		);
 
 	broadcastDependencyChanged(event.params.projectId, user.id);
 	return json({ ok: true });

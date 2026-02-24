@@ -20,31 +20,28 @@ export const POST: RequestHandler = async (event) => {
 	const projectId = event.params.projectId;
 	const taskId = event.params.taskId;
 
-	const source = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	const [source] = await db.select().from(tasks).where(eq(tasks.id, taskId));
 	if (!source) return json({ error: 'Task not found' }, { status: 404 });
 
 	// Auto-increment number
-	const maxNum = db
+	const [maxNum] = await db
 		.select({ max: sql<number>`coalesce(max(${tasks.number}), 0)` })
 		.from(tasks)
-		.where(eq(tasks.projectId, projectId))
-		.get();
+		.where(eq(tasks.projectId, projectId));
 	const number = (maxNum?.max || 0) + 1;
 
 	// Reset to first open status
-	const firstStatus = db.select().from(taskStatuses)
+	const [firstStatus] = await db.select().from(taskStatuses)
 		.where(and(eq(taskStatuses.projectId, projectId), eq(taskStatuses.isClosed, false)))
 		.orderBy(asc(taskStatuses.position))
-		.limit(1)
-		.get();
+		.limit(1);
 	const statusId = firstStatus?.id || source.statusId;
 
 	// Position at end of status column
-	const lastTask = db.select({ pos: tasks.position }).from(tasks)
+	const [lastTask] = await db.select({ pos: tasks.position }).from(tasks)
 		.where(and(eq(tasks.projectId, projectId), eq(tasks.statusId, statusId)))
 		.orderBy(desc(tasks.position))
-		.limit(1)
-		.get();
+		.limit(1);
 
 	const now = Date.now();
 	const id = nanoid(12);
@@ -70,46 +67,44 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(tasks).values(newTask).run();
+	await db.insert(tasks).values(newTask);
 
 	// Activity log
-	db.insert(activityLog).values({
+	await db.insert(activityLog).values({
 		id: nanoid(12),
 		taskId: id,
 		userId: user.id,
 		action: 'created',
 		detail: JSON.stringify({ duplicatedFrom: taskId }),
 		createdAt: now
-	}).run();
+	});
 
 	// Copy labels
-	const labels = db.select({ labelId: taskLabelAssignments.labelId })
+	const labels = await db.select({ labelId: taskLabelAssignments.labelId })
 		.from(taskLabelAssignments)
-		.where(eq(taskLabelAssignments.taskId, taskId))
-		.all();
+		.where(eq(taskLabelAssignments.taskId, taskId));
 
 	const assignedLabels: Array<{ labelId: string; name: string; color: string }> = [];
 	for (const la of labels) {
-		db.insert(taskLabelAssignments).values({ taskId: id, labelId: la.labelId }).run();
-		const label = db.select().from(taskLabels).where(eq(taskLabels.id, la.labelId)).get();
+		await db.insert(taskLabelAssignments).values({ taskId: id, labelId: la.labelId });
+		const [label] = await db.select().from(taskLabels).where(eq(taskLabels.id, la.labelId));
 		if (label) assignedLabels.push({ labelId: label.id, name: label.name, color: label.color });
 	}
 
 	// Copy checklist items
-	const items = db.select().from(checklistItems)
+	const items = await db.select().from(checklistItems)
 		.where(eq(checklistItems.taskId, taskId))
-		.orderBy(asc(checklistItems.position))
-		.all();
+		.orderBy(asc(checklistItems.position));
 
 	for (const item of items) {
-		db.insert(checklistItems).values({
+		await db.insert(checklistItems).values({
 			id: nanoid(12),
 			taskId: id,
 			title: item.title,
 			completed: false,
 			position: item.position,
 			createdAt: now
-		}).run();
+		});
 	}
 
 	const result = { ...newTask, labels: assignedLabels };

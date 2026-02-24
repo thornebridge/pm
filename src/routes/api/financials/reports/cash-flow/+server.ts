@@ -9,12 +9,12 @@ import { eq, and, sql, gte, lte, lt } from 'drizzle-orm';
  * Returns SUM(debit) - SUM(credit) for debit-normal, or SUM(credit) - SUM(debit) for credit-normal.
  * We compute per-account and sum based on normal balance direction.
  */
-function getNetMovement(
+async function getNetMovement(
 	accountFilter: ReturnType<typeof sql>,
 	from: number,
 	to: number
-): number {
-	const rows = db
+): Promise<number> {
+	const rows = await db
 		.select({
 			normalBalance: finAccounts.normalBalance,
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
@@ -31,8 +31,7 @@ function getNetMovement(
 				accountFilter
 			)
 		)
-		.groupBy(finAccounts.normalBalance)
-		.all();
+		.groupBy(finAccounts.normalBalance);
 
 	let net = 0;
 	for (const row of rows) {
@@ -49,8 +48,8 @@ function getNetMovement(
  * Get the balance of cash accounts (accountNumber 1000-1099) up to a given date.
  * Cash accounts are assets, so balance = SUM(debit) - SUM(credit).
  */
-function getCashBalance(upTo: number): number {
-	const result = db
+async function getCashBalance(upTo: number): Promise<number> {
+	const [result] = await db
 		.select({
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 			totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -64,8 +63,7 @@ function getCashBalance(upTo: number): number {
 				lte(finJournalEntries.date, upTo),
 				sql`${finAccounts.accountNumber} >= 1000 AND ${finAccounts.accountNumber} <= 1099`
 			)
-		)
-		.get();
+		);
 
 	return (result?.totalDebit ?? 0) - (result?.totalCredit ?? 0);
 }
@@ -89,14 +87,14 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	// Operating: net of revenue + expense accounts
-	const operating = getNetMovement(
+	const operating = await getNetMovement(
 		sql`(${finAccounts.accountType} = 'revenue' OR ${finAccounts.accountType} = 'expense')`,
 		from,
 		to
 	);
 
 	// Investing: net of fixed asset accounts (accountNumber 1500-1599)
-	const investing = getNetMovement(
+	const investing = await getNetMovement(
 		sql`(${finAccounts.accountNumber} >= 1500 AND ${finAccounts.accountNumber} <= 1599)`,
 		from,
 		to
@@ -104,17 +102,17 @@ export const GET: RequestHandler = async (event) => {
 
 	// Financing: net of equity + long-term liability accounts
 	// Long-term liabilities are liabilities; equity is equity.
-	const financing = getNetMovement(
+	const financing = await getNetMovement(
 		sql`(${finAccounts.accountType} = 'equity' OR ${finAccounts.accountType} = 'liability')`,
 		from,
 		to
 	);
 
 	// Beginning cash balance: cash accounts up to (but not including) from date
-	const beginningCash = getCashBalance(from - 1);
+	const beginningCash = await getCashBalance(from - 1);
 
 	// Ending cash balance: cash accounts up to to date
-	const endingCash = getCashBalance(to);
+	const endingCash = await getCashBalance(to);
 
 	const netChange = endingCash - beginningCash;
 

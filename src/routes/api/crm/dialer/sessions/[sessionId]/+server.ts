@@ -10,12 +10,12 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { sessionId } = event.params;
 
-	const session = db.select().from(dialSessions).where(eq(dialSessions.id, sessionId)).get();
+	const [session] = await db.select().from(dialSessions).where(eq(dialSessions.id, sessionId));
 	if (!session) {
 		return json({ error: 'Session not found' }, { status: 404 });
 	}
 
-	const items = db
+	const items = await db
 		.select({
 			id: dialQueueItems.id,
 			sessionId: dialQueueItems.sessionId,
@@ -43,8 +43,7 @@ export const GET: RequestHandler = async (event) => {
 		.innerJoin(crmContacts, eq(dialQueueItems.contactId, crmContacts.id))
 		.leftJoin(crmCompanies, eq(crmContacts.companyId, crmCompanies.id))
 		.where(eq(dialQueueItems.sessionId, sessionId))
-		.orderBy(asc(dialQueueItems.position))
-		.all();
+		.orderBy(asc(dialQueueItems.position));
 
 	return json({ ...session, items });
 };
@@ -55,7 +54,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const { sessionId } = event.params;
 	const body = await event.request.json();
 
-	const session = db.select().from(dialSessions).where(eq(dialSessions.id, sessionId)).get();
+	const [session] = await db.select().from(dialSessions).where(eq(dialSessions.id, sessionId));
 	if (!session) {
 		return json({ error: 'Session not found' }, { status: 404 });
 	}
@@ -67,9 +66,9 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.startedAt !== undefined) updates.startedAt = body.startedAt;
 	if (body.endedAt !== undefined) updates.endedAt = body.endedAt;
 
-	db.update(dialSessions).set(updates).where(eq(dialSessions.id, sessionId)).run();
+	await db.update(dialSessions).set(updates).where(eq(dialSessions.id, sessionId));
 
-	const updated = db.select().from(dialSessions).where(eq(dialSessions.id, sessionId)).get();
+	const [updated] = await db.select().from(dialSessions).where(eq(dialSessions.id, sessionId));
 	return json(updated);
 };
 
@@ -78,11 +77,11 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { sessionId } = event.params;
 
-	const session = db.select().from(dialSessions).where(eq(dialSessions.id, sessionId)).get();
+	const [session] = await db.select().from(dialSessions).where(eq(dialSessions.id, sessionId));
 	if (!session) {
 		return json({ error: 'Session not found' }, { status: 404 });
 	}
 
-	db.delete(dialSessions).where(eq(dialSessions.id, sessionId)).run();
+	await db.delete(dialSessions).where(eq(dialSessions.id, sessionId));
 	return json({ ok: true });
 };

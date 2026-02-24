@@ -7,13 +7,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const userId = locals.user.id;
 
 	// Load all sessions for this user (most recent first)
-	const sessions = db
+	const sessions = await db
 		.select()
 		.from(dialSessions)
 		.where(eq(dialSessions.userId, userId))
 		.orderBy(desc(dialSessions.createdAt))
-		.limit(50)
-		.all();
+		.limit(50);
 
 	// Find active or paused session (prefer active)
 	const activeSession =
@@ -24,7 +23,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Load queue items for the active session
 	let queueItems: Array<Record<string, unknown>> = [];
 	if (activeSession) {
-		queueItems = db
+		queueItems = await db
 			.select({
 				id: dialQueueItems.id,
 				sessionId: dialQueueItems.sessionId,
@@ -52,8 +51,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.innerJoin(crmContacts, eq(dialQueueItems.contactId, crmContacts.id))
 			.leftJoin(crmCompanies, eq(crmContacts.companyId, crmCompanies.id))
 			.where(eq(dialQueueItems.sessionId, activeSession.id))
-			.orderBy(asc(dialQueueItems.position))
-			.all();
+			.orderBy(asc(dialQueueItems.position));
 	}
 
 	return { sessions, activeSession, queueItems };

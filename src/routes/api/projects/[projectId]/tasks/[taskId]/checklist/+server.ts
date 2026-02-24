@@ -10,12 +10,11 @@ import { broadcastChecklistChanged } from '$lib/server/ws/handlers.js';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const items = db
+	const items = await db
 		.select()
 		.from(checklistItems)
 		.where(eq(checklistItems.taskId, event.params.taskId))
-		.orderBy(asc(checklistItems.position))
-		.all();
+		.orderBy(asc(checklistItems.position));
 
 	return json(items);
 };
@@ -29,10 +28,9 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	for (let i = 0; i < order.length; i++) {
-		db.update(checklistItems)
+		await db.update(checklistItems)
 			.set({ position: i })
-			.where(eq(checklistItems.id, order[i]))
-			.run();
+			.where(eq(checklistItems.id, order[i]));
 	}
 
 	broadcastChecklistChanged(event.params.projectId, user.id);
@@ -47,11 +45,10 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Title is required' }, { status: 400 });
 	}
 
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ max: sql<number>`coalesce(max(${checklistItems.position}), -1)` })
 		.from(checklistItems)
-		.where(eq(checklistItems.taskId, event.params.taskId))
-		.get();
+		.where(eq(checklistItems.taskId, event.params.taskId));
 
 	const item = {
 		id: nanoid(12),
@@ -62,7 +59,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(checklistItems).values(item).run();
+	await db.insert(checklistItems).values(item);
 	broadcastChecklistChanged(event.params.projectId, user.id);
 	return json(item, { status: 201 });
 };

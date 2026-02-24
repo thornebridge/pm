@@ -10,10 +10,10 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { accountId } = event.params;
 
-	const account = db.select().from(finAccounts).where(eq(finAccounts.id, accountId)).get();
+	const [account] = await db.select().from(finAccounts).where(eq(finAccounts.id, accountId));
 	if (!account) return json({ error: 'Account not found' }, { status: 404 });
 
-	const balance = getAccountBalance(accountId);
+	const balance = await getAccountBalance(accountId);
 
 	return json({ ...account, balance });
 };
@@ -22,7 +22,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { accountId } = event.params;
 
-	const existing = db.select().from(finAccounts).where(eq(finAccounts.id, accountId)).get();
+	const [existing] = await db.select().from(finAccounts).where(eq(finAccounts.id, accountId));
 	if (!existing) return json({ error: 'Account not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -47,8 +47,8 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'name cannot be empty' }, { status: 400 });
 	}
 
-	db.update(finAccounts).set(updates).where(eq(finAccounts.id, accountId)).run();
-	const updated = db.select().from(finAccounts).where(eq(finAccounts.id, accountId)).get();
+	await db.update(finAccounts).set(updates).where(eq(finAccounts.id, accountId));
+	const [updated] = await db.select().from(finAccounts).where(eq(finAccounts.id, accountId));
 	return json(updated);
 };
 
@@ -56,11 +56,11 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { accountId } = event.params;
 
-	const existing = db.select().from(finAccounts).where(eq(finAccounts.id, accountId)).get();
+	const [existing] = await db.select().from(finAccounts).where(eq(finAccounts.id, accountId));
 	if (!existing) return json({ error: 'Account not found' }, { status: 404 });
 
 	// Reject if account has any posted journal lines
-	const postedLineCount = db
+	const [postedLineCount] = await db
 		.select({ n: count() })
 		.from(finJournalLines)
 		.innerJoin(finJournalEntries, eq(finJournalLines.journalEntryId, finJournalEntries.id))
@@ -69,8 +69,7 @@ export const DELETE: RequestHandler = async (event) => {
 				eq(finJournalLines.accountId, accountId),
 				eq(finJournalEntries.status, 'posted')
 			)
-		)
-		.get();
+		);
 
 	if (postedLineCount && postedLineCount.n > 0) {
 		return json(
@@ -80,10 +79,9 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	// Soft-deactivate
-	db.update(finAccounts)
+	await db.update(finAccounts)
 		.set({ active: false, updatedAt: Date.now() })
-		.where(eq(finAccounts.id, accountId))
-		.run();
+		.where(eq(finAccounts.id, accountId));
 
 	return json({ ok: true });
 };

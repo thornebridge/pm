@@ -15,19 +15,17 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'Comment body is required' }, { status: 400 });
 	}
 
-	const comment = db
+	const [comment] = await db
 		.select()
 		.from(comments)
-		.where(and(eq(comments.id, event.params.commentId), eq(comments.taskId, event.params.taskId)))
-		.get();
+		.where(and(eq(comments.id, event.params.commentId), eq(comments.taskId, event.params.taskId)));
 
 	if (!comment) return json({ error: 'Comment not found' }, { status: 404 });
 	if (comment.userId !== user.id) return json({ error: 'Forbidden' }, { status: 403 });
 
-	db.update(comments)
+	await db.update(comments)
 		.set({ body: body.trim(), updatedAt: Date.now() })
-		.where(eq(comments.id, event.params.commentId))
-		.run();
+		.where(eq(comments.id, event.params.commentId));
 
 	broadcastCommentChanged(event.params.projectId, user.id);
 	return json({ ok: true });
@@ -36,18 +34,17 @@ export const PATCH: RequestHandler = async (event) => {
 export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const comment = db
+	const [comment] = await db
 		.select()
 		.from(comments)
-		.where(and(eq(comments.id, event.params.commentId), eq(comments.taskId, event.params.taskId)))
-		.get();
+		.where(and(eq(comments.id, event.params.commentId), eq(comments.taskId, event.params.taskId)));
 
 	if (!comment) return json({ error: 'Comment not found' }, { status: 404 });
 	if (comment.userId !== user.id && user.role !== 'admin') {
 		return json({ error: 'Forbidden' }, { status: 403 });
 	}
 
-	db.delete(comments).where(eq(comments.id, event.params.commentId)).run();
+	await db.delete(comments).where(eq(comments.id, event.params.commentId));
 	removeDocument('comments', event.params.commentId);
 	broadcastCommentChanged(event.params.projectId, user.id);
 	return json({ ok: true });

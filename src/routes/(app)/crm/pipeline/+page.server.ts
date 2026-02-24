@@ -10,11 +10,10 @@ import {
 import { eq, asc, sql, inArray, max } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const stages = db
+	const stages = await db
 		.select()
 		.from(crmPipelineStages)
-		.orderBy(asc(crmPipelineStages.position))
-		.all();
+		.orderBy(asc(crmPipelineStages.position));
 
 	const openStageIds = stages.filter((s) => !s.isClosed).map((s) => s.id);
 
@@ -38,7 +37,7 @@ export const load: PageServerLoad = async () => {
 	}> = [];
 
 	if (openStageIds.length > 0) {
-		opportunities = db
+		const allOpps = await db
 			.select({
 				id: crmOpportunities.id,
 				title: crmOpportunities.title,
@@ -60,24 +59,22 @@ export const load: PageServerLoad = async () => {
 			.from(crmOpportunities)
 			.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
 			.leftJoin(users, eq(crmOpportunities.ownerId, users.id))
-			.orderBy(asc(crmOpportunities.position))
-			.all()
-			.filter((o) => openStageIds.includes(o.stageId));
+			.orderBy(asc(crmOpportunities.position));
+		opportunities = allOpps.filter((o) => openStageIds.includes(o.stageId));
 	}
 
 	// Compute last activity dates for all open opportunities
 	const oppIds = opportunities.map((o) => o.id);
 	const lastActivities: Record<string, number> = {};
 	if (oppIds.length > 0) {
-		const actRows = db
+		const actRows = await db
 			.select({
 				opportunityId: crmActivities.opportunityId,
 				lastAt: max(crmActivities.createdAt)
 			})
 			.from(crmActivities)
 			.where(inArray(crmActivities.opportunityId, oppIds))
-			.groupBy(crmActivities.opportunityId)
-			.all();
+			.groupBy(crmActivities.opportunityId);
 		for (const row of actRows) {
 			if (row.opportunityId && row.lastAt) {
 				lastActivities[row.opportunityId] = row.lastAt;

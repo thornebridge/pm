@@ -10,7 +10,7 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'bankAccountId, amount, opportunityId, companyId, and description are required' }, { status: 400 });
 	}
 
-	const result = recordPaymentReceived({
+	const result = await recordPaymentReceived({
 		bankAccountId: body.bankAccountId,
 		amount: body.amount,
 		opportunityId: body.opportunityId,

@@ -22,34 +22,31 @@ function computeLineTotal(item: {
 	return Math.max(0, subtotal);
 }
 
-function updateProposalAmount(proposalId: string) {
-	const result = db
+async function updateProposalAmount(proposalId: string) {
+	const [result] = await db
 		.select({ total: sql<number>`COALESCE(SUM(line_total), 0)` })
 		.from(crmProposalItems)
-		.where(eq(crmProposalItems.proposalId, proposalId))
-		.get();
+		.where(eq(crmProposalItems.proposalId, proposalId));
 
-	db.update(crmProposals)
+	await db.update(crmProposals)
 		.set({ amount: result?.total ?? 0, updatedAt: Date.now() })
-		.where(eq(crmProposals.id, proposalId))
-		.run();
+		.where(eq(crmProposals.id, proposalId));
 }
 
 export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId, itemId } = event.params;
 
-	const proposal = db
+	const [proposal] = await db
 		.select()
 		.from(crmProposals)
-		.where(eq(crmProposals.id, proposalId))
-		.get();
+		.where(eq(crmProposals.id, proposalId));
 	if (!proposal) return json({ error: 'Proposal not found' }, { status: 404 });
 	if (proposal.status !== 'draft') {
 		return json({ error: 'Can only edit items on draft proposals' }, { status: 400 });
 	}
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmProposalItems)
 		.where(
@@ -57,8 +54,7 @@ export const PATCH: RequestHandler = async (event) => {
 				eq(crmProposalItems.id, itemId),
 				eq(crmProposalItems.proposalId, proposalId)
 			)
-		)
-		.get();
+		);
 	if (!existing) return json({ error: 'Item not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -83,10 +79,10 @@ export const PATCH: RequestHandler = async (event) => {
 		setupFee: merged.setupFee as number | null
 	});
 
-	db.update(crmProposalItems).set(updates).where(eq(crmProposalItems.id, itemId)).run();
-	updateProposalAmount(proposalId);
+	await db.update(crmProposalItems).set(updates).where(eq(crmProposalItems.id, itemId));
+	await updateProposalAmount(proposalId);
 
-	const updated = db.select().from(crmProposalItems).where(eq(crmProposalItems.id, itemId)).get();
+	const [updated] = await db.select().from(crmProposalItems).where(eq(crmProposalItems.id, itemId));
 	return json(updated);
 };
 
@@ -94,17 +90,16 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId, itemId } = event.params;
 
-	const proposal = db
+	const [proposal] = await db
 		.select()
 		.from(crmProposals)
-		.where(eq(crmProposals.id, proposalId))
-		.get();
+		.where(eq(crmProposals.id, proposalId));
 	if (!proposal) return json({ error: 'Proposal not found' }, { status: 404 });
 	if (proposal.status !== 'draft') {
 		return json({ error: 'Can only remove items from draft proposals' }, { status: 400 });
 	}
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmProposalItems)
 		.where(
@@ -112,12 +107,11 @@ export const DELETE: RequestHandler = async (event) => {
 				eq(crmProposalItems.id, itemId),
 				eq(crmProposalItems.proposalId, proposalId)
 			)
-		)
-		.get();
+		);
 	if (!existing) return json({ error: 'Item not found' }, { status: 404 });
 
-	db.delete(crmProposalItems).where(eq(crmProposalItems.id, itemId)).run();
-	updateProposalAmount(proposalId);
+	await db.delete(crmProposalItems).where(eq(crmProposalItems.id, itemId));
+	await updateProposalAmount(proposalId);
 
 	return json({ ok: true });
 };

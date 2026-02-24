@@ -21,59 +21,54 @@ export const load: PageServerLoad = async ({ parent }) => {
 	const monthStartMs = monthStart.getTime();
 
 	// All stages
-	const stages = db
+	const stages = await db
 		.select()
 		.from(crmPipelineStages)
-		.orderBy(asc(crmPipelineStages.position))
-		.all();
+		.orderBy(asc(crmPipelineStages.position));
 
 	const openStageIds = stages.filter((s) => !s.isClosed).map((s) => s.id);
 	const wonStageIds = stages.filter((s) => s.isWon).map((s) => s.id);
 	const lostStageIds = stages.filter((s) => s.isClosed && !s.isWon).map((s) => s.id);
 
 	// Pipeline by stage (open only)
-	const pipelineByStage = stages
-		.filter((s) => !s.isClosed)
-		.map((s) => {
-			const opps = db
-				.select({
-					count: sql<number>`COUNT(*)`,
-					totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
-				})
-				.from(crmOpportunities)
-				.where(eq(crmOpportunities.stageId, s.id))
-				.get();
-			return {
-				name: s.name,
-				color: s.color,
-				count: opps?.count || 0,
-				value: opps?.totalValue || 0
-			};
+	const pipelineByStage = [];
+	for (const s of stages.filter((s) => !s.isClosed)) {
+		const [opps] = await db
+			.select({
+				count: sql<number>`COUNT(*)`,
+				totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
+			})
+			.from(crmOpportunities)
+			.where(eq(crmOpportunities.stageId, s.id));
+		pipelineByStage.push({
+			name: s.name,
+			color: s.color,
+			count: opps?.count || 0,
+			value: opps?.totalValue || 0
 		});
+	}
 
 	// Open deals count + total
-	const openDeals = db
+	const [openDeals] = await db
 		.select({
 			count: sql<number>`COUNT(*)`,
 			totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
 		})
 		.from(crmOpportunities)
 		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
-		.where(eq(crmPipelineStages.isClosed, false))
-		.get();
+		.where(eq(crmPipelineStages.isClosed, false));
 
 	// Weighted pipeline
-	const weightedResult = db
+	const [weightedResult] = await db
 		.select({
 			weighted: sql<number>`COALESCE(SUM(${crmOpportunities.value} * COALESCE(${crmOpportunities.probability}, ${crmPipelineStages.probability}) / 100), 0)`
 		})
 		.from(crmOpportunities)
 		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
-		.where(eq(crmPipelineStages.isClosed, false))
-		.get();
+		.where(eq(crmPipelineStages.isClosed, false));
 
 	// Won deals this month
-	const wonThisMonth = db
+	const [wonThisMonth] = await db
 		.select({
 			count: sql<number>`COUNT(*)`,
 			totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
@@ -85,11 +80,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 				eq(crmPipelineStages.isWon, true),
 				gte(crmOpportunities.actualCloseDate, monthStartMs)
 			)
-		)
-		.get();
+		);
 
 	// Win rate (last 90 days)
-	const closedRecently = db
+	const closedRecently = await db
 		.select({
 			isWon: crmPipelineStages.isWon
 		})
@@ -100,15 +94,14 @@ export const load: PageServerLoad = async ({ parent }) => {
 				eq(crmPipelineStages.isClosed, true),
 				gte(crmOpportunities.actualCloseDate, ninetyDaysAgo)
 			)
-		)
-		.all();
+		);
 
 	const wonCount = closedRecently.filter((r) => r.isWon).length;
 	const winRate = closedRecently.length > 0 ? Math.round((wonCount / closedRecently.length) * 100) : 0;
 
 	// Upcoming activities (next 7 days)
 	const sevenDays = now + 7 * 86400000;
-	const upcomingActivities = db
+	const upcomingActivities = await db
 		.select({
 			id: crmActivities.id,
 			type: crmActivities.type,
@@ -128,11 +121,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 			)
 		)
 		.orderBy(asc(crmActivities.scheduledAt))
-		.limit(10)
-		.all();
+		.limit(10);
 
 	// Overdue tasks
-	const overdueTasks = db
+	const overdueTasks = await db
 		.select({
 			id: crmTasks.id,
 			title: crmTasks.title,
@@ -151,11 +143,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 			)
 		)
 		.orderBy(asc(crmTasks.dueDate))
-		.limit(10)
-		.all();
+		.limit(10);
 
 	// Closing soon (next 30 days)
-	const closingSoon = db
+	const closingSoon = await db
 		.select({
 			id: crmOpportunities.id,
 			title: crmOpportunities.title,
@@ -177,11 +168,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 			)
 		)
 		.orderBy(asc(crmOpportunities.expectedCloseDate))
-		.limit(10)
-		.all();
+		.limit(10);
 
 	// Recent activity
-	const recentActivity = db
+	const recentActivity = await db
 		.select({
 			id: crmActivities.id,
 			type: crmActivities.type,
@@ -194,8 +184,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 		.innerJoin(users, eq(crmActivities.userId, users.id))
 		.leftJoin(crmCompanies, eq(crmActivities.companyId, crmCompanies.id))
 		.orderBy(desc(crmActivities.createdAt))
-		.limit(10)
-		.all();
+		.limit(10);
 
 	// === ACTION VIEW QUERIES ===
 
@@ -204,7 +193,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	todayStart.setHours(0, 0, 0, 0);
 	const todayEnd = new Date();
 	todayEnd.setHours(23, 59, 59, 999);
-	const todayTasks = db
+	const todayTasks = await db
 		.select({
 			id: crmTasks.id,
 			title: crmTasks.title,
@@ -225,11 +214,10 @@ export const load: PageServerLoad = async ({ parent }) => {
 			)
 		)
 		.orderBy(asc(crmTasks.priority), asc(crmTasks.dueDate))
-		.limit(20)
-		.all();
+		.limit(20);
 
 	// Overdue next steps — open opps where nextStepDueDate < now
-	const overdueNextSteps = db
+	const overdueNextSteps = await db
 		.select({
 			id: crmOpportunities.id,
 			title: crmOpportunities.title,
@@ -254,8 +242,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			)
 		)
 		.orderBy(asc(crmOpportunities.nextStepDueDate))
-		.limit(15)
-		.all();
+		.limit(15);
 
 	// Stale deals — open opps with last activity > 7 days ago
 	const sevenDaysAgo = now - 7 * 86400000;
@@ -272,7 +259,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}> = [];
 
 	if (openStageIds.length > 0) {
-		const openOpps = db
+		const openOpps = await db
 			.select({
 				id: crmOpportunities.id,
 				title: crmOpportunities.title,
@@ -288,21 +275,19 @@ export const load: PageServerLoad = async ({ parent }) => {
 			.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
 			.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
 			.leftJoin(users, eq(crmOpportunities.ownerId, users.id))
-			.where(eq(crmPipelineStages.isClosed, false))
-			.all();
+			.where(eq(crmPipelineStages.isClosed, false));
 
 		const oppIds = openOpps.map((o) => o.id);
 		const lastActivities: Record<string, number> = {};
 		if (oppIds.length > 0) {
-			const actRows = db
+			const actRows = await db
 				.select({
 					opportunityId: crmActivities.opportunityId,
 					lastAt: max(crmActivities.createdAt)
 				})
 				.from(crmActivities)
 				.where(inArray(crmActivities.opportunityId, oppIds))
-				.groupBy(crmActivities.opportunityId)
-				.all();
+				.groupBy(crmActivities.opportunityId);
 			for (const row of actRows) {
 				if (row.opportunityId && row.lastAt) {
 					lastActivities[row.opportunityId] = row.lastAt;
@@ -321,7 +306,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 	}
 
 	// Closing this week
-	const closingThisWeek = db
+	const closingThisWeek = await db
 		.select({
 			id: crmOpportunities.id,
 			title: crmOpportunities.title,
@@ -345,8 +330,7 @@ export const load: PageServerLoad = async ({ parent }) => {
 			)
 		)
 		.orderBy(asc(crmOpportunities.expectedCloseDate))
-		.limit(15)
-		.all();
+		.limit(15);
 
 	return {
 		metrics: {

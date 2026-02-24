@@ -7,7 +7,7 @@ import { getTelnyxConfig, generateWebRtcToken } from '$lib/server/telnyx/index.j
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const config = getTelnyxConfig();
+	const config = await getTelnyxConfig();
 	if (!config) {
 		return json({ error: 'Telnyx integration is not configured' }, { status: 503 });
 	}

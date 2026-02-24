@@ -9,7 +9,7 @@ import {
 import { eq, and, gte, lte, asc, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const budgets = db
+	const budgets = await db
 		.select({
 			id: finBudgets.id,
 			accountId: finBudgets.accountId,
@@ -25,12 +25,11 @@ export const load: PageServerLoad = async () => {
 		})
 		.from(finBudgets)
 		.leftJoin(finAccounts, eq(finBudgets.accountId, finAccounts.id))
-		.orderBy(asc(finBudgets.periodStart), asc(finAccounts.accountNumber))
-		.all();
+		.orderBy(asc(finBudgets.periodStart), asc(finAccounts.accountNumber));
 
 	// Compute actual spend for each budget
-	const budgetsWithActuals = budgets.map((budget) => {
-		const actualResult = db
+	const budgetsWithActuals = await Promise.all(budgets.map(async (budget) => {
+		const [actualResult] = await db
 			.select({
 				totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 				totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -44,8 +43,7 @@ export const load: PageServerLoad = async () => {
 					gte(finJournalEntries.date, budget.periodStart),
 					lte(finJournalEntries.date, budget.periodEnd)
 				)
-			)
-			.get();
+			);
 
 		const totalDebit = actualResult?.totalDebit ?? 0;
 		const totalCredit = actualResult?.totalCredit ?? 0;
@@ -72,7 +70,7 @@ export const load: PageServerLoad = async () => {
 			variance,
 			percentUsed
 		};
-	});
+	}));
 
 	return { budgets: budgetsWithActuals };
 };

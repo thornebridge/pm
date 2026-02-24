@@ -10,11 +10,10 @@ export const PUT: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId, tierId } = event.params;
 
-	const tier = db
+	const [tier] = await db
 		.select()
 		.from(crmPriceTiers)
-		.where(and(eq(crmPriceTiers.id, tierId), eq(crmPriceTiers.productId, productId)))
-		.get();
+		.where(and(eq(crmPriceTiers.id, tierId), eq(crmPriceTiers.productId, productId)));
 	if (!tier) return json({ error: 'Price tier not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -23,7 +22,7 @@ export const PUT: RequestHandler = async (event) => {
 	}
 
 	// Delete existing brackets and re-insert
-	db.delete(crmPriceBrackets).where(eq(crmPriceBrackets.priceTierId, tierId)).run();
+	await db.delete(crmPriceBrackets).where(eq(crmPriceBrackets.priceTierId, tierId));
 
 	const brackets = [];
 	for (let i = 0; i < body.brackets.length; i++) {
@@ -37,7 +36,7 @@ export const PUT: RequestHandler = async (event) => {
 			flatAmount: b.flatAmount ?? null,
 			position: i
 		};
-		db.insert(crmPriceBrackets).values(bracket).run();
+		await db.insert(crmPriceBrackets).values(bracket);
 		brackets.push(bracket);
 	}
 

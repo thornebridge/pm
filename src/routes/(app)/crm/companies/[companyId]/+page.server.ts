@@ -13,21 +13,20 @@ import {
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ params }) => {
-	const company = db.select().from(crmCompanies).where(eq(crmCompanies.id, params.companyId)).get();
+	const [company] = await db.select().from(crmCompanies).where(eq(crmCompanies.id, params.companyId));
 	if (!company) throw error(404, 'Company not found');
 
 	const owner = company.ownerId
-		? db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, company.ownerId)).get()
+		? (await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, company.ownerId)))[0]
 		: null;
 
-	const contacts = db
+	const contacts = await db
 		.select()
 		.from(crmContacts)
 		.where(eq(crmContacts.companyId, params.companyId))
-		.orderBy(desc(crmContacts.createdAt))
-		.all();
+		.orderBy(desc(crmContacts.createdAt));
 
-	const opportunities = db
+	const opportunities = await db
 		.select({
 			id: crmOpportunities.id,
 			title: crmOpportunities.title,
@@ -43,10 +42,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(crmOpportunities)
 		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
 		.where(eq(crmOpportunities.companyId, params.companyId))
-		.orderBy(desc(crmOpportunities.createdAt))
-		.all();
+		.orderBy(desc(crmOpportunities.createdAt));
 
-	const activities = db
+	const activities = await db
 		.select({
 			id: crmActivities.id,
 			type: crmActivities.type,
@@ -61,10 +59,9 @@ export const load: PageServerLoad = async ({ params }) => {
 		.innerJoin(users, eq(crmActivities.userId, users.id))
 		.where(eq(crmActivities.companyId, params.companyId))
 		.orderBy(desc(crmActivities.createdAt))
-		.limit(20)
-		.all();
+		.limit(20);
 
-	const tasks = db
+	const tasks = await db
 		.select({
 			id: crmTasks.id,
 			title: crmTasks.title,
@@ -76,8 +73,7 @@ export const load: PageServerLoad = async ({ params }) => {
 		.from(crmTasks)
 		.leftJoin(users, eq(crmTasks.assigneeId, users.id))
 		.where(eq(crmTasks.companyId, params.companyId))
-		.orderBy(desc(crmTasks.createdAt))
-		.all();
+		.orderBy(desc(crmTasks.createdAt));
 
 	return { company, owner, contacts, opportunities, activities, tasks };
 };

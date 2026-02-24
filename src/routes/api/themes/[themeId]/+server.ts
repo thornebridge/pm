@@ -17,11 +17,10 @@ export const GET: RequestHandler = async (event) => {
 		return json({ source: builtin.source });
 	}
 
-	const theme = db
+	const [theme] = await db
 		.select()
 		.from(userThemes)
-		.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)))
-		.get();
+		.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)));
 
 	if (!theme) {
 		return json({ error: 'Theme not found' }, { status: 404 });
@@ -40,25 +39,22 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'Cannot delete built-in theme' }, { status: 400 });
 	}
 
-	const theme = db
+	const [theme] = await db
 		.select()
 		.from(userThemes)
-		.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)))
-		.get();
+		.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)));
 
 	if (!theme) {
 		return json({ error: 'Theme not found' }, { status: 404 });
 	}
 
 	// If this was the active theme, clear it
-	db.update(users)
+	await db.update(users)
 		.set({ activeThemeId: null })
-		.where(and(eq(users.id, user.id), eq(users.activeThemeId, themeId)))
-		.run();
+		.where(and(eq(users.id, user.id), eq(users.activeThemeId, themeId)));
 
-	db.delete(userThemes)
-		.where(eq(userThemes.id, themeId))
-		.run();
+	await db.delete(userThemes)
+		.where(eq(userThemes.id, themeId));
 
 	return json({ ok: true });
 };

@@ -26,14 +26,14 @@ export const PATCH: RequestHandler = async (event) => {
 		return json({ error: 'No valid updates' }, { status: 400 });
 	}
 
-	const updated = db.transaction((tx) => {
+	const updated = await db.transaction(async (tx) => {
 		let count = 0;
 		for (const taskId of taskIds) {
-			const r = tx.update(tasks)
+			const r = await tx.update(tasks)
 				.set(allowed)
 				.where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
-				.run();
-			count += r.changes;
+				.returning({ id: tasks.id });
+			count += r.length;
 		}
 		return count;
 	});
@@ -57,13 +57,13 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'taskIds is required' }, { status: 400 });
 	}
 
-	const deleted = db.transaction((tx) => {
+	const deleted = await db.transaction(async (tx) => {
 		let count = 0;
 		for (const taskId of taskIds) {
-			const r = tx.delete(tasks)
+			const r = await tx.delete(tasks)
 				.where(and(eq(tasks.id, taskId), eq(tasks.projectId, projectId)))
-				.run();
-			count += r.changes;
+				.returning({ id: tasks.id });
+			count += r.length;
 		}
 		return count;
 	});

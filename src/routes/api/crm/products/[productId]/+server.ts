@@ -9,25 +9,24 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId } = event.params;
 
-	const product = db.select().from(crmProducts).where(eq(crmProducts.id, productId)).get();
+	const [product] = await db.select().from(crmProducts).where(eq(crmProducts.id, productId));
 	if (!product) return json({ error: 'Product not found' }, { status: 404 });
 
-	const tiers = db
+	const tiers = await db
 		.select()
 		.from(crmPriceTiers)
 		.where(eq(crmPriceTiers.productId, productId))
-		.orderBy(asc(crmPriceTiers.position))
-		.all();
+		.orderBy(asc(crmPriceTiers.position));
 
-	const tiersWithBrackets = tiers.map((tier) => {
-		const brackets = db
+	const tiersWithBrackets = [];
+	for (const tier of tiers) {
+		const brackets = await db
 			.select()
 			.from(crmPriceBrackets)
 			.where(eq(crmPriceBrackets.priceTierId, tier.id))
-			.orderBy(asc(crmPriceBrackets.position))
-			.all();
-		return { ...tier, brackets };
-	});
+			.orderBy(asc(crmPriceBrackets.position));
+		tiersWithBrackets.push({ ...tier, brackets });
+	}
 
 	return json({ ...product, tiers: tiersWithBrackets });
 };
@@ -36,7 +35,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId } = event.params;
 
-	const existing = db.select().from(crmProducts).where(eq(crmProducts.id, productId)).get();
+	const [existing] = await db.select().from(crmProducts).where(eq(crmProducts.id, productId));
 	if (!existing) return json({ error: 'Product not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -47,8 +46,8 @@ export const PATCH: RequestHandler = async (event) => {
 		if (f in body) updates[f] = body[f];
 	}
 
-	db.update(crmProducts).set(updates).where(eq(crmProducts.id, productId)).run();
-	const updated = db.select().from(crmProducts).where(eq(crmProducts.id, productId)).get();
+	await db.update(crmProducts).set(updates).where(eq(crmProducts.id, productId));
+	const [updated] = await db.select().from(crmProducts).where(eq(crmProducts.id, productId));
 	return json(updated);
 };
 
@@ -56,25 +55,23 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId } = event.params;
 
-	const existing = db.select().from(crmProducts).where(eq(crmProducts.id, productId)).get();
+	const [existing] = await db.select().from(crmProducts).where(eq(crmProducts.id, productId));
 	if (!existing) return json({ error: 'Product not found' }, { status: 404 });
 
 	// Check if referenced in any opportunity items — archive instead of delete
-	const refs = db
+	const refs = await db
 		.select({ id: crmOpportunityItems.id })
 		.from(crmOpportunityItems)
 		.where(eq(crmOpportunityItems.productId, productId))
-		.limit(1)
-		.all();
+		.limit(1);
 
 	if (refs.length > 0) {
-		db.update(crmProducts)
+		await db.update(crmProducts)
 			.set({ status: 'archived', updatedAt: Date.now() })
-			.where(eq(crmProducts.id, productId))
-			.run();
+			.where(eq(crmProducts.id, productId));
 		return json({ ok: true, archived: true });
 	}
 
-	db.delete(crmProducts).where(eq(crmProducts.id, productId)).run();
+	await db.delete(crmProducts).where(eq(crmProducts.id, productId));
 	return json({ ok: true });
 };

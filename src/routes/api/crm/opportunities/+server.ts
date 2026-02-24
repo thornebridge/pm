@@ -94,7 +94,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(where) as typeof query;
 	}
 
-	const rows = query.all();
+	const rows = await query;
 	return json(rows);
 };
 
@@ -112,12 +112,11 @@ export const POST: RequestHandler = async (event) => {
 	// Default to first stage if not provided
 	let stageId = body.stageId;
 	if (!stageId) {
-		const firstStage = db
+		const [firstStage] = await db
 			.select({ id: crmPipelineStages.id })
 			.from(crmPipelineStages)
 			.orderBy(asc(crmPipelineStages.position))
-			.limit(1)
-			.get();
+			.limit(1);
 		stageId = firstStage?.id;
 	}
 
@@ -126,11 +125,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Calculate position within stage
-	const maxPos = db
+	const [maxPos] = await db
 		.select({ max: sql<number>`MAX(${crmOpportunities.position})` })
 		.from(crmOpportunities)
-		.where(eq(crmOpportunities.stageId, stageId))
-		.get();
+		.where(eq(crmOpportunities.stageId, stageId));
 
 	const now = Date.now();
 	const opp = {
@@ -158,7 +156,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmOpportunities).values(opp).run();
+	await db.insert(crmOpportunities).values(opp);
 	indexDocument('opportunities', { id: opp.id, title: opp.title, description: opp.description, value: opp.value, currency: opp.currency, priority: opp.priority, source: opp.source, companyId: opp.companyId, stageId: opp.stageId, ownerId: opp.ownerId, nextStep: opp.nextStep, expectedCloseDate: opp.expectedCloseDate, updatedAt: opp.updatedAt });
 
 	emitCrmAutomationEvent({

@@ -10,10 +10,9 @@ export const POST: RequestHandler = async (event) => {
 	const { threadId } = event.params;
 
 	// Verify thread belongs to user
-	const thread = db.select()
+	const [thread] = await db.select()
 		.from(gmailThreads)
-		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)))
-		.get();
+		.where(and(eq(gmailThreads.id, threadId), eq(gmailThreads.userId, user.id)));
 
 	if (!thread) {
 		return new Response(JSON.stringify({ error: 'Thread not found' }), {
@@ -52,10 +51,9 @@ export const POST: RequestHandler = async (event) => {
 	let finalCompanyId = companyId;
 
 	if (!finalOppId || !finalContactId || !finalCompanyId) {
-		const links = db.select()
+		const links = await db.select()
 			.from(gmailEntityLinks)
-			.where(eq(gmailEntityLinks.threadId, threadId))
-			.all();
+			.where(eq(gmailEntityLinks.threadId, threadId));
 
 		if (!finalContactId) {
 			const contactLink = links.find((l) => l.contactId);
@@ -87,7 +85,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmTasks).values(task).run();
+	await db.insert(crmTasks).values(task);
 
 	return Response.json({ ok: true, task });
 };

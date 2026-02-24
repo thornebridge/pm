@@ -10,7 +10,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const { fieldId } = event.params;
 	const body = await event.request.json();
 
-	const existing = db.select().from(crmCustomFieldDefs).where(eq(crmCustomFieldDefs.id, fieldId)).get();
+	const [existing] = await db.select().from(crmCustomFieldDefs).where(eq(crmCustomFieldDefs.id, fieldId));
 	if (!existing) return json({ error: 'Field not found' }, { status: 404 });
 
 	const updates: Record<string, unknown> = { updatedAt: Date.now() };
@@ -21,8 +21,8 @@ export const PATCH: RequestHandler = async (event) => {
 	if ('showInList' in body) updates.showInList = body.showInList;
 	if ('showInCard' in body) updates.showInCard = body.showInCard;
 
-	db.update(crmCustomFieldDefs).set(updates).where(eq(crmCustomFieldDefs.id, fieldId)).run();
-	const updated = db.select().from(crmCustomFieldDefs).where(eq(crmCustomFieldDefs.id, fieldId)).get();
+	await db.update(crmCustomFieldDefs).set(updates).where(eq(crmCustomFieldDefs.id, fieldId));
+	const [updated] = await db.select().from(crmCustomFieldDefs).where(eq(crmCustomFieldDefs.id, fieldId));
 	return json(updated);
 };
 
@@ -30,6 +30,6 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { fieldId } = event.params;
 
-	db.delete(crmCustomFieldDefs).where(eq(crmCustomFieldDefs.id, fieldId)).run();
+	await db.delete(crmCustomFieldDefs).where(eq(crmCustomFieldDefs.id, fieldId));
 	return json({ ok: true });
 };

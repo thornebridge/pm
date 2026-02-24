@@ -21,9 +21,9 @@ export const POST: RequestHandler = async (event) => {
 
 	const now = Date.now();
 	const entryId = nanoid(12);
-	const entryNumber = getNextEntryNumber();
+	const entryNumber = await getNextEntryNumber();
 
-	db.insert(finJournalEntries)
+	await db.insert(finJournalEntries)
 		.values({
 			id: entryId,
 			entryNumber,
@@ -36,11 +36,10 @@ export const POST: RequestHandler = async (event) => {
 			createdBy: user.id,
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
 	// Debit bank account (asset increases), Credit income account (revenue increases)
-	db.insert(finJournalLines)
+	await db.insert(finJournalLines)
 		.values([
 			{
 				id: nanoid(12),
@@ -62,8 +61,7 @@ export const POST: RequestHandler = async (event) => {
 				position: 1,
 				createdAt: now
 			}
-		])
-		.run();
+		]);
 
 	return json({ id: entryId, entryNumber }, { status: 201 });
 };

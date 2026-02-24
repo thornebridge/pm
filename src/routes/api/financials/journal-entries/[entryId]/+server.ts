@@ -10,10 +10,10 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { entryId } = event.params;
 
-	const entry = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
+	const [entry] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	if (!entry) return json({ error: 'Journal entry not found' }, { status: 404 });
 
-	const lines = db
+	const lines = await db
 		.select({
 			id: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -31,8 +31,7 @@ export const GET: RequestHandler = async (event) => {
 		.from(finJournalLines)
 		.innerJoin(finAccounts, eq(finJournalLines.accountId, finAccounts.id))
 		.where(eq(finJournalLines.journalEntryId, entryId))
-		.orderBy(asc(finJournalLines.position))
-		.all();
+		.orderBy(asc(finJournalLines.position));
 
 	return json({ ...entry, lines });
 };
@@ -41,7 +40,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const { entryId } = event.params;
 
-	const entry = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
+	const [entry] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	if (!entry) return json({ error: 'Journal entry not found' }, { status: 404 });
 
 	if (entry.status !== 'draft') {
@@ -96,7 +95,7 @@ export const PATCH: RequestHandler = async (event) => {
 		}
 
 		// Delete old lines, insert new
-		db.delete(finJournalLines).where(eq(finJournalLines.journalEntryId, entryId)).run();
+		await db.delete(finJournalLines).where(eq(finJournalLines.journalEntryId, entryId));
 
 		const lineRecords = lines.map((line: { accountId: string; debit?: number; credit?: number; memo?: string }, i: number) => ({
 			id: nanoid(12),
@@ -109,14 +108,14 @@ export const PATCH: RequestHandler = async (event) => {
 			createdAt: now
 		}));
 
-		db.insert(finJournalLines).values(lineRecords).run();
+		await db.insert(finJournalLines).values(lineRecords);
 	}
 
-	db.update(finJournalEntries).set(updates).where(eq(finJournalEntries.id, entryId)).run();
+	await db.update(finJournalEntries).set(updates).where(eq(finJournalEntries.id, entryId));
 
 	// Return updated entry with lines
-	const updated = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
-	const updatedLines = db
+	const [updated] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
+	const updatedLines = await db
 		.select({
 			id: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -131,8 +130,7 @@ export const PATCH: RequestHandler = async (event) => {
 		.from(finJournalLines)
 		.innerJoin(finAccounts, eq(finJournalLines.accountId, finAccounts.id))
 		.where(eq(finJournalLines.journalEntryId, entryId))
-		.orderBy(asc(finJournalLines.position))
-		.all();
+		.orderBy(asc(finJournalLines.position));
 
 	return json({ ...updated, lines: updatedLines });
 };
@@ -141,7 +139,7 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { entryId } = event.params;
 
-	const entry = db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId)).get();
+	const [entry] = await db.select().from(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	if (!entry) return json({ error: 'Journal entry not found' }, { status: 404 });
 
 	if (entry.status !== 'draft') {
@@ -149,6 +147,6 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	// Lines cascade-delete via FK constraint
-	db.delete(finJournalEntries).where(eq(finJournalEntries.id, entryId)).run();
+	await db.delete(finJournalEntries).where(eq(finJournalEntries.id, entryId));
 	return json({ ok: true });
 };

@@ -8,7 +8,7 @@ import { nanoid } from 'nanoid';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const reconciliations = db
+	const reconciliations = await db
 		.select({
 			id: finReconciliations.id,
 			bankAccountId: finReconciliations.bankAccountId,
@@ -23,8 +23,7 @@ export const GET: RequestHandler = async (event) => {
 		})
 		.from(finReconciliations)
 		.leftJoin(finAccounts, eq(finReconciliations.bankAccountId, finAccounts.id))
-		.orderBy(desc(finReconciliations.createdAt))
-		.all();
+		.orderBy(desc(finReconciliations.createdAt));
 
 	return json(reconciliations);
 };
@@ -51,6 +50,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(finReconciliations).values(recon).run();
+	await db.insert(finReconciliations).values(recon);
 	return json(recon, { status: 201 });
 };

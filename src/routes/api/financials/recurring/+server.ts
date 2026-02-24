@@ -8,11 +8,10 @@ import { nanoid } from 'nanoid';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const rules = db
+	const rules = await db
 		.select()
 		.from(finRecurringRules)
-		.orderBy(desc(finRecurringRules.createdAt))
-		.all();
+		.orderBy(desc(finRecurringRules.createdAt));
 
 	return json(rules);
 };
@@ -55,6 +54,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(finRecurringRules).values(rule).run();
+	await db.insert(finRecurringRules).values(rule);
 	return json(rule, { status: 201 });
 };

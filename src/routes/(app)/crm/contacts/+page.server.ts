@@ -4,7 +4,7 @@ import { crmContacts, crmCompanies, users } from '$lib/server/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const contacts = db
+	const contacts = await db
 		.select({
 			id: crmContacts.id,
 			firstName: crmContacts.firstName,
@@ -23,8 +23,7 @@ export const load: PageServerLoad = async () => {
 		.from(crmContacts)
 		.leftJoin(crmCompanies, eq(crmContacts.companyId, crmCompanies.id))
 		.leftJoin(users, eq(crmContacts.ownerId, users.id))
-		.orderBy(desc(crmContacts.createdAt))
-		.all();
+		.orderBy(desc(crmContacts.createdAt));
 
 	return { contacts };
 };

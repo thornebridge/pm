@@ -46,22 +46,22 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(where) as typeof query;
 	}
 
-	const products = query.all();
+	const products = await query;
 
 	// Attach tier count and default price for each product
-	const result = products.map((p) => {
-		const tiers = db
+	const result = [];
+	for (const p of products) {
+		const tiers = await db
 			.select()
 			.from(crmPriceTiers)
-			.where(eq(crmPriceTiers.productId, p.id))
-			.all();
+			.where(eq(crmPriceTiers.productId, p.id));
 		const defaultTier = tiers.find((t) => t.isDefault) || tiers[0];
-		return {
+		result.push({
 			...p,
 			tierCount: tiers.length,
 			defaultPrice: defaultTier?.unitAmount ?? null
-		};
-	});
+		});
+	}
 
 	return json(result);
 };
@@ -89,6 +89,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmProducts).values(product).run();
+	await db.insert(crmProducts).values(product);
 	return json(product, { status: 201 });
 };

@@ -6,7 +6,7 @@ import { eq, and, gte, desc, sql } from 'drizzle-orm';
 export const load: PageServerLoad = async ({ locals }) => {
 	const userId = locals.user!.id;
 
-	const eventTypes = db
+	const eventTypes = await db
 		.select({
 			id: bookingEventTypes.id,
 			title: bookingEventTypes.title,
@@ -24,11 +24,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		})
 		.from(bookingEventTypes)
 		.where(eq(bookingEventTypes.userId, userId))
-		.orderBy(bookingEventTypes.createdAt)
-		.all();
+		.orderBy(bookingEventTypes.createdAt);
 
 	const now = Date.now();
-	const upcomingBookings = db
+	const upcomingBookings = await db
 		.select({
 			id: bookings.id,
 			eventTypeTitle: bookingEventTypes.title,
@@ -51,14 +50,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 			)
 		)
 		.orderBy(bookings.startTime)
-		.limit(50)
-		.all();
+		.limit(50);
 
-	const calendarConnected = !!db
+	const [calendarRow] = await db
 		.select({ id: calendarIntegrations.id })
 		.from(calendarIntegrations)
-		.where(eq(calendarIntegrations.userId, userId))
-		.get();
+		.where(eq(calendarIntegrations.userId, userId));
+	const calendarConnected = !!calendarRow;
 
 	return { eventTypes, upcomingBookings, calendarConnected };
 };

@@ -12,12 +12,11 @@ import { validateTheme, themeToVariables } from '$lib/server/theme/parser.js';
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const custom = db
+	const customRows = await db
 		.select()
 		.from(userThemes)
-		.where(eq(userThemes.userId, user.id))
-		.all()
-		.map((t) => ({
+		.where(eq(userThemes.userId, user.id));
+	const custom = customRows.map((t) => ({
 			id: t.id,
 			name: t.name,
 			description: t.description,
@@ -54,7 +53,7 @@ export const POST: RequestHandler = async (event) => {
 	const now = Date.now();
 	const id = nanoid(12);
 
-	db.insert(userThemes)
+	await db.insert(userThemes)
 		.values({
 			id,
 			userId: user.id,
@@ -64,8 +63,7 @@ export const POST: RequestHandler = async (event) => {
 			variables: JSON.stringify(variables),
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
 	return json({ id, name: result.theme.name, variables, builtin: false }, { status: 201 });
 };

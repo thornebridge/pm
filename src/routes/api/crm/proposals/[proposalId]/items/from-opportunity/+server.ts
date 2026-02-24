@@ -15,18 +15,17 @@ export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId } = event.params;
 
-	const proposal = db
+	const [proposal] = await db
 		.select()
 		.from(crmProposals)
-		.where(eq(crmProposals.id, proposalId))
-		.get();
+		.where(eq(crmProposals.id, proposalId));
 	if (!proposal) return json({ error: 'Proposal not found' }, { status: 404 });
 	if (proposal.status !== 'draft') {
 		return json({ error: 'Can only import items to draft proposals' }, { status: 400 });
 	}
 
 	// Get opportunity items with product info
-	const oppItems = db
+	const oppItems = await db
 		.select({
 			id: crmOpportunityItems.id,
 			productId: crmOpportunityItems.productId,
@@ -45,15 +44,14 @@ export const POST: RequestHandler = async (event) => {
 		.from(crmOpportunityItems)
 		.innerJoin(crmProducts, eq(crmOpportunityItems.productId, crmProducts.id))
 		.where(eq(crmOpportunityItems.opportunityId, proposal.opportunityId))
-		.orderBy(asc(crmOpportunityItems.position))
-		.all();
+		.orderBy(asc(crmOpportunityItems.position));
 
 	if (oppItems.length === 0) {
 		return json({ error: 'No items on this opportunity to import' }, { status: 400 });
 	}
 
 	// Delete existing proposal items first (replace)
-	db.delete(crmProposalItems).where(eq(crmProposalItems.proposalId, proposalId)).run();
+	await db.delete(crmProposalItems).where(eq(crmProposalItems.proposalId, proposalId));
 
 	const now = Date.now();
 	const created = [];
@@ -88,16 +86,15 @@ export const POST: RequestHandler = async (event) => {
 			createdAt: now
 		};
 
-		db.insert(crmProposalItems).values(item).run();
+		await db.insert(crmProposalItems).values(item);
 		created.push(item);
 	}
 
 	// Update proposal amount
 	const total = created.reduce((sum, item) => sum + item.lineTotal, 0);
-	db.update(crmProposals)
+	await db.update(crmProposals)
 		.set({ amount: total, updatedAt: Date.now() })
-		.where(eq(crmProposals.id, proposalId))
-		.run();
+		.where(eq(crmProposals.id, proposalId));
 
 	return json({ items: created, total }, { status: 201 });
 };

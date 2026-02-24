@@ -10,12 +10,11 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { projectId } = event.params;
 
-	const all = db
+	const all = await db
 		.select()
 		.from(sprints)
 		.where(eq(sprints.projectId, projectId))
-		.orderBy(desc(sprints.createdAt))
-		.all();
+		.orderBy(desc(sprints.createdAt));
 
 	return json(all);
 };
@@ -41,7 +40,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(sprints).values(sprint).run();
+	await db.insert(sprints).values(sprint);
 
 	if (globalThis.__wsBroadcast) {
 		globalThis.__wsBroadcast(projectId, { type: 'sprint:created', sprint });

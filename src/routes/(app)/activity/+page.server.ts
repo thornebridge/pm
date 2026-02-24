@@ -4,7 +4,7 @@ import { activityLog, tasks, projects, users } from '$lib/server/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const activity = db
+	const activity = await db
 		.select({
 			id: activityLog.id,
 			action: activityLog.action,
@@ -23,8 +23,7 @@ export const load: PageServerLoad = async () => {
 		.innerJoin(projects, eq(tasks.projectId, projects.id))
 		.innerJoin(users, eq(activityLog.userId, users.id))
 		.orderBy(desc(activityLog.createdAt))
-		.limit(100)
-		.all();
+		.limit(100);
 
 	return { activity };
 };

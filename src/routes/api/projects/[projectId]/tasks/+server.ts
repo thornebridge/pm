@@ -58,19 +58,18 @@ export const GET: RequestHandler = async (event) => {
 	const limit = Math.min(parseInt(url.searchParams.get('limit') || '500'), 500);
 	const offset = parseInt(url.searchParams.get('offset') || '0');
 
-	const result = db
+	const result = await db
 		.select()
 		.from(tasks)
 		.where(and(...conditions))
 		.orderBy(orderFn(orderCol))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
 	// Fetch label assignments for all tasks
 	if (result.length > 0) {
 		const taskIds = result.map((t) => t.id);
-		const labelAssigns = db
+		const labelAssigns = await db
 			.select({
 				taskId: taskLabelAssignments.taskId,
 				labelId: taskLabelAssignments.labelId,
@@ -79,8 +78,7 @@ export const GET: RequestHandler = async (event) => {
 			})
 			.from(taskLabelAssignments)
 			.innerJoin(taskLabels, eq(taskLabelAssignments.labelId, taskLabels.id))
-			.where(inArray(taskLabelAssignments.taskId, taskIds))
-			.all();
+			.where(inArray(taskLabelAssignments.taskId, taskIds));
 
 		const labelMap = new Map<string, typeof labelAssigns>();
 		for (const la of labelAssigns) {
@@ -108,31 +106,29 @@ export const POST: RequestHandler = async (event) => {
 	// Resolve assignee: use provided or project default
 	let resolvedAssigneeId = assigneeId || null;
 	if (!resolvedAssigneeId) {
-		const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
+		const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
 		if (project?.defaultAssigneeId) {
 			resolvedAssigneeId = project.defaultAssigneeId;
 		}
 	}
 
 	// Auto-increment number per project
-	const maxNum = db
+	const [maxNum] = await db
 		.select({ max: sql<number>`coalesce(max(${tasks.number}), 0)` })
 		.from(tasks)
-		.where(eq(tasks.projectId, projectId))
-		.get();
+		.where(eq(tasks.projectId, projectId));
 
 	const number = (maxNum?.max || 0) + 1;
 
 	// Default to first status if not specified
 	let resolvedStatusId = statusId;
 	if (!resolvedStatusId) {
-		const firstStatus = db
+		const [firstStatus] = await db
 			.select()
 			.from(taskStatuses)
 			.where(eq(taskStatuses.projectId, projectId))
 			.orderBy(asc(taskStatuses.position))
-			.limit(1)
-			.get();
+			.limit(1);
 		resolvedStatusId = firstStatus?.id;
 	}
 
@@ -141,13 +137,12 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Position: append to end of status column
-	const lastTask = db
+	const [lastTask] = await db
 		.select({ pos: tasks.position })
 		.from(tasks)
 		.where(and(eq(tasks.projectId, projectId), eq(tasks.statusId, resolvedStatusId)))
 		.orderBy(desc(tasks.position))
-		.limit(1)
-		.get();
+		.limit(1);
 
 	const position = (lastTask?.pos || 0) + 1;
 
@@ -174,33 +169,32 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(tasks).values(task).run();
+	await db.insert(tasks).values(task);
 
 	// Activity log
-	db.insert(activityLog)
+	await db.insert(activityLog)
 		.values({
 			id: nanoid(12),
 			taskId: id,
 			userId: user.id,
 			action: 'created',
 			createdAt: now
-		})
-		.run();
+		});
 
 	// Assign labels if provided
 	const assignedLabels: Array<{ labelId: string; name: string; color: string }> = [];
 	if (labelIds && Array.isArray(labelIds) && labelIds.length > 0) {
 		for (const labelId of labelIds) {
-			const label = db.select().from(taskLabels).where(eq(taskLabels.id, labelId)).get();
+			const [label] = await db.select().from(taskLabels).where(eq(taskLabels.id, labelId));
 			if (label && label.projectId === projectId) {
-				db.insert(taskLabelAssignments).values({ taskId: id, labelId }).run();
+				await db.insert(taskLabelAssignments).values({ taskId: id, labelId });
 				assignedLabels.push({ labelId: label.id, name: label.name, color: label.color });
 			}
 		}
 	}
 
 	const result = { ...task, labels: assignedLabels };
-	const proj = db.select({ slug: projects.slug, name: projects.name }).from(projects).where(eq(projects.id, projectId)).get();
+	const [proj] = await db.select({ slug: projects.slug, name: projects.name }).from(projects).where(eq(projects.id, projectId));
 	indexDocument('tasks', { id: task.id, number: task.number, title: task.title, projectId, projectSlug: proj?.slug, projectName: proj?.name, assigneeId: task.assigneeId, statusId: task.statusId, priority: task.priority, dueDate: task.dueDate, updatedAt: task.updatedAt });
 	broadcastTaskCreated(projectId, result, user.id);
 	fireWebhooks('task.created', { projectId, task: result }).catch(() => {});

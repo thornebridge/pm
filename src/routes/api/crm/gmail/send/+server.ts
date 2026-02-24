@@ -10,10 +10,9 @@ import { nanoid } from 'nanoid';
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const integration = db.select()
+	const [integration] = await db.select()
 		.from(gmailIntegrations)
-		.where(eq(gmailIntegrations.userId, user.id))
-		.get();
+		.where(eq(gmailIntegrations.userId, user.id));
 
 	if (!integration) {
 		return new Response(JSON.stringify({ error: 'Gmail not connected' }), {
@@ -65,7 +64,7 @@ export const POST: RequestHandler = async (event) => {
 
 		// Create a CRM activity for the sent email
 		const now = Date.now();
-		db.insert(crmActivities).values({
+		await db.insert(crmActivities).values({
 			id: nanoid(12),
 			type: 'email',
 			subject: `Sent: ${subject}`,
@@ -73,7 +72,7 @@ export const POST: RequestHandler = async (event) => {
 			userId: user.id,
 			createdAt: now,
 			updatedAt: now
-		}).run();
+		});
 
 		return Response.json({ ok: true, messageId: result.id, threadId: result.threadId });
 	} catch (err) {

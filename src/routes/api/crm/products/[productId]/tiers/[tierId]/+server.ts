@@ -9,11 +9,10 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId, tierId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmPriceTiers)
-		.where(and(eq(crmPriceTiers.id, tierId), eq(crmPriceTiers.productId, productId)))
-		.get();
+		.where(and(eq(crmPriceTiers.id, tierId), eq(crmPriceTiers.productId, productId)));
 	if (!existing) return json({ error: 'Price tier not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -28,8 +27,8 @@ export const PATCH: RequestHandler = async (event) => {
 		if (f in body) updates[f] = body[f];
 	}
 
-	db.update(crmPriceTiers).set(updates).where(eq(crmPriceTiers.id, tierId)).run();
-	const updated = db.select().from(crmPriceTiers).where(eq(crmPriceTiers.id, tierId)).get();
+	await db.update(crmPriceTiers).set(updates).where(eq(crmPriceTiers.id, tierId));
+	const [updated] = await db.select().from(crmPriceTiers).where(eq(crmPriceTiers.id, tierId));
 	return json(updated);
 };
 
@@ -37,13 +36,12 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { productId, tierId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmPriceTiers)
-		.where(and(eq(crmPriceTiers.id, tierId), eq(crmPriceTiers.productId, productId)))
-		.get();
+		.where(and(eq(crmPriceTiers.id, tierId), eq(crmPriceTiers.productId, productId)));
 	if (!existing) return json({ error: 'Price tier not found' }, { status: 404 });
 
-	db.delete(crmPriceTiers).where(eq(crmPriceTiers.id, tierId)).run();
+	await db.delete(crmPriceTiers).where(eq(crmPriceTiers.id, tierId));
 	return json({ ok: true });
 };

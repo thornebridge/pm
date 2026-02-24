@@ -6,7 +6,7 @@ import { commentReactions, comments } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { broadcastReactionChanged } from '$lib/server/ws/handlers.js';
 
-const ALLOWED_EMOJIS = ['👍', '👎', '❤️', '🎉', '😄', '👀', '🚀', '💯'];
+const ALLOWED_EMOJIS = ['\ud83d\udc4d', '\ud83d\udc4e', '\u2764\ufe0f', '\ud83c\udf89', '\ud83d\ude04', '\ud83d\udc40', '\ud83d\ude80', '\ud83d\udcaf'];
 
 // POST: toggle a reaction (add if missing, remove if exists)
 export const POST: RequestHandler = async (event) => {
@@ -18,16 +18,15 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Verify comment exists
-	const comment = comments && db
+	const [comment] = await db
 		.select({ id: comments.id })
 		.from(comments)
-		.where(and(eq(comments.id, event.params.commentId), eq(comments.taskId, event.params.taskId)))
-		.get();
+		.where(and(eq(comments.id, event.params.commentId), eq(comments.taskId, event.params.taskId)));
 
 	if (!comment) return json({ error: 'Comment not found' }, { status: 404 });
 
 	// Check if reaction exists
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(commentReactions)
 		.where(
@@ -36,32 +35,29 @@ export const POST: RequestHandler = async (event) => {
 				eq(commentReactions.userId, user.id),
 				eq(commentReactions.emoji, emoji)
 			)
-		)
-		.get();
+		);
 
 	if (existing) {
 		// Remove
-		db.delete(commentReactions)
+		await db.delete(commentReactions)
 			.where(
 				and(
 					eq(commentReactions.commentId, event.params.commentId),
 					eq(commentReactions.userId, user.id),
 					eq(commentReactions.emoji, emoji)
 				)
-			)
-			.run();
+			);
 		broadcastReactionChanged(event.params.projectId, user.id);
 		return json({ action: 'removed' });
 	} else {
 		// Add
-		db.insert(commentReactions)
+		await db.insert(commentReactions)
 			.values({
 				commentId: event.params.commentId,
 				userId: user.id,
 				emoji,
 				createdAt: Date.now()
-			})
-			.run();
+			});
 		broadcastReactionChanged(event.params.projectId, user.id);
 		return json({ action: 'added' });
 	}

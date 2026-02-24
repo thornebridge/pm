@@ -10,11 +10,10 @@ import { broadcastLabelChanged } from '$lib/server/ws/handlers.js';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const labels = db
+	const labels = await db
 		.select()
 		.from(taskLabels)
-		.where(eq(taskLabels.projectId, event.params.projectId))
-		.all();
+		.where(eq(taskLabels.projectId, event.params.projectId));
 
 	return json(labels);
 };
@@ -35,7 +34,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(taskLabels).values(label).run();
+	await db.insert(taskLabels).values(label);
 	broadcastLabelChanged(event.params.projectId, user.id);
 	return json(label, { status: 201 });
 };
@@ -49,9 +48,8 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	// CASCADE on task_label_assignments handles cleanup
-	db.delete(taskLabels)
-		.where(and(eq(taskLabels.id, id), eq(taskLabels.projectId, event.params.projectId)))
-		.run();
+	await db.delete(taskLabels)
+		.where(and(eq(taskLabels.id, id), eq(taskLabels.projectId, event.params.projectId)));
 
 	broadcastLabelChanged(event.params.projectId, user.id);
 	return json({ ok: true });

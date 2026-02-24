@@ -50,12 +50,11 @@ export const GET: RequestHandler = async (event) => {
 	if (hasPhone === 'true') conditions.push(isNotNull(crmContacts.phone));
 
 	// Exclude contacts marked Do Not Call in any session
-	const dncContactIds = db
+	const dncRows = await db
 		.select({ contactId: dialQueueItems.contactId })
 		.from(dialQueueItems)
-		.where(eq(dialQueueItems.disposition, 'connected_do_not_call'))
-		.all()
-		.map((r) => r.contactId);
+		.where(eq(dialQueueItems.disposition, 'connected_do_not_call'));
+	const dncContactIds = dncRows.map((r) => r.contactId);
 
 	if (dncContactIds.length > 0) {
 		conditions.push(not(inArray(crmContacts.id, dncContactIds)));
@@ -63,12 +62,11 @@ export const GET: RequestHandler = async (event) => {
 
 	// Exclude contacts already in a specific session
 	if (excludeSessionId) {
-		const sessionContactIds = db
+		const sessionRows = await db
 			.select({ contactId: dialQueueItems.contactId })
 			.from(dialQueueItems)
-			.where(eq(dialQueueItems.sessionId, excludeSessionId))
-			.all()
-			.map((r) => r.contactId);
+			.where(eq(dialQueueItems.sessionId, excludeSessionId));
+		const sessionContactIds = sessionRows.map((r) => r.contactId);
 
 		if (sessionContactIds.length > 0) {
 			conditions.push(not(inArray(crmContacts.id, sessionContactIds)));
@@ -77,11 +75,11 @@ export const GET: RequestHandler = async (event) => {
 
 	// Filter by opportunity stage
 	if (opportunityStageId) {
-		const oppContactIds = db
+		const oppRows = await db
 			.select({ contactId: crmOpportunities.contactId })
 			.from(crmOpportunities)
-			.where(eq(crmOpportunities.stageId, opportunityStageId))
-			.all()
+			.where(eq(crmOpportunities.stageId, opportunityStageId));
+		const oppContactIds = oppRows
 			.filter((r) => r.contactId)
 			.map((r) => r.contactId!);
 
@@ -95,11 +93,11 @@ export const GET: RequestHandler = async (event) => {
 
 	// Filter by opportunity priority
 	if (opportunityPriority) {
-		const oppContactIds = db
+		const oppRows = await db
 			.select({ contactId: crmOpportunities.contactId })
 			.from(crmOpportunities)
-			.where(eq(crmOpportunities.priority, opportunityPriority as 'hot' | 'warm' | 'cold'))
-			.all()
+			.where(eq(crmOpportunities.priority, opportunityPriority as 'hot' | 'warm' | 'cold'));
+		const oppContactIds = oppRows
 			.filter((r) => r.contactId)
 			.map((r) => r.contactId!);
 
@@ -115,7 +113,7 @@ export const GET: RequestHandler = async (event) => {
 		const ts = parseInt(lastContactedBefore);
 		// Contacts whose most recent activity is before the given timestamp
 		// OR contacts with no activity at all
-		const recentlyContactedIds = db
+		const recentRows = await db
 			.select({ contactId: crmActivities.contactId })
 			.from(crmActivities)
 			.where(
@@ -123,8 +121,8 @@ export const GET: RequestHandler = async (event) => {
 					isNotNull(crmActivities.contactId),
 					sql`${crmActivities.createdAt} > ${ts}`
 				)
-			)
-			.all()
+			);
+		const recentlyContactedIds = recentRows
 			.filter((r) => r.contactId)
 			.map((r) => r.contactId!);
 
@@ -165,7 +163,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(where) as typeof query;
 	}
 
-	const contacts = query.all();
+	const contacts = await query;
 
 	// Enrich with recently-called info (within 48 hours)
 	const fortyEightHoursAgo = Date.now() - 48 * 60 * 60 * 1000;
@@ -173,7 +171,7 @@ export const GET: RequestHandler = async (event) => {
 
 	let recentCalls: Record<string, { disposition: string | null; dialedAt: number | null }> = {};
 	if (contactIds.length > 0) {
-		const recentItems = db
+		const recentItems = await db
 			.select({
 				contactId: dialQueueItems.contactId,
 				disposition: dialQueueItems.disposition,
@@ -186,8 +184,7 @@ export const GET: RequestHandler = async (event) => {
 					sql`${dialQueueItems.dialedAt} > ${fortyEightHoursAgo}`
 				)
 			)
-			.orderBy(desc(dialQueueItems.dialedAt))
-			.all();
+			.orderBy(desc(dialQueueItems.dialedAt));
 
 		// Keep only the most recent per contact
 		for (const item of recentItems) {

@@ -9,7 +9,7 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId } = event.params;
 
-	const linked = db
+	const linked = await db
 		.select({
 			contactId: crmOpportunityContacts.contactId,
 			role: crmOpportunityContacts.role,
@@ -23,8 +23,7 @@ export const GET: RequestHandler = async (event) => {
 		})
 		.from(crmOpportunityContacts)
 		.innerJoin(crmContacts, eq(crmOpportunityContacts.contactId, crmContacts.id))
-		.where(eq(crmOpportunityContacts.opportunityId, opportunityId))
-		.all();
+		.where(eq(crmOpportunityContacts.opportunityId, opportunityId));
 
 	return json(linked);
 };
@@ -38,7 +37,7 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'Contact ID is required' }, { status: 400 });
 	}
 
-	db.insert(crmOpportunityContacts)
+	await db.insert(crmOpportunityContacts)
 		.values({
 			opportunityId,
 			contactId: body.contactId,
@@ -46,8 +45,7 @@ export const POST: RequestHandler = async (event) => {
 			influence: body.influence || null,
 			sentiment: body.sentiment || null,
 			notes: body.notes || null
-		})
-		.run();
+		});
 
 	return json({ ok: true }, { status: 201 });
 };
@@ -68,15 +66,14 @@ export const PATCH: RequestHandler = async (event) => {
 	if ('notes' in body) updates.notes = body.notes || null;
 
 	if (Object.keys(updates).length > 0) {
-		db.update(crmOpportunityContacts)
+		await db.update(crmOpportunityContacts)
 			.set(updates)
 			.where(
 				and(
 					eq(crmOpportunityContacts.opportunityId, opportunityId),
 					eq(crmOpportunityContacts.contactId, body.contactId)
 				)
-			)
-			.run();
+			);
 	}
 
 	return json({ ok: true });
@@ -91,14 +88,13 @@ export const DELETE: RequestHandler = async (event) => {
 		return json({ error: 'Contact ID is required' }, { status: 400 });
 	}
 
-	db.delete(crmOpportunityContacts)
+	await db.delete(crmOpportunityContacts)
 		.where(
 			and(
 				eq(crmOpportunityContacts.opportunityId, opportunityId),
 				eq(crmOpportunityContacts.contactId, body.contactId)
 			)
-		)
-		.run();
+		);
 
 	return json({ ok: true });
 };

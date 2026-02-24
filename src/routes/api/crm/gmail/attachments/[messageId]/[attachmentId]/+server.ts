@@ -10,20 +10,18 @@ export const GET: RequestHandler = async (event) => {
 	const { messageId, attachmentId } = event.params;
 
 	// Verify message belongs to user
-	const msg = db.select({ userId: gmailMessages.userId })
+	const [msg] = await db.select({ userId: gmailMessages.userId })
 		.from(gmailMessages)
-		.where(eq(gmailMessages.id, messageId))
-		.get();
+		.where(eq(gmailMessages.id, messageId));
 
 	if (!msg || msg.userId !== user.id) {
 		return new Response('Not found', { status: 404 });
 	}
 
 	// Get attachment metadata
-	const att = db.select()
+	const [att] = await db.select()
 		.from(gmailAttachments)
-		.where(and(eq(gmailAttachments.messageId, messageId), eq(gmailAttachments.gmailAttachmentId, attachmentId)))
-		.get();
+		.where(and(eq(gmailAttachments.messageId, messageId), eq(gmailAttachments.gmailAttachmentId, attachmentId)));
 
 	if (!att) {
 		return new Response('Not found', { status: 404 });

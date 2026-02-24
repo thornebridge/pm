@@ -88,12 +88,11 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Load project statuses
-	const statuses = db
+	const statuses = await db
 		.select()
 		.from(taskStatuses)
 		.where(eq(taskStatuses.projectId, projectId))
-		.orderBy(asc(taskStatuses.position))
-		.all();
+		.orderBy(asc(taskStatuses.position));
 
 	const statusNameMap = new Map(statuses.map((s) => [s.name.toLowerCase(), s.id]));
 	const defaultStatusId = statuses[0]?.id;
@@ -102,16 +101,15 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Load users for assignee matching
-	const allUsers = db.select({ id: users.id, name: users.name, email: users.email }).from(users).all();
+	const allUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users);
 	const userNameMap = new Map(allUsers.map((u) => [u.name.toLowerCase(), u.id]));
 	const userEmailMap = new Map(allUsers.map((u) => [u.email.toLowerCase(), u.id]));
 
 	// Get current max number
-	const maxNum = db
+	const [maxNum] = await db
 		.select({ max: sql<number>`coalesce(max(${tasks.number}), 0)` })
 		.from(tasks)
-		.where(eq(tasks.projectId, projectId))
-		.get();
+		.where(eq(tasks.projectId, projectId));
 
 	let nextNumber = (maxNum?.max || 0) + 1;
 
@@ -142,7 +140,7 @@ export const POST: RequestHandler = async (event) => {
 		}
 
 		const id = nanoid(12);
-		db.insert(tasks)
+		await db.insert(tasks)
 			.values({
 				id,
 				projectId,
@@ -157,10 +155,9 @@ export const POST: RequestHandler = async (event) => {
 				position: imported + 1,
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 
-		db.insert(activityLog)
+		await db.insert(activityLog)
 			.values({
 				id: nanoid(12),
 				taskId: id,
@@ -168,8 +165,7 @@ export const POST: RequestHandler = async (event) => {
 				action: 'created',
 				detail: JSON.stringify({ source: 'csv_import' }),
 				createdAt: now
-			})
-			.run();
+			});
 
 		imported++;
 	}

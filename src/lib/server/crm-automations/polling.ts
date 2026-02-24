@@ -134,22 +134,20 @@ async function pollCloseDateApproaching(ruleId: string, trigger: CrmTriggerDef):
 	const now = Date.now();
 	const threshold = now + daysBefore * 86400000;
 
-	const closedStageIds = db.select({ id: crmPipelineStages.id })
+	const closedStageRows = await db.select({ id: crmPipelineStages.id })
 		.from(crmPipelineStages)
-		.where(eq(crmPipelineStages.isClosed, true))
-		.all()
-		.map((s) => s.id);
+		.where(eq(crmPipelineStages.isClosed, true));
+	const closedStageIds = closedStageRows.map((s) => s.id);
 
-	const approachingOpps = db.select().from(crmOpportunities)
+	const allApproachingOpps = await db.select().from(crmOpportunities)
 		.where(
 			and(
 				isNotNull(crmOpportunities.expectedCloseDate),
 				gt(crmOpportunities.expectedCloseDate, now),
 				lte(crmOpportunities.expectedCloseDate, threshold)
 			)
-		)
-		.all()
-		.filter((o) => !closedStageIds.includes(o.stageId));
+		);
+	const approachingOpps = allApproachingOpps.filter((o) => !closedStageIds.includes(o.stageId));
 
 	for (const opp of approachingOpps) {
 		const key = `${ruleId}:${opp.id}`;

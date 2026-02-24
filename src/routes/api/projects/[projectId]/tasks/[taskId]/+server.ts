@@ -45,20 +45,19 @@ function computeNextDueDate(currentDue: number, rule: { freq: string; interval?:
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const task = db.select().from(tasks).where(eq(tasks.id, event.params.taskId)).get();
+	const [task] = await db.select().from(tasks).where(eq(tasks.id, event.params.taskId));
 
 	if (!task) {
 		return json({ error: 'Task not found' }, { status: 404 });
 	}
 
-	const labels = db
+	const labels = await db
 		.select({ id: taskLabels.id, name: taskLabels.name, color: taskLabels.color })
 		.from(taskLabelAssignments)
 		.innerJoin(taskLabels, eq(taskLabelAssignments.labelId, taskLabels.id))
-		.where(eq(taskLabelAssignments.taskId, task.id))
-		.all();
+		.where(eq(taskLabelAssignments.taskId, task.id));
 
-	const activity = db
+	const activity = await db
 		.select({
 			id: activityLog.id,
 			action: activityLog.action,
@@ -70,10 +69,9 @@ export const GET: RequestHandler = async (event) => {
 		.from(activityLog)
 		.innerJoin(users, eq(activityLog.userId, users.id))
 		.where(eq(activityLog.taskId, task.id))
-		.orderBy(asc(activityLog.createdAt))
-		.all();
+		.orderBy(asc(activityLog.createdAt));
 
-	const taskComments = db
+	const taskComments = await db
 		.select({
 			id: comments.id,
 			body: comments.body,
@@ -85,13 +83,12 @@ export const GET: RequestHandler = async (event) => {
 		.from(comments)
 		.innerJoin(users, eq(comments.userId, users.id))
 		.where(eq(comments.taskId, task.id))
-		.orderBy(asc(comments.createdAt))
-		.all();
+		.orderBy(asc(comments.createdAt));
 
 	// Load reactions for comments
 	const commentIds = taskComments.map((c) => c.id);
 	const reactions = commentIds.length > 0
-		? db
+		? await db
 			.select({
 				commentId: commentReactions.commentId,
 				userId: commentReactions.userId,
@@ -101,7 +98,6 @@ export const GET: RequestHandler = async (event) => {
 			.from(commentReactions)
 			.innerJoin(users, eq(commentReactions.userId, users.id))
 			.where(inArray(commentReactions.commentId, commentIds))
-			.all()
 		: [];
 
 	const reactionsByComment = new Map<string, typeof reactions>();
@@ -116,23 +112,21 @@ export const GET: RequestHandler = async (event) => {
 		reactions: reactionsByComment.get(c.id) || []
 	}));
 
-	const checklist = db
+	const checklist = await db
 		.select()
 		.from(checklistItems)
 		.where(eq(checklistItems.taskId, task.id))
-		.orderBy(asc(checklistItems.position))
-		.all();
+		.orderBy(asc(checklistItems.position));
 
 	// Subtask counts
-	const subtaskSummary = db
+	const [subtaskSummary] = await db
 		.select({
 			total: sql<number>`count(*)`,
 			done: sql<number>`sum(case when ${taskStatuses.isClosed} = 1 then 1 else 0 end)`
 		})
 		.from(tasks)
 		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
-		.where(eq(tasks.parentId, task.id))
-		.get();
+		.where(eq(tasks.parentId, task.id));
 
 	return json({
 		...task,
@@ -151,7 +145,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const now = Date.now();
 	const taskId = event.params.taskId;
 
-	const existing = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	const [existing] = await db.select().from(tasks).where(eq(tasks.id, taskId));
 	if (!existing) {
 		return json({ error: 'Task not found' }, { status: 404 });
 	}
@@ -194,7 +188,7 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.dueDate !== undefined) {
 		updates.dueDate = body.dueDate || null;
 		// Clear sent reminders so they re-fire for new due date
-		db.delete(dueDateRemindersSent).where(eq(dueDateRemindersSent.taskId, taskId)).run();
+		await db.delete(dueDateRemindersSent).where(eq(dueDateRemindersSent.taskId, taskId));
 	}
 	if (body.sprintId !== undefined) {
 		updates.sprintId = body.sprintId || null;
@@ -212,10 +206,10 @@ export const PATCH: RequestHandler = async (event) => {
 		updates.recurrence = body.recurrence ? JSON.stringify(body.recurrence) : null;
 	}
 
-	db.update(tasks).set(updates).where(eq(tasks.id, taskId)).run();
+	await db.update(tasks).set(updates).where(eq(tasks.id, taskId));
 
 	for (const a of activities) {
-		db.insert(activityLog)
+		await db.insert(activityLog)
 			.values({
 				id: nanoid(12),
 				taskId,
@@ -223,13 +217,12 @@ export const PATCH: RequestHandler = async (event) => {
 				action: a.action as typeof activityLog.$inferInsert.action,
 				detail: a.detail || null,
 				createdAt: now
-			})
-			.run();
+			});
 	}
 
-	const updated = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	const [updated] = await db.select().from(tasks).where(eq(tasks.id, taskId));
 	if (updated) {
-		const proj = db.select({ slug: projects.slug, name: projects.name }).from(projects).where(eq(projects.id, event.params.projectId)).get();
+		const [proj] = await db.select({ slug: projects.slug, name: projects.name }).from(projects).where(eq(projects.id, event.params.projectId));
 		indexDocument('tasks', { id: updated.id, number: updated.number, title: updated.title, projectId: event.params.projectId, projectSlug: proj?.slug, projectName: proj?.name, assigneeId: updated.assigneeId, statusId: updated.statusId, priority: updated.priority, dueDate: updated.dueDate, updatedAt: updated.updatedAt });
 	}
 	broadcastTaskUpdated(event.params.projectId, updated, user.id);
@@ -263,7 +256,7 @@ export const PATCH: RequestHandler = async (event) => {
 
 	// Auto-create next recurring task when moved to a closed status
 	if (body.statusId !== undefined && body.statusId !== existing.statusId && updated?.recurrence) {
-		const newStatus = db.select().from(taskStatuses).where(eq(taskStatuses.id, body.statusId)).get();
+		const [newStatus] = await db.select().from(taskStatuses).where(eq(taskStatuses.id, body.statusId));
 		if (newStatus?.isClosed) {
 			try {
 				const rule = JSON.parse(updated.recurrence);
@@ -272,25 +265,22 @@ export const PATCH: RequestHandler = async (event) => {
 				// Check endDate
 				if (!rule.endDate || nextDue <= rule.endDate) {
 					// Find first open status for this project
-					const firstStatus = db.select().from(taskStatuses)
+					const [firstStatus] = await db.select().from(taskStatuses)
 						.where(eq(taskStatuses.projectId, event.params.projectId))
 						.orderBy(asc(taskStatuses.position))
-						.limit(1)
-						.get();
+						.limit(1);
 
 					// Auto-increment number
-					const maxNum = db
+					const [maxNum] = await db
 						.select({ max: sql<number>`coalesce(max(${tasks.number}), 0)` })
 						.from(tasks)
-						.where(eq(tasks.projectId, event.params.projectId))
-						.get();
+						.where(eq(tasks.projectId, event.params.projectId));
 
 					// Position at end
-					const lastPos = db.select({ pos: tasks.position }).from(tasks)
+					const [lastPos] = await db.select({ pos: tasks.position }).from(tasks)
 						.where(sql`${tasks.projectId} = ${event.params.projectId} AND ${tasks.statusId} = ${firstStatus?.id}`)
 						.orderBy(sql`${tasks.position} DESC`)
-						.limit(1)
-						.get();
+						.limit(1);
 
 					const nextId = nanoid(12);
 					const sourceId = updated.recurrenceSourceId || updated.id;
@@ -324,24 +314,23 @@ export const PATCH: RequestHandler = async (event) => {
 						updatedAt: now
 					};
 
-					db.insert(tasks).values(nextTask).run();
+					await db.insert(tasks).values(nextTask);
 
-					db.insert(activityLog).values({
+					await db.insert(activityLog).values({
 						id: nanoid(12),
 						taskId: nextId,
 						userId: user.id,
 						action: 'created',
 						detail: JSON.stringify({ recurring: true, sourceTaskId: taskId }),
 						createdAt: now
-					}).run();
+					});
 
 					// Copy labels from closed task
-					const existingLabels = db.select()
+					const existingLabels = await db.select()
 						.from(taskLabelAssignments)
-						.where(eq(taskLabelAssignments.taskId, taskId))
-						.all();
+						.where(eq(taskLabelAssignments.taskId, taskId));
 					for (const la of existingLabels) {
-						db.insert(taskLabelAssignments).values({ taskId: nextId, labelId: la.labelId }).run();
+						await db.insert(taskLabelAssignments).values({ taskId: nextId, labelId: la.labelId });
 					}
 
 					broadcastTaskCreated(event.params.projectId, nextTask, user.id);
@@ -359,8 +348,8 @@ export const PATCH: RequestHandler = async (event) => {
 export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const taskId = event.params.taskId;
-	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
-	db.delete(tasks).where(eq(tasks.id, taskId)).run();
+	const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+	await db.delete(tasks).where(eq(tasks.id, taskId));
 	removeDocument('tasks', taskId);
 	broadcastTaskDeleted(event.params.projectId, taskId, user.id);
 	fireWebhooks('task.deleted', { projectId: event.params.projectId, taskId }).catch(() => {});

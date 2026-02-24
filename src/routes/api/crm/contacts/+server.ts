@@ -72,7 +72,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(where) as typeof query;
 	}
 
-	const rows = query.all();
+	const rows = await query;
 	return json(rows);
 };
 
@@ -102,7 +102,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmContacts).values(contact).run();
+	await db.insert(crmContacts).values(contact);
 	indexDocument('contacts', { id: contact.id, firstName: contact.firstName, lastName: contact.lastName, email: contact.email, phone: contact.phone, title: contact.title, source: contact.source, companyId: contact.companyId, ownerId: contact.ownerId, notes: contact.notes, updatedAt: contact.updatedAt });
 
 	emitCrmAutomationEvent({

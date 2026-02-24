@@ -4,11 +4,10 @@ import { projects } from '$lib/server/db/schema.js';
 import { desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const allProjects = db
+	const allProjects = await db
 		.select({ id: projects.id, name: projects.name, slug: projects.slug })
 		.from(projects)
-		.orderBy(desc(projects.updatedAt))
-		.all();
+		.orderBy(desc(projects.updatedAt));
 
 	return { existingProjects: allProjects };
 };

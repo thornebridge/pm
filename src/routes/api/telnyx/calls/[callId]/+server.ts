@@ -11,7 +11,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const { callId } = event.params;
 	const body = await event.request.json();
 
-	const existing = db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.id, callId)).get();
+	const [existing] = await db.select().from(telnyxCallLogs).where(eq(telnyxCallLogs.id, callId));
 	if (!existing) {
 		return json({ error: 'Call log not found' }, { status: 404 });
 	}
@@ -25,7 +25,7 @@ export const PATCH: RequestHandler = async (event) => {
 	if (typeof body.telnyxCallControlId === 'string') updates.telnyxCallControlId = body.telnyxCallControlId;
 	if (typeof body.telnyxCallSessionId === 'string') updates.telnyxCallSessionId = body.telnyxCallSessionId;
 
-	db.update(telnyxCallLogs).set(updates).where(eq(telnyxCallLogs.id, callId)).run();
+	await db.update(telnyxCallLogs).set(updates).where(eq(telnyxCallLogs.id, callId));
 
 	return json({ ...existing, ...updates });
 };

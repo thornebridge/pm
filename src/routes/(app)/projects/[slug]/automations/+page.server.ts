@@ -6,17 +6,16 @@ import { eq, desc, sql } from 'drizzle-orm';
 export const load: PageServerLoad = async ({ parent }) => {
 	const { project } = await parent();
 
-	const rules = db
+	const rules = await db
 		.select()
 		.from(automationRules)
 		.where(eq(automationRules.projectId, project.id))
-		.orderBy(desc(automationRules.createdAt))
-		.all();
+		.orderBy(desc(automationRules.createdAt));
 
 	const ruleIds = rules.map((r) => r.id);
 
 	const execStats = ruleIds.length > 0
-		? db
+		? await db
 			.select({
 				ruleId: automationExecutions.ruleId,
 				count: sql<number>`count(*)`,
@@ -25,7 +24,6 @@ export const load: PageServerLoad = async ({ parent }) => {
 			})
 			.from(automationExecutions)
 			.groupBy(automationExecutions.ruleId)
-			.all()
 		: [];
 
 	const statsMap = new Map(execStats.map((s) => [s.ruleId, s]));

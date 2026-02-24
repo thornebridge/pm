@@ -8,7 +8,7 @@ import {
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const proposals = db
+	const proposals = await db
 		.select({
 			id: crmProposals.id,
 			opportunityId: crmProposals.opportunityId,
@@ -24,8 +24,7 @@ export const load: PageServerLoad = async () => {
 		.from(crmProposals)
 		.innerJoin(crmOpportunities, eq(crmProposals.opportunityId, crmOpportunities.id))
 		.innerJoin(crmCompanies, eq(crmOpportunities.companyId, crmCompanies.id))
-		.orderBy(desc(crmProposals.createdAt))
-		.all();
+		.orderBy(desc(crmProposals.createdAt));
 
 	return { proposals };
 };

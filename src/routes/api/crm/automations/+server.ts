@@ -10,21 +10,21 @@ import { validateCrmRule } from '$lib/server/crm-automations/validate.js';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const rules = db.select().from(crmAutomationRules).orderBy(desc(crmAutomationRules.createdAt)).all();
+	const rules = await db.select().from(crmAutomationRules).orderBy(desc(crmAutomationRules.createdAt));
 
 	// Get stats for each rule
-	const rulesWithStats = rules.map((rule) => {
-		const stats = db
+	const rulesWithStats = [];
+	for (const rule of rules) {
+		const [stats] = await db
 			.select({
 				runCount: count(),
 				lastRun: max(crmAutomationExecutions.createdAt),
 				errorCount: sql<number>`SUM(CASE WHEN ${crmAutomationExecutions.status} = 'error' THEN 1 ELSE 0 END)`
 			})
 			.from(crmAutomationExecutions)
-			.where(eq(crmAutomationExecutions.ruleId, rule.id))
-			.get();
+			.where(eq(crmAutomationExecutions.ruleId, rule.id));
 
-		return {
+		rulesWithStats.push({
 			...rule,
 			trigger: JSON.parse(rule.trigger),
 			conditions: rule.conditions ? JSON.parse(rule.conditions) : null,
@@ -32,8 +32,8 @@ export const GET: RequestHandler = async (event) => {
 			runCount: stats?.runCount || 0,
 			lastRun: stats?.lastRun || null,
 			errorCount: stats?.errorCount || 0
-		};
-	});
+		});
+	}
 
 	return json(rulesWithStats);
 };
@@ -60,7 +60,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmAutomationRules).values(rule).run();
+	await db.insert(crmAutomationRules).values(rule);
 
 	return json({
 		...rule,

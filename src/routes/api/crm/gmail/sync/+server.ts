@@ -8,10 +8,9 @@ import { initialSync, incrementalSync } from '$lib/server/gmail/sync.js';
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const integration = db.select()
+	const [integration] = await db.select()
 		.from(gmailIntegrations)
-		.where(eq(gmailIntegrations.userId, user.id))
-		.get();
+		.where(eq(gmailIntegrations.userId, user.id));
 
 	if (!integration) {
 		return new Response(JSON.stringify({ error: 'Gmail not connected' }), {

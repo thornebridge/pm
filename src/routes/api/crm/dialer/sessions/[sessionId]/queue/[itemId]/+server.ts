@@ -47,11 +47,10 @@ export const PATCH: RequestHandler = async (event) => {
 	const { sessionId, itemId } = event.params;
 	const body = await event.request.json();
 
-	const item = db
+	const [item] = await db
 		.select()
 		.from(dialQueueItems)
-		.where(eq(dialQueueItems.id, itemId))
-		.get();
+		.where(eq(dialQueueItems.id, itemId));
 
 	if (!item || item.sessionId !== sessionId) {
 		return json({ error: 'Queue item not found' }, { status: 404 });
@@ -69,15 +68,14 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.dialedAt !== undefined) updates.dialedAt = body.dialedAt;
 	if (body.completedAt !== undefined) updates.completedAt = body.completedAt;
 
-	db.update(dialQueueItems).set(updates).where(eq(dialQueueItems.id, itemId)).run();
+	await db.update(dialQueueItems).set(updates).where(eq(dialQueueItems.id, itemId));
 
 	// If a disposition was submitted, create a CRM activity and update session stats
 	if (body.disposition && body.status === 'completed') {
-		const contact = db
+		const [contact] = await db
 			.select()
 			.from(crmContacts)
-			.where(eq(crmContacts.id, item.contactId))
-			.get();
+			.where(eq(crmContacts.id, item.contactId));
 
 		const contactName = contact
 			? `${contact.firstName} ${contact.lastName}`
@@ -92,7 +90,7 @@ export const PATCH: RequestHandler = async (event) => {
 			? Math.ceil(body.callDurationSeconds / 60)
 			: null;
 
-		db.insert(crmActivities)
+		await db.insert(crmActivities)
 			.values({
 				id: activityId,
 				type: 'call',
@@ -107,18 +105,16 @@ export const PATCH: RequestHandler = async (event) => {
 				userId: user.id,
 				createdAt: now,
 				updatedAt: now
-			})
-			.run();
+			});
 
 		// Link the activity to the queue item
-		db.update(dialQueueItems)
+		await db.update(dialQueueItems)
 			.set({ crmActivityId: activityId })
-			.where(eq(dialQueueItems.id, itemId))
-			.run();
+			.where(eq(dialQueueItems.id, itemId));
 
 		// If callback requested, create a CRM task
 		if (body.disposition === 'connected_callback' && body.callbackAt) {
-			db.insert(crmTasks)
+			await db.insert(crmTasks)
 				.values({
 					id: nanoid(12),
 					title: `Callback: ${contactName}`,
@@ -133,8 +129,7 @@ export const PATCH: RequestHandler = async (event) => {
 					createdBy: user.id,
 					createdAt: now,
 					updatedAt: now
-				})
-				.run();
+				});
 		}
 
 		// Update session aggregate stats
@@ -142,7 +137,7 @@ export const PATCH: RequestHandler = async (event) => {
 		const isNoAnswer = NO_ANSWER_DISPOSITIONS.has(body.disposition);
 		const duration = body.callDurationSeconds || 0;
 
-		db.update(dialSessions)
+		await db.update(dialSessions)
 			.set({
 				completedContacts: sql`${dialSessions.completedContacts} + 1`,
 				totalConnected: isConnected
@@ -154,11 +149,10 @@ export const PATCH: RequestHandler = async (event) => {
 				totalDurationSeconds: sql`${dialSessions.totalDurationSeconds} + ${duration}`,
 				updatedAt: Date.now()
 			})
-			.where(eq(dialSessions.id, sessionId))
-			.run();
+			.where(eq(dialSessions.id, sessionId));
 	}
 
-	const updated = db.select().from(dialQueueItems).where(eq(dialQueueItems.id, itemId)).get();
+	const [updated] = await db.select().from(dialQueueItems).where(eq(dialQueueItems.id, itemId));
 	return json(updated);
 };
 
@@ -167,26 +161,24 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { sessionId, itemId } = event.params;
 
-	const item = db
+	const [item] = await db
 		.select()
 		.from(dialQueueItems)
-		.where(eq(dialQueueItems.id, itemId))
-		.get();
+		.where(eq(dialQueueItems.id, itemId));
 
 	if (!item || item.sessionId !== sessionId) {
 		return json({ error: 'Queue item not found' }, { status: 404 });
 	}
 
-	db.delete(dialQueueItems).where(eq(dialQueueItems.id, itemId)).run();
+	await db.delete(dialQueueItems).where(eq(dialQueueItems.id, itemId));
 
 	// Decrement session totalContacts
-	db.update(dialSessions)
+	await db.update(dialSessions)
 		.set({
 			totalContacts: sql`max(${dialSessions.totalContacts} - 1, 0)`,
 			updatedAt: Date.now()
 		})
-		.where(eq(dialSessions.id, sessionId))
-		.run();
+		.where(eq(dialSessions.id, sessionId));
 
 	return json({ ok: true });
 };

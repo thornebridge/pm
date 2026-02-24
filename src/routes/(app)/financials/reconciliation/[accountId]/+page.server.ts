@@ -11,35 +11,33 @@ import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ params }) => {
 	// Find the most recent (active or completed) reconciliation for this bank account
-	const recon = db
+	const [recon] = await db
 		.select()
 		.from(finReconciliations)
 		.where(eq(finReconciliations.bankAccountId, params.accountId))
 		.orderBy(desc(finReconciliations.createdAt))
-		.limit(1)
-		.get();
+		.limit(1);
 
 	if (!recon) {
 		throw error(404, 'No reconciliation found for this account');
 	}
 
 	// Get the bank account info
-	const account = db
+	const [account] = await db
 		.select({
 			id: finAccounts.id,
 			name: finAccounts.name,
 			accountNumber: finAccounts.accountNumber
 		})
 		.from(finAccounts)
-		.where(eq(finAccounts.id, params.accountId))
-		.get();
+		.where(eq(finAccounts.id, params.accountId));
 
 	if (!account) {
 		throw error(404, 'Account not found');
 	}
 
 	// Get all posted journal lines for this account up to statement date
-	const lines = db
+	const lines = await db
 		.select({
 			lineId: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -59,8 +57,7 @@ export const load: PageServerLoad = async ({ params }) => {
 				eq(finJournalEntries.status, 'posted'),
 				lte(finJournalEntries.date, recon.statementDate)
 			)
-		)
-		.all();
+		);
 
 	return {
 		recon,

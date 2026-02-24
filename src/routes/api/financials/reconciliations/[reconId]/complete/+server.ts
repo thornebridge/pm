@@ -1,4 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { finReconciliations, finJournalLines, finJournalEntries, finBankAccountMeta } from '$lib/server/db/schema.js';
@@ -7,11 +8,10 @@ import { eq, and, lte, sql } from 'drizzle-orm';
 export const POST: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const recon = db
+	const [recon] = await db
 		.select()
 		.from(finReconciliations)
-		.where(eq(finReconciliations.id, event.params.reconId))
-		.get();
+		.where(eq(finReconciliations.id, event.params.reconId));
 
 	if (!recon) {
 		return json({ error: 'Reconciliation not found' }, { status: 404 });
@@ -22,7 +22,7 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Compute reconciled balance: sum of reconciled lines
-	const result = db
+	const [result] = await db
 		.select({
 			totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 			totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -36,38 +36,34 @@ export const POST: RequestHandler = async (event) => {
 				eq(finJournalLines.reconciled, true),
 				lte(finJournalEntries.date, recon.statementDate)
 			)
-		)
-		.get();
+		);
 
 	const reconciledBalance = (result?.totalDebit ?? 0) - (result?.totalCredit ?? 0);
 	const now = Date.now();
 
-	db.update(finReconciliations)
+	await db.update(finReconciliations)
 		.set({
 			status: 'completed',
 			reconciledBalance,
 			completedAt: now,
 			updatedAt: now
 		})
-		.where(eq(finReconciliations.id, event.params.reconId))
-		.run();
+		.where(eq(finReconciliations.id, event.params.reconId));
 
 	// Update bank account meta with last reconciled info
-	const meta = db
+	const [meta] = await db
 		.select()
 		.from(finBankAccountMeta)
-		.where(eq(finBankAccountMeta.accountId, recon.bankAccountId))
-		.get();
+		.where(eq(finBankAccountMeta.accountId, recon.bankAccountId));
 
 	if (meta) {
-		db.update(finBankAccountMeta)
+		await db.update(finBankAccountMeta)
 			.set({
 				lastReconciledDate: recon.statementDate,
 				lastReconciledBalance: reconciledBalance,
 				updatedAt: now
 			})
-			.where(eq(finBankAccountMeta.accountId, recon.bankAccountId))
-			.run();
+			.where(eq(finBankAccountMeta.accountId, recon.bankAccountId));
 	}
 
 	return json({

@@ -22,14 +22,13 @@ export const GET: RequestHandler = async (event) => {
 
 	const where = conditions.length === 1 ? conditions[0] : and(...conditions);
 
-	const sessions = db
+	const sessions = await db
 		.select()
 		.from(dialSessions)
 		.where(where)
 		.orderBy(desc(dialSessions.createdAt))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
 	return json(sessions);
 };
@@ -60,6 +59,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(dialSessions).values(session).run();
+	await db.insert(dialSessions).values(session);
 	return json(session, { status: 201 });
 };

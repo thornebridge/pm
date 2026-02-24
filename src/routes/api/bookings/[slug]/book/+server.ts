@@ -17,11 +17,10 @@ export const POST: RequestHandler = async (event) => {
 	if (!body.startTime) return json({ error: 'Start time is required' }, { status: 400 });
 	if (!body.timezone) return json({ error: 'Timezone is required' }, { status: 400 });
 
-	const eventType = db
+	const [eventType] = await db
 		.select()
 		.from(bookingEventTypes)
-		.where(and(eq(bookingEventTypes.slug, slug), eq(bookingEventTypes.isActive, true)))
-		.get();
+		.where(and(eq(bookingEventTypes.slug, slug), eq(bookingEventTypes.isActive, true)));
 
 	if (!eventType) return json({ error: 'Not found' }, { status: 404 });
 
@@ -68,10 +67,10 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: now
 	};
 
-	db.insert(bookings).values(booking).run();
+	await db.insert(bookings).values(booking);
 
 	// Send confirmation emails
-	const owner = db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, eventType.userId)).get();
+	const [owner] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, eventType.userId));
 	if (owner) {
 		sendBookingConfirmation(booking, eventType, owner).catch((err) =>
 			console.error('[bookings] Failed to send confirmation:', err)

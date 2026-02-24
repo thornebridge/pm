@@ -17,11 +17,10 @@ export const PUT: RequestHandler = async (event) => {
 	if (themeId) {
 		const builtin = getBuiltinTheme(themeId);
 		if (!builtin) {
-			const custom = db
+			const [custom] = await db
 				.select()
 				.from(userThemes)
-				.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)))
-				.get();
+				.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)));
 
 			if (!custom) {
 				return json({ error: 'Theme not found' }, { status: 404 });
@@ -29,10 +28,9 @@ export const PUT: RequestHandler = async (event) => {
 		}
 	}
 
-	db.update(users)
+	await db.update(users)
 		.set({ activeThemeId: themeId })
-		.where(eq(users.id, user.id))
-		.run();
+		.where(eq(users.id, user.id));
 
 	return json({ ok: true });
 };

@@ -10,12 +10,11 @@ import { broadcastStatusChanged } from '$lib/server/ws/handlers.js';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const statuses = db
+	const statuses = await db
 		.select()
 		.from(taskStatuses)
 		.where(eq(taskStatuses.projectId, event.params.projectId))
-		.orderBy(asc(taskStatuses.position))
-		.all();
+		.orderBy(asc(taskStatuses.position));
 
 	return json(statuses);
 };
@@ -38,7 +37,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: Date.now()
 	};
 
-	db.insert(taskStatuses).values(status).run();
+	await db.insert(taskStatuses).values(status);
 	broadcastStatusChanged(event.params.projectId, user.id);
 	return json(status, { status: 201 });
 };
@@ -53,10 +52,9 @@ export const PUT: RequestHandler = async (event) => {
 	}
 
 	for (const item of order) {
-		db.update(taskStatuses)
+		await db.update(taskStatuses)
 			.set({ position: item.position })
-			.where(eq(taskStatuses.id, item.id))
-			.run();
+			.where(eq(taskStatuses.id, item.id));
 	}
 
 	broadcastStatusChanged(event.params.projectId, user.id);
@@ -72,20 +70,18 @@ export const DELETE: RequestHandler = async (event) => {
 	}
 
 	// Check if any tasks use this status
-	const usage = db
+	const usage = await db
 		.select({ id: tasks.id })
 		.from(tasks)
 		.where(and(eq(tasks.statusId, id), eq(tasks.projectId, event.params.projectId)))
-		.limit(1)
-		.all();
+		.limit(1);
 
 	if (usage.length > 0) {
 		return json({ error: 'Cannot delete status — tasks are still using it. Move or delete those tasks first.' }, { status: 400 });
 	}
 
-	db.delete(taskStatuses)
-		.where(and(eq(taskStatuses.id, id), eq(taskStatuses.projectId, event.params.projectId)))
-		.run();
+	await db.delete(taskStatuses)
+		.where(and(eq(taskStatuses.id, id), eq(taskStatuses.projectId, event.params.projectId)));
 
 	broadcastStatusChanged(event.params.projectId, user.id);
 	return json({ ok: true });

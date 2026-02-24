@@ -7,41 +7,37 @@ import { error, redirect } from '@sveltejs/kit';
 export const load: PageServerLoad = async ({ params, parent }) => {
 	const { project } = await parent();
 
-	const sprint = db
+	const [sprint] = await db
 		.select()
 		.from(sprints)
-		.where(and(eq(sprints.id, params.sprintId), eq(sprints.projectId, project.id)))
-		.get();
+		.where(and(eq(sprints.id, params.sprintId), eq(sprints.projectId, project.id)));
 
 	if (!sprint) {
 		throw redirect(302, `/projects/${project.slug}/sprints`);
 	}
 
-	const sprintTasks = db
+	const sprintTasks = await db
 		.select()
 		.from(tasks)
-		.where(eq(tasks.sprintId, sprint.id))
-		.all();
+		.where(eq(tasks.sprintId, sprint.id));
 
 	// Get backlog tasks (tasks with no sprint assigned)
-	const backlogTasks = db
+	const backlogTasks = await db
 		.select()
 		.from(tasks)
-		.where(and(eq(tasks.projectId, project.id), isNull(tasks.sprintId)))
-		.all();
+		.where(and(eq(tasks.projectId, project.id), isNull(tasks.sprintId)));
 
-	const statuses = db
+	const statuses = await db
 		.select()
 		.from(taskStatuses)
 		.where(eq(taskStatuses.projectId, project.id))
-		.orderBy(taskStatuses.position)
-		.all();
+		.orderBy(taskStatuses.position);
 
 	// Get labels for tasks
-	const allLabels = db.select().from(taskLabels).where(eq(taskLabels.projectId, project.id)).all();
+	const allLabels = await db.select().from(taskLabels).where(eq(taskLabels.projectId, project.id));
 	const allTaskIds = [...sprintTasks, ...backlogTasks].map((t) => t.id);
 	const assignments = allTaskIds.length > 0
-		? db.select().from(taskLabelAssignments).where(inArray(taskLabelAssignments.taskId, allTaskIds)).all()
+		? await db.select().from(taskLabelAssignments).where(inArray(taskLabelAssignments.taskId, allTaskIds))
 		: [];
 
 	const taskIds = new Set([...sprintTasks, ...backlogTasks].map((t) => t.id));

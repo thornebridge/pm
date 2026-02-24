@@ -10,13 +10,12 @@ function maskSecret(value: string | null): string | null {
 	return `${'•'.repeat(Math.max(0, value.length - 4))}${value.slice(-4)}`;
 }
 
-function getOrgSettings() {
-	let settings = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
+async function getOrgSettings() {
+	let [settings] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'default'));
 	if (!settings) {
-		db.insert(orgSettings)
-			.values({ id: 'default', platformName: 'PM', updatedAt: Date.now() })
-			.run();
-		settings = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get()!;
+		await db.insert(orgSettings)
+			.values({ id: 'default', platformName: 'PM', updatedAt: Date.now() });
+		[settings] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'default'));
 	}
 	return settings;
 }
@@ -24,7 +23,7 @@ function getOrgSettings() {
 /** GET — read org settings (mask secrets) */
 export const GET: RequestHandler = async (event) => {
 	requireAdmin(event);
-	const settings = getOrgSettings();
+	const settings = await getOrgSettings();
 	return json({
 		...settings,
 		telnyxApiKey: maskSecret(settings.telnyxApiKey),
@@ -38,7 +37,7 @@ export const PUT: RequestHandler = async (event) => {
 	requireAdmin(event);
 	const body = await event.request.json();
 
-	const current = getOrgSettings();
+	const current = await getOrgSettings();
 
 	const platformName =
 		typeof body.platformName === 'string' && body.platformName.trim().length > 0 && body.platformName.trim().length <= 30
@@ -90,7 +89,7 @@ export const PUT: RequestHandler = async (event) => {
 		? (body.resendApiKey.trim() || null)
 		: current.resendApiKey;
 
-	db.update(orgSettings)
+	await db.update(orgSettings)
 		.set({
 			platformName,
 			telnyxEnabled,
@@ -106,8 +105,7 @@ export const PUT: RequestHandler = async (event) => {
 			resendApiKey,
 			updatedAt: Date.now()
 		})
-		.where(eq(orgSettings.id, 'default'))
-		.run();
+		.where(eq(orgSettings.id, 'default'));
 
 	return json({
 		...current,

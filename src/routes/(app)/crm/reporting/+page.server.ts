@@ -16,34 +16,31 @@ export const load: PageServerLoad = async ({ url }) => {
 	const { fromMs, toMs } = range;
 
 	// All stages ordered
-	const stages = db
+	const stages = await db
 		.select()
 		.from(crmPipelineStages)
-		.orderBy(asc(crmPipelineStages.position))
-		.all();
+		.orderBy(asc(crmPipelineStages.position));
 
 	// --- Pipeline funnel (open stages, current snapshot) ---
-	const pipelineFunnel = stages
-		.filter((s) => !s.isClosed)
-		.map((s) => {
-			const opps = db
-				.select({
-					count: sql<number>`COUNT(*)`,
-					totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
-				})
-				.from(crmOpportunities)
-				.where(eq(crmOpportunities.stageId, s.id))
-				.get();
-			return {
-				name: s.name,
-				color: s.color,
-				count: opps?.count || 0,
-				value: opps?.totalValue || 0
-			};
+	const pipelineFunnel = [];
+	for (const s of stages.filter((s) => !s.isClosed)) {
+		const [opps] = await db
+			.select({
+				count: sql<number>`COUNT(*)`,
+				totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
+			})
+			.from(crmOpportunities)
+			.where(eq(crmOpportunities.stageId, s.id));
+		pipelineFunnel.push({
+			name: s.name,
+			color: s.color,
+			count: opps?.count || 0,
+			value: opps?.totalValue || 0
 		});
+	}
 
 	// --- Win/Loss analysis for the period ---
-	const wonInPeriod = db
+	const [wonInPeriod] = await db
 		.select({
 			count: sql<number>`COUNT(*)`,
 			totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
@@ -56,10 +53,9 @@ export const load: PageServerLoad = async ({ url }) => {
 				gte(crmOpportunities.actualCloseDate, fromMs),
 				lte(crmOpportunities.actualCloseDate, toMs)
 			)
-		)
-		.get();
+		);
 
-	const lostInPeriod = db
+	const [lostInPeriod] = await db
 		.select({
 			count: sql<number>`COUNT(*)`,
 			totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`
@@ -73,11 +69,10 @@ export const load: PageServerLoad = async ({ url }) => {
 				gte(crmOpportunities.actualCloseDate, fromMs),
 				lte(crmOpportunities.actualCloseDate, toMs)
 			)
-		)
-		.get();
+		);
 
 	// --- Lost reasons breakdown ---
-	const lostReasons = db
+	const lostReasonsRows = await db
 		.select({
 			reason: crmOpportunities.lostReason,
 			count: sql<number>`COUNT(*)`
@@ -93,13 +88,12 @@ export const load: PageServerLoad = async ({ url }) => {
 			)
 		)
 		.groupBy(crmOpportunities.lostReason)
-		.orderBy(desc(sql`COUNT(*)`))
-		.all()
-		.map((r) => ({ reason: r.reason || 'Not specified', count: r.count }));
+		.orderBy(desc(sql`COUNT(*)`));
+	const lostReasons = lostReasonsRows.map((r) => ({ reason: r.reason || 'Not specified', count: r.count }));
 
 	// --- Win/loss trend by month (last 12 months) ---
 	const twelveMonthsAgo = Date.now() - 365 * 86400000;
-	const closedDeals = db
+	const closedDeals = await db
 		.select({
 			isWon: crmPipelineStages.isWon,
 			closeDate: crmOpportunities.actualCloseDate,
@@ -112,8 +106,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				eq(crmPipelineStages.isClosed, true),
 				gte(crmOpportunities.actualCloseDate, twelveMonthsAgo)
 			)
-		)
-		.all();
+		);
 
 	// Bucket by month
 	const trendMap = new Map<string, { won: number; lost: number }>();
@@ -136,7 +129,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		}));
 
 	// --- Activity metrics for the period ---
-	const activityByType = db
+	const activityByType = await db
 		.select({
 			type: crmActivities.type,
 			count: sql<number>`COUNT(*)`,
@@ -149,24 +142,23 @@ export const load: PageServerLoad = async ({ url }) => {
 				lte(crmActivities.createdAt, toMs)
 			)
 		)
-		.groupBy(crmActivities.type)
-		.all();
+		.groupBy(crmActivities.type);
 
 	const totalActivities = activityByType.reduce((a, b) => a + b.count, 0);
 	const callData = activityByType.find((a) => a.type === 'call');
 	const avgCallDuration = callData && callData.count > 0 ? Math.round(callData.totalDuration / callData.count) : 0;
 
 	// --- Rep performance ---
-	const repDeals = db
+	const repDeals = await db
 		.select({
 			ownerId: crmOpportunities.ownerId,
 			ownerName: users.name,
 			count: sql<number>`COUNT(*)`,
 			totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`,
-			wonCount: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isWon} = 1 THEN 1 ELSE 0 END)`,
-			wonValue: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isWon} = 1 THEN ${crmOpportunities.value} ELSE 0 END)`,
-			closedCount: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isClosed} = 1 THEN 1 ELSE 0 END)`,
-			avgCycleMs: sql<number>`AVG(CASE WHEN ${crmPipelineStages.isWon} = 1 THEN ${crmOpportunities.actualCloseDate} - ${crmOpportunities.createdAt} END)`
+			wonCount: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isWon} = true THEN 1 ELSE 0 END)`,
+			wonValue: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isWon} = true THEN ${crmOpportunities.value} ELSE 0 END)`,
+			closedCount: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isClosed} = true THEN 1 ELSE 0 END)`,
+			avgCycleMs: sql<number>`AVG(CASE WHEN ${crmPipelineStages.isWon} = true THEN ${crmOpportunities.actualCloseDate} - ${crmOpportunities.createdAt} END)`
 		})
 		.from(crmOpportunities)
 		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
@@ -177,11 +169,10 @@ export const load: PageServerLoad = async ({ url }) => {
 				lte(crmOpportunities.createdAt, toMs)
 			)
 		)
-		.groupBy(crmOpportunities.ownerId)
-		.all();
+		.groupBy(crmOpportunities.ownerId);
 
 	// Activity counts per rep
-	const repActivityCounts = db
+	const repActivityCounts = await db
 		.select({
 			userId: crmActivities.userId,
 			count: sql<number>`COUNT(*)`
@@ -193,8 +184,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				lte(crmActivities.createdAt, toMs)
 			)
 		)
-		.groupBy(crmActivities.userId)
-		.all();
+		.groupBy(crmActivities.userId);
 	const repActivityMap: Record<string, number> = {};
 	for (const r of repActivityCounts) {
 		repActivityMap[r.userId] = r.count;
@@ -212,13 +202,13 @@ export const load: PageServerLoad = async ({ url }) => {
 	}));
 
 	// --- Conversion by source ---
-	const sourceStats = db
+	const sourceStatsRows = await db
 		.select({
 			source: crmOpportunities.source,
 			count: sql<number>`COUNT(*)`,
-			wonCount: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isWon} = 1 THEN 1 ELSE 0 END)`,
+			wonCount: sql<number>`SUM(CASE WHEN ${crmPipelineStages.isWon} = true THEN 1 ELSE 0 END)`,
 			totalValue: sql<number>`COALESCE(SUM(${crmOpportunities.value}), 0)`,
-			wonValue: sql<number>`COALESCE(SUM(CASE WHEN ${crmPipelineStages.isWon} = 1 THEN ${crmOpportunities.value} ELSE 0 END), 0)`
+			wonValue: sql<number>`COALESCE(SUM(CASE WHEN ${crmPipelineStages.isWon} = true THEN ${crmOpportunities.value} ELSE 0 END), 0)`
 		})
 		.from(crmOpportunities)
 		.innerJoin(crmPipelineStages, eq(crmOpportunities.stageId, crmPipelineStages.id))
@@ -228,20 +218,19 @@ export const load: PageServerLoad = async ({ url }) => {
 				lte(crmOpportunities.createdAt, toMs)
 			)
 		)
-		.groupBy(crmOpportunities.source)
-		.all()
-		.map((s) => ({
-			source: s.source || 'Unknown',
-			count: s.count,
-			wonCount: s.wonCount || 0,
-			totalValue: s.totalValue,
-			wonValue: s.wonValue,
-			winRate: s.count > 0 ? Math.round(((s.wonCount || 0) / s.count) * 100) : 0,
-			avgDealSize: s.count > 0 ? Math.round(s.totalValue / s.count) : 0
-		}));
+		.groupBy(crmOpportunities.source);
+	const sourceStats = sourceStatsRows.map((s) => ({
+		source: s.source || 'Unknown',
+		count: s.count,
+		wonCount: s.wonCount || 0,
+		totalValue: s.totalValue,
+		wonValue: s.wonValue,
+		winRate: s.count > 0 ? Math.round(((s.wonCount || 0) / s.count) * 100) : 0,
+		avgDealSize: s.count > 0 ? Math.round(s.totalValue / s.count) : 0
+	}));
 
 	// --- Average sales cycle ---
-	const cycleResult = db
+	const [cycleResult] = await db
 		.select({
 			avgMs: sql<number>`AVG(${crmOpportunities.actualCloseDate} - ${crmOpportunities.createdAt})`
 		})
@@ -253,8 +242,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				gte(crmOpportunities.actualCloseDate, fromMs),
 				lte(crmOpportunities.actualCloseDate, toMs)
 			)
-		)
-		.get();
+		);
 	const avgSalesCycleDays = cycleResult?.avgMs ? Math.round(cycleResult.avgMs / 86400000) : 0;
 
 	return {

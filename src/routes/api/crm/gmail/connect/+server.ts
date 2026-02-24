@@ -9,7 +9,7 @@ const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const config = getGoogleConfig();
+	const config = await getGoogleConfig();
 	if (!config) {
 		return new Response(JSON.stringify({ error: 'Google OAuth not configured' }), {
 			status: 400,

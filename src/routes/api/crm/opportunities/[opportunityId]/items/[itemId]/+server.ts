@@ -9,7 +9,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId, itemId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmOpportunityItems)
 		.where(
@@ -17,8 +17,7 @@ export const PATCH: RequestHandler = async (event) => {
 				eq(crmOpportunityItems.id, itemId),
 				eq(crmOpportunityItems.opportunityId, opportunityId)
 			)
-		)
-		.get();
+		);
 	if (!existing) return json({ error: 'Item not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -32,12 +31,11 @@ export const PATCH: RequestHandler = async (event) => {
 		if (f in body) updates[f] = body[f];
 	}
 
-	db.update(crmOpportunityItems).set(updates).where(eq(crmOpportunityItems.id, itemId)).run();
-	const updated = db
+	await db.update(crmOpportunityItems).set(updates).where(eq(crmOpportunityItems.id, itemId));
+	const [updated] = await db
 		.select()
 		.from(crmOpportunityItems)
-		.where(eq(crmOpportunityItems.id, itemId))
-		.get();
+		.where(eq(crmOpportunityItems.id, itemId));
 	return json(updated);
 };
 
@@ -45,7 +43,7 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { opportunityId, itemId } = event.params;
 
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(crmOpportunityItems)
 		.where(
@@ -53,10 +51,9 @@ export const DELETE: RequestHandler = async (event) => {
 				eq(crmOpportunityItems.id, itemId),
 				eq(crmOpportunityItems.opportunityId, opportunityId)
 			)
-		)
-		.get();
+		);
 	if (!existing) return json({ error: 'Item not found' }, { status: 404 });
 
-	db.delete(crmOpportunityItems).where(eq(crmOpportunityItems.id, itemId)).run();
+	await db.delete(crmOpportunityItems).where(eq(crmOpportunityItems.id, itemId));
 	return json({ ok: true });
 };

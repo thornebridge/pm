@@ -4,7 +4,7 @@ import { finReconciliations, finAccounts } from '$lib/server/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const reconciliations = db
+	const reconciliations = await db
 		.select({
 			id: finReconciliations.id,
 			bankAccountId: finReconciliations.bankAccountId,
@@ -19,8 +19,7 @@ export const load: PageServerLoad = async () => {
 		})
 		.from(finReconciliations)
 		.leftJoin(finAccounts, eq(finReconciliations.bankAccountId, finAccounts.id))
-		.orderBy(desc(finReconciliations.createdAt))
-		.all();
+		.orderBy(desc(finReconciliations.createdAt));
 
 	return { reconciliations };
 };

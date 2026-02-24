@@ -4,7 +4,7 @@ import { finAccounts } from '$lib/server/db/schema.js';
 import { eq, asc } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async () => {
-	const accounts = db
+	const accounts = await db
 		.select({
 			id: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -18,8 +18,7 @@ export const load: LayoutServerLoad = async () => {
 		})
 		.from(finAccounts)
 		.where(eq(finAccounts.active, true))
-		.orderBy(asc(finAccounts.accountNumber))
-		.all();
+		.orderBy(asc(finAccounts.accountNumber));
 
 	// Separate bank/cash accounts for quick access in forms
 	const bankAccounts = accounts.filter(

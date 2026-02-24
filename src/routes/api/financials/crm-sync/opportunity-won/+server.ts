@@ -10,7 +10,7 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'opportunityId, companyId, amount, and description are required' }, { status: 400 });
 	}
 
-	const result = createRevenueJournalEntry({
+	const result = await createRevenueJournalEntry({
 		opportunityId: body.opportunityId,
 		companyId: body.companyId,
 		amount: body.amount,

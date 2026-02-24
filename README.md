@@ -60,11 +60,12 @@ A lightweight, self-hosted project management platform with CRM, double-entry fi
 | Framework | SvelteKit 2 |
 | Language | TypeScript |
 | Frontend | Svelte 5 (runes) |
-| Database | SQLite via better-sqlite3 |
+| Database | PostgreSQL 17 |
 | ORM | Drizzle ORM |
+| Cache/Pub-Sub | Redis 7 (optional) |
 | Styling | Tailwind CSS 4 |
 | Auth | Argon2 password hashing + session cookies |
-| Real-time | WebSocket (ws) |
+| Real-time | WebSocket (ws) + Redis pub/sub |
 | Push | Web Push API (VAPID) |
 | Email | Resend API |
 | Telephony | Telnyx WebRTC |

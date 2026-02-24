@@ -6,29 +6,25 @@ import { asc, eq } from 'drizzle-orm';
 export const load: LayoutServerLoad = async ({ parent }) => {
 	await parent();
 
-	const stages = db
+	const stages = await db
 		.select()
 		.from(crmPipelineStages)
-		.orderBy(asc(crmPipelineStages.position))
-		.all();
+		.orderBy(asc(crmPipelineStages.position));
 
-	const members = db
+	const members = await db
 		.select({ id: users.id, name: users.name })
-		.from(users)
-		.all();
+		.from(users);
 
-	const companies = db
+	const companies = await db
 		.select({ id: crmCompanies.id, name: crmCompanies.name })
 		.from(crmCompanies)
-		.orderBy(asc(crmCompanies.name))
-		.all();
+		.orderBy(asc(crmCompanies.name));
 
-	const products = db
+	const products = await db
 		.select({ id: crmProducts.id, name: crmProducts.name, sku: crmProducts.sku })
 		.from(crmProducts)
 		.where(eq(crmProducts.status, 'active'))
-		.orderBy(asc(crmProducts.name))
-		.all();
+		.orderBy(asc(crmProducts.name));
 
 	return { stages, members, crmCompanies: companies, crmProducts: products };
 };

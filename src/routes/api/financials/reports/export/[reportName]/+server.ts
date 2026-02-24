@@ -1,4 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { finAccounts, finJournalEntries, finJournalLines, finBudgets } from '$lib/server/db/schema.js';
@@ -23,8 +24,8 @@ function centsToDecimal(cents: number): string {
 
 // ── Report Data Fetchers ────────────────────────────────────────────────────
 
-function getProfitLossData(from: number, to: number) {
-	const revenueAccounts = db
+async function getProfitLossData(from: number, to: number) {
+	const revenueAccounts = await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -46,10 +47,9 @@ function getProfitLossData(from: number, to: number) {
 			)
 		)
 		.where(eq(finAccounts.accountType, 'revenue'))
-		.groupBy(finAccounts.id)
-		.all();
+		.groupBy(finAccounts.id);
 
-	const expenseAccounts = db
+	const expenseAccounts = await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -71,15 +71,14 @@ function getProfitLossData(from: number, to: number) {
 			)
 		)
 		.where(eq(finAccounts.accountType, 'expense'))
-		.groupBy(finAccounts.id)
-		.all();
+		.groupBy(finAccounts.id);
 
 	return { revenueAccounts, expenseAccounts };
 }
 
-function getBalanceSheetData(asOf: number) {
-	function getByType(accountType: string) {
-		return db
+async function getBalanceSheetData(asOf: number) {
+	async function getByType(accountType: string) {
+		return await db
 			.select({
 				accountId: finAccounts.id,
 				accountNumber: finAccounts.accountNumber,
@@ -100,21 +99,20 @@ function getBalanceSheetData(asOf: number) {
 				)
 			)
 			.where(eq(finAccounts.accountType, accountType as any))
-			.groupBy(finAccounts.id)
-			.all();
+			.groupBy(finAccounts.id);
 	}
 
 	return {
-		assetRows: getByType('asset'),
-		liabilityRows: getByType('liability'),
-		equityRows: getByType('equity'),
-		revenueRows: getByType('revenue'),
-		expenseRows: getByType('expense')
+		assetRows: await getByType('asset'),
+		liabilityRows: await getByType('liability'),
+		equityRows: await getByType('equity'),
+		revenueRows: await getByType('revenue'),
+		expenseRows: await getByType('expense')
 	};
 }
 
-function getTrialBalanceData(from: number, to: number) {
-	return db
+async function getTrialBalanceData(from: number, to: number) {
+	return await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -137,11 +135,10 @@ function getTrialBalanceData(from: number, to: number) {
 			)
 		)
 		.groupBy(finAccounts.id)
-		.orderBy(asc(finAccounts.accountNumber))
-		.all();
+		.orderBy(asc(finAccounts.accountNumber));
 }
 
-function getGeneralLedgerData(from: number, to: number, accountId?: string) {
+async function getGeneralLedgerData(from: number, to: number, accountId?: string) {
 	const conditions = [
 		eq(finJournalEntries.status, 'posted'),
 		gte(finJournalEntries.date, from),
@@ -152,7 +149,7 @@ function getGeneralLedgerData(from: number, to: number, accountId?: string) {
 		conditions.push(eq(finJournalLines.accountId, accountId));
 	}
 
-	return db
+	return await db
 		.select({
 			accountId: finJournalLines.accountId,
 			accountNumber: finAccounts.accountNumber,
@@ -167,15 +164,14 @@ function getGeneralLedgerData(from: number, to: number, accountId?: string) {
 		.innerJoin(finJournalEntries, eq(finJournalLines.journalEntryId, finJournalEntries.id))
 		.innerJoin(finAccounts, eq(finJournalLines.accountId, finAccounts.id))
 		.where(and(...conditions))
-		.orderBy(asc(finAccounts.accountNumber), asc(finJournalEntries.date), asc(finJournalEntries.entryNumber))
-		.all();
+		.orderBy(asc(finAccounts.accountNumber), asc(finJournalEntries.date), asc(finJournalEntries.entryNumber));
 }
 
-function getBudgetVsActualData(periodType: string, year: number) {
+async function getBudgetVsActualData(periodType: string, year: number) {
 	const yearStart = new Date(year, 0, 1).getTime();
 	const yearEnd = new Date(year + 1, 0, 1).getTime() - 1;
 
-	const budgets = db
+	const budgets = await db
 		.select({
 			accountId: finBudgets.accountId,
 			periodStart: finBudgets.periodStart,
@@ -194,11 +190,10 @@ function getBudgetVsActualData(periodType: string, year: number) {
 				gte(finBudgets.periodStart, yearStart),
 				lte(finBudgets.periodEnd, yearEnd)
 			)
-		)
-		.all();
+		);
 
-	return budgets.map((budget) => {
-		const actualResult = db
+	return await Promise.all(budgets.map(async (budget) => {
+		const [actualResult] = await db
 			.select({
 				totalDebit: sql<number>`coalesce(sum(${finJournalLines.debit}), 0)`,
 				totalCredit: sql<number>`coalesce(sum(${finJournalLines.credit}), 0)`
@@ -212,8 +207,7 @@ function getBudgetVsActualData(periodType: string, year: number) {
 					gte(finJournalEntries.date, budget.periodStart),
 					lte(finJournalEntries.date, budget.periodEnd)
 				)
-			)
-			.get();
+			);
 
 		const totalDebit = actualResult?.totalDebit ?? 0;
 		const totalCredit = actualResult?.totalCredit ?? 0;
@@ -230,13 +224,13 @@ function getBudgetVsActualData(periodType: string, year: number) {
 		}
 
 		return { ...budget, actual };
-	});
+	}));
 }
 
 // ── CSV Generators ──────────────────────────────────────────────────────────
 
-function profitLossCsv(from: number, to: number): string {
-	const { revenueAccounts, expenseAccounts } = getProfitLossData(from, to);
+async function profitLossCsv(from: number, to: number): Promise<string> {
+	const { revenueAccounts, expenseAccounts } = await getProfitLossData(from, to);
 
 	const rows: string[] = [];
 	rows.push(buildCsvRow(['Profit & Loss Statement', '', '']));
@@ -273,8 +267,8 @@ function profitLossCsv(from: number, to: number): string {
 	return rows.join('\n');
 }
 
-function balanceSheetCsv(asOf: number): string {
-	const { assetRows, liabilityRows, equityRows, revenueRows, expenseRows } = getBalanceSheetData(asOf);
+async function balanceSheetCsv(asOf: number): Promise<string> {
+	const { assetRows, liabilityRows, equityRows, revenueRows, expenseRows } = await getBalanceSheetData(asOf);
 
 	const rows: string[] = [];
 	rows.push(buildCsvRow(['Balance Sheet', '', '']));
@@ -324,8 +318,8 @@ function balanceSheetCsv(asOf: number): string {
 	return rows.join('\n');
 }
 
-function trialBalanceCsv(from: number, to: number): string {
-	const data = getTrialBalanceData(from, to);
+async function trialBalanceCsv(from: number, to: number): Promise<string> {
+	const data = await getTrialBalanceData(from, to);
 
 	const rows: string[] = [];
 	rows.push(buildCsvRow(['Trial Balance', '', '', '', '']));
@@ -349,8 +343,8 @@ function trialBalanceCsv(from: number, to: number): string {
 	return rows.join('\n');
 }
 
-function generalLedgerCsv(from: number, to: number, accountId?: string): string {
-	const data = getGeneralLedgerData(from, to, accountId);
+async function generalLedgerCsv(from: number, to: number, accountId?: string): Promise<string> {
+	const data = await getGeneralLedgerData(from, to, accountId);
 
 	const rows: string[] = [];
 	rows.push(buildCsvRow(['General Ledger', '', '', '', '', '']));
@@ -375,8 +369,8 @@ function generalLedgerCsv(from: number, to: number, accountId?: string): string 
 	return rows.join('\n');
 }
 
-function budgetVsActualCsv(periodType: string, year: number): string {
-	const data = getBudgetVsActualData(periodType, year);
+async function budgetVsActualCsv(periodType: string, year: number): Promise<string> {
+	const data = await getBudgetVsActualData(periodType, year);
 
 	const rows: string[] = [];
 	rows.push(buildCsvRow(['Budget vs Actual', '', '', '', '', '', '']));
@@ -438,12 +432,12 @@ export const GET: RequestHandler = async (event) => {
 			if (!from || !to) {
 				return json({ error: 'from and to query parameters are required' }, { status: 400 });
 			}
-			csv = profitLossCsv(parseInt(from), parseInt(to));
+			csv = await profitLossCsv(parseInt(from), parseInt(to));
 			break;
 		}
 		case 'balance-sheet': {
 			const asOf = url.searchParams.get('asOf');
-			csv = balanceSheetCsv(asOf ? parseInt(asOf) : Date.now());
+			csv = await balanceSheetCsv(asOf ? parseInt(asOf) : Date.now());
 			break;
 		}
 		case 'trial-balance': {
@@ -452,7 +446,7 @@ export const GET: RequestHandler = async (event) => {
 			if (!from || !to) {
 				return json({ error: 'from and to query parameters are required' }, { status: 400 });
 			}
-			csv = trialBalanceCsv(parseInt(from), parseInt(to));
+			csv = await trialBalanceCsv(parseInt(from), parseInt(to));
 			break;
 		}
 		case 'general-ledger': {
@@ -462,7 +456,7 @@ export const GET: RequestHandler = async (event) => {
 			if (!from || !to) {
 				return json({ error: 'from and to query parameters are required' }, { status: 400 });
 			}
-			csv = generalLedgerCsv(parseInt(from), parseInt(to), accountId);
+			csv = await generalLedgerCsv(parseInt(from), parseInt(to), accountId);
 			break;
 		}
 		case 'budget-vs-actual': {
@@ -471,7 +465,7 @@ export const GET: RequestHandler = async (event) => {
 			if (!yearParam) {
 				return json({ error: 'year query parameter is required' }, { status: 400 });
 			}
-			csv = budgetVsActualCsv(periodType, parseInt(yearParam));
+			csv = await budgetVsActualCsv(periodType, parseInt(yearParam));
 			break;
 		}
 		default:

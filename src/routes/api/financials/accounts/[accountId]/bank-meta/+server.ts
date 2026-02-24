@@ -10,18 +10,16 @@ export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { accountId } = event.params;
 
-	const account = db
+	const [account] = await db
 		.select({ id: finAccounts.id })
 		.from(finAccounts)
-		.where(eq(finAccounts.id, accountId))
-		.get();
+		.where(eq(finAccounts.id, accountId));
 	if (!account) return json({ error: 'Account not found' }, { status: 404 });
 
-	const meta = db
+	const [meta] = await db
 		.select()
 		.from(finBankAccountMeta)
-		.where(eq(finBankAccountMeta.accountId, accountId))
-		.get();
+		.where(eq(finBankAccountMeta.accountId, accountId));
 
 	if (!meta) return json(null);
 
@@ -32,11 +30,10 @@ export const PUT: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { accountId } = event.params;
 
-	const account = db
+	const [account] = await db
 		.select({ id: finAccounts.id })
 		.from(finAccounts)
-		.where(eq(finAccounts.id, accountId))
-		.get();
+		.where(eq(finAccounts.id, accountId));
 	if (!account) return json({ error: 'Account not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -46,11 +43,10 @@ export const PUT: RequestHandler = async (event) => {
 	}
 
 	const now = Date.now();
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(finBankAccountMeta)
-		.where(eq(finBankAccountMeta.accountId, accountId))
-		.get();
+		.where(eq(finBankAccountMeta.accountId, accountId));
 
 	if (existing) {
 		// Update existing
@@ -64,16 +60,14 @@ export const PUT: RequestHandler = async (event) => {
 			updatedAt: now
 		};
 
-		db.update(finBankAccountMeta)
+		await db.update(finBankAccountMeta)
 			.set(updates)
-			.where(eq(finBankAccountMeta.accountId, accountId))
-			.run();
+			.where(eq(finBankAccountMeta.accountId, accountId));
 
-		const updated = db
+		const [updated] = await db
 			.select()
 			.from(finBankAccountMeta)
-			.where(eq(finBankAccountMeta.accountId, accountId))
-			.get();
+			.where(eq(finBankAccountMeta.accountId, accountId));
 		return json(updated);
 	} else {
 		// Create new
@@ -92,7 +86,7 @@ export const PUT: RequestHandler = async (event) => {
 			updatedAt: now
 		};
 
-		db.insert(finBankAccountMeta).values(meta).run();
+		await db.insert(finBankAccountMeta).values(meta);
 		return json(meta, { status: 201 });
 	}
 };

@@ -16,7 +16,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	// Get all field definitions for this entity type
-	let defs = db.select().from(crmCustomFieldDefs).all();
+	let defs = await db.select().from(crmCustomFieldDefs);
 	if (entityType) {
 		defs = defs.filter((d) => d.entityType === entityType);
 	}
@@ -25,7 +25,7 @@ export const GET: RequestHandler = async (event) => {
 	if (defIds.length === 0) return json({ defs: [], values: {} });
 
 	// Get values for this entity
-	const values = db
+	const values = await db
 		.select()
 		.from(crmCustomFieldValues)
 		.where(
@@ -33,8 +33,7 @@ export const GET: RequestHandler = async (event) => {
 				eq(crmCustomFieldValues.entityId, entityId),
 				inArray(crmCustomFieldValues.fieldDefId, defIds)
 			)
-		)
-		.all();
+		);
 
 	const valueMap: Record<string, string | null> = {};
 	for (const v of values) {
@@ -60,7 +59,7 @@ export const PUT: RequestHandler = async (event) => {
 	const entries = Object.entries(body.values) as [string, string | null][];
 
 	for (const [fieldDefId, value] of entries) {
-		const existing = db
+		const [existing] = await db
 			.select()
 			.from(crmCustomFieldValues)
 			.where(
@@ -68,16 +67,14 @@ export const PUT: RequestHandler = async (event) => {
 					eq(crmCustomFieldValues.fieldDefId, fieldDefId),
 					eq(crmCustomFieldValues.entityId, body.entityId)
 				)
-			)
-			.get();
+			);
 
 		if (existing) {
-			db.update(crmCustomFieldValues)
+			await db.update(crmCustomFieldValues)
 				.set({ value: value ?? null, updatedAt: now })
-				.where(eq(crmCustomFieldValues.id, existing.id))
-				.run();
+				.where(eq(crmCustomFieldValues.id, existing.id));
 		} else if (value !== null && value !== '') {
-			db.insert(crmCustomFieldValues)
+			await db.insert(crmCustomFieldValues)
 				.values({
 					id: nanoid(12),
 					fieldDefId,
@@ -85,8 +82,7 @@ export const PUT: RequestHandler = async (event) => {
 					value,
 					createdAt: now,
 					updatedAt: now
-				})
-				.run();
+				});
 		}
 	}
 

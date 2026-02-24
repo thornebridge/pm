@@ -10,7 +10,7 @@ import {
 import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const activities = db
+	const activities = await db
 		.select({
 			id: crmActivities.id,
 			type: crmActivities.type,
@@ -31,8 +31,7 @@ export const load: PageServerLoad = async () => {
 		.innerJoin(users, eq(crmActivities.userId, users.id))
 		.leftJoin(crmCompanies, eq(crmActivities.companyId, crmCompanies.id))
 		.orderBy(desc(crmActivities.createdAt))
-		.limit(100)
-		.all();
+		.limit(100);
 
 	// Get contact names and opportunity titles for display
 	const contactIds = [...new Set(activities.filter((a) => a.contactId).map((a) => a.contactId!))];
@@ -40,13 +39,13 @@ export const load: PageServerLoad = async () => {
 
 	const contactMap = new Map<string, string>();
 	for (const cId of contactIds) {
-		const c = db.select({ firstName: crmContacts.firstName, lastName: crmContacts.lastName }).from(crmContacts).where(eq(crmContacts.id, cId)).get();
+		const [c] = await db.select({ firstName: crmContacts.firstName, lastName: crmContacts.lastName }).from(crmContacts).where(eq(crmContacts.id, cId));
 		if (c) contactMap.set(cId, `${c.firstName} ${c.lastName}`);
 	}
 
 	const oppMap = new Map<string, string>();
 	for (const oId of oppIds) {
-		const o = db.select({ title: crmOpportunities.title }).from(crmOpportunities).where(eq(crmOpportunities.id, oId)).get();
+		const [o] = await db.select({ title: crmOpportunities.title }).from(crmOpportunities).where(eq(crmOpportunities.id, oId));
 		if (o) oppMap.set(oId, o.title);
 	}
 

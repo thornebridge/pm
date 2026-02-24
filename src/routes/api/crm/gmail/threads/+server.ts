@@ -32,10 +32,9 @@ export const GET: RequestHandler = async (event) => {
 			...(companyId ? [eq(gmailEntityLinks.companyId, companyId)] : []),
 			...(opportunityId ? [eq(gmailEntityLinks.opportunityId, opportunityId)] : [])
 		];
-		const links = db.select({ threadId: gmailEntityLinks.threadId })
+		const links = await db.select({ threadId: gmailEntityLinks.threadId })
 			.from(gmailEntityLinks)
-			.where(or(...conditions))
-			.all();
+			.where(or(...conditions));
 		entityThreadIds = [...new Set(links.map((l) => l.threadId))];
 		if (entityThreadIds.length === 0) {
 			return Response.json({ threads: [], total: 0 });
@@ -96,58 +95,52 @@ export const GET: RequestHandler = async (event) => {
 			.where(where)
 			.orderBy(desc(gmailThreads.lastMessageAt))
 			.limit(limit)
-			.offset(offset)
-			.all(),
+			.offset(offset),
 		db.select({ count: sql<number>`count(*)` })
 			.from(gmailThreads)
 			.where(where)
-			.get()
+			.then(rows => rows[0])
 	]);
 
 	// Enrich with first message sender and linked entities
-	const enriched = threads.map((thread) => {
+	const enriched = [];
+	for (const thread of threads) {
 		// Get the latest message sender
-		const latestMsg = db.select({
+		const [latestMsg] = await db.select({
 			fromEmail: gmailMessages.fromEmail,
 			fromName: gmailMessages.fromName
 		}).from(gmailMessages)
 			.where(eq(gmailMessages.threadId, thread.id))
 			.orderBy(desc(gmailMessages.internalDate))
-			.limit(1)
-			.get();
+			.limit(1);
 
 		// Get linked entities
-		const links = db.select()
+		const links = await db.select()
 			.from(gmailEntityLinks)
-			.where(eq(gmailEntityLinks.threadId, thread.id))
-			.all();
+			.where(eq(gmailEntityLinks.threadId, thread.id));
 
-		const linkedContacts = links
-			.filter((l) => l.contactId)
-			.map((l) => {
-				const c = db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName })
-					.from(crmContacts).where(eq(crmContacts.id, l.contactId!)).get();
-				return c ? { id: c.id, name: `${c.firstName} ${c.lastName}` } : null;
-			})
-			.filter(Boolean);
+		const linkedContacts = [];
+		for (const l of links.filter((l) => l.contactId)) {
+			const [c] = await db.select({ id: crmContacts.id, firstName: crmContacts.firstName, lastName: crmContacts.lastName })
+				.from(crmContacts).where(eq(crmContacts.id, l.contactId!));
+			if (c) linkedContacts.push({ id: c.id, name: `${c.firstName} ${c.lastName}` });
+		}
 
-		const linkedOpportunities = links
-			.filter((l) => l.opportunityId)
-			.map((l) => {
-				const o = db.select({ id: crmOpportunities.id, title: crmOpportunities.title })
-					.from(crmOpportunities).where(eq(crmOpportunities.id, l.opportunityId!)).get();
-				return o ? { id: o.id, title: o.title } : null;
-			})
-			.filter(Boolean);
+		const linkedOpportunities = [];
+		for (const l of links.filter((l) => l.opportunityId)) {
+			const [o] = await db.select({ id: crmOpportunities.id, title: crmOpportunities.title })
+				.from(crmOpportunities).where(eq(crmOpportunities.id, l.opportunityId!));
+			if (o) linkedOpportunities.push({ id: o.id, title: o.title });
+		}
 
-		return {
+		enriched.push({
 			...thread,
 			fromEmail: latestMsg?.fromEmail || '',
 			fromName: latestMsg?.fromName || '',
 			linkedContacts,
 			linkedOpportunities
-		};
-	});
+		});
+	}
 
 	return Response.json({ threads: enriched, total: countResult?.count || 0 });
 };

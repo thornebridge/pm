@@ -42,18 +42,17 @@ export const load: PageServerLoad = async ({ url }) => {
 	}
 
 	// All pipeline stages
-	const stages = db
+	const stages = await db
 		.select()
 		.from(crmPipelineStages)
-		.orderBy(asc(crmPipelineStages.position))
-		.all();
+		.orderBy(asc(crmPipelineStages.position));
 	const stageMap: Record<string, { probability: number; isClosed: boolean }> = {};
 	for (const s of stages) {
 		stageMap[s.id] = { probability: s.probability, isClosed: s.isClosed };
 	}
 
 	// Open deals expected to close in the target period
-	const forecastDeals = db
+	const forecastDealsRaw = await db
 		.select({
 			id: crmOpportunities.id,
 			title: crmOpportunities.title,
@@ -80,14 +79,13 @@ export const load: PageServerLoad = async ({ url }) => {
 				lte(crmOpportunities.expectedCloseDate, periodToMs)
 			)
 		)
-		.orderBy(asc(crmOpportunities.expectedCloseDate))
-		.all()
-		.map((d) => {
-			const effectiveProbability = d.probability ?? d.stageProbability;
-			const category = deriveForecastCategory(d.forecastCategory, d.probability, d.stageProbability);
-			const weightedValue = Math.round(((d.value || 0) * effectiveProbability) / 100);
-			return { ...d, category, weightedValue, effectiveProbability };
-		});
+		.orderBy(asc(crmOpportunities.expectedCloseDate));
+	const forecastDeals = forecastDealsRaw.map((d) => {
+		const effectiveProbability = d.probability ?? d.stageProbability;
+		const category = deriveForecastCategory(d.forecastCategory, d.probability, d.stageProbability);
+		const weightedValue = Math.round(((d.value || 0) * effectiveProbability) / 100);
+		return { ...d, category, weightedValue, effectiveProbability };
+	});
 
 	// Summary by category
 	const categorySummary = {
@@ -131,7 +129,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	// All open deals with expected close in next 6 months
 	const sixMonthsOut = new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59, 999);
-	const allForecastDeals = db
+	const allForecastDeals = await db
 		.select({
 			value: crmOpportunities.value,
 			probability: crmOpportunities.probability,
@@ -147,8 +145,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				gte(crmOpportunities.expectedCloseDate, now.getTime()),
 				lte(crmOpportunities.expectedCloseDate, sixMonthsOut.getTime())
 			)
-		)
-		.all();
+		);
 
 	for (const d of allForecastDeals) {
 		if (!d.expectedCloseDate) continue;
@@ -164,7 +161,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
 	// Historical closed-won (past 6 months for comparison)
 	const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1).getTime();
-	const historicalWon = db
+	const historicalWon = await db
 		.select({
 			closeDate: crmOpportunities.actualCloseDate,
 			value: crmOpportunities.value
@@ -176,8 +173,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				eq(crmPipelineStages.isWon, true),
 				gte(crmOpportunities.actualCloseDate, sixMonthsAgo)
 			)
-		)
-		.all();
+		);
 
 	const historicalByMonth: Array<{ label: string; value: number }> = [];
 	for (let i = -6; i < 0; i++) {

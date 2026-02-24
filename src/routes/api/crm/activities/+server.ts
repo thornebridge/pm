@@ -71,7 +71,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(where) as typeof query;
 	}
 
-	const rows = query.all();
+	const rows = await query;
 	return json(rows);
 };
 
@@ -100,7 +100,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmActivities).values(activity).run();
+	await db.insert(crmActivities).values(activity);
 
 	emitCrmAutomationEvent({
 		event: 'activity.logged',

@@ -4,8 +4,8 @@ import { db } from '$lib/server/db/index.js';
 import { finAccounts, finJournalEntries, finJournalLines } from '$lib/server/db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 
-function getAccountsByType(accountType: string, asOf: number) {
-	return db
+async function getAccountsByType(accountType: string, asOf: number) {
+	return await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -26,8 +26,7 @@ function getAccountsByType(accountType: string, asOf: number) {
 			)
 		)
 		.where(eq(finAccounts.accountType, accountType as any))
-		.groupBy(finAccounts.id)
-		.all();
+		.groupBy(finAccounts.id);
 }
 
 export const GET: RequestHandler = async (event) => {
@@ -42,7 +41,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	// Assets: balance = SUM(debit) - SUM(credit)
-	const assetRows = getAccountsByType('asset', asOf);
+	const assetRows = await getAccountsByType('asset', asOf);
 	const assets = assetRows.map((r) => ({
 		accountId: r.accountId,
 		accountNumber: r.accountNumber,
@@ -51,7 +50,7 @@ export const GET: RequestHandler = async (event) => {
 	}));
 
 	// Liabilities: balance = SUM(credit) - SUM(debit)
-	const liabilityRows = getAccountsByType('liability', asOf);
+	const liabilityRows = await getAccountsByType('liability', asOf);
 	const liabilities = liabilityRows.map((r) => ({
 		accountId: r.accountId,
 		accountNumber: r.accountNumber,
@@ -60,7 +59,7 @@ export const GET: RequestHandler = async (event) => {
 	}));
 
 	// Equity: balance = SUM(credit) - SUM(debit)
-	const equityRows = getAccountsByType('equity', asOf);
+	const equityRows = await getAccountsByType('equity', asOf);
 	const equity = equityRows.map((r) => ({
 		accountId: r.accountId,
 		accountNumber: r.accountNumber,
@@ -69,10 +68,10 @@ export const GET: RequestHandler = async (event) => {
 	}));
 
 	// Net Income = Revenue totals - Expense totals (all time up to asOf)
-	const revenueRows = getAccountsByType('revenue', asOf);
+	const revenueRows = await getAccountsByType('revenue', asOf);
 	const totalRevenueForNI = revenueRows.reduce((sum, r) => sum + (r.totalCredit - r.totalDebit), 0);
 
-	const expenseRows = getAccountsByType('expense', asOf);
+	const expenseRows = await getAccountsByType('expense', asOf);
 	const totalExpensesForNI = expenseRows.reduce((sum, r) => sum + (r.totalDebit - r.totalCredit), 0);
 
 	const netIncome = totalRevenueForNI - totalExpensesForNI;

@@ -10,7 +10,7 @@ import { broadcastViewChanged } from '$lib/server/ws/handlers.js';
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const views = db
+	const views = await db
 		.select()
 		.from(savedViews)
 		.where(
@@ -19,8 +19,7 @@ export const GET: RequestHandler = async (event) => {
 				and(eq(savedViews.projectId, event.params.projectId), eq(savedViews.shared, true))
 			)
 		)
-		.orderBy(savedViews.createdAt)
-		.all();
+		.orderBy(savedViews.createdAt);
 
 	return json(views);
 };
@@ -45,7 +44,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(savedViews).values(view).run();
+	await db.insert(savedViews).values(view);
 	broadcastViewChanged(event.params.projectId, user.id);
 	return json(view, { status: 201 });
 };
@@ -59,11 +58,10 @@ export const PATCH: RequestHandler = async (event) => {
 	}
 
 	// Only the owner can update
-	const existing = db
+	const [existing] = await db
 		.select()
 		.from(savedViews)
-		.where(and(eq(savedViews.id, id), eq(savedViews.userId, user.id)))
-		.get();
+		.where(and(eq(savedViews.id, id), eq(savedViews.userId, user.id)));
 
 	if (!existing) {
 		return json({ error: 'View not found' }, { status: 404 });
@@ -74,12 +72,11 @@ export const PATCH: RequestHandler = async (event) => {
 	if (filters !== undefined) updates.filters = JSON.stringify(filters);
 	if (shared !== undefined) updates.shared = shared === true;
 
-	db.update(savedViews)
+	await db.update(savedViews)
 		.set(updates)
-		.where(eq(savedViews.id, id))
-		.run();
+		.where(eq(savedViews.id, id));
 
-	const updated = db.select().from(savedViews).where(eq(savedViews.id, id)).get();
+	const [updated] = await db.select().from(savedViews).where(eq(savedViews.id, id));
 	broadcastViewChanged(event.params.projectId, user.id);
 	return json(updated);
 };
@@ -88,9 +85,8 @@ export const DELETE: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 	const { id } = await event.request.json();
 
-	db.delete(savedViews)
-		.where(and(eq(savedViews.id, id), eq(savedViews.userId, user.id)))
-		.run();
+	await db.delete(savedViews)
+		.where(and(eq(savedViews.id, id), eq(savedViews.userId, user.id)));
 
 	broadcastViewChanged(event.params.projectId, user.id);
 	return json({ ok: true });

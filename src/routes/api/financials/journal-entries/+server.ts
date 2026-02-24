@@ -31,12 +31,11 @@ export const GET: RequestHandler = async (event) => {
 
 	// If accountId filter, only return entries that have a line for that account
 	if (accountId) {
-		const entryIds = db
+		const entryIdRows = await db
 			.selectDistinct({ journalEntryId: finJournalLines.journalEntryId })
 			.from(finJournalLines)
-			.where(eq(finJournalLines.accountId, accountId))
-			.all()
-			.map((r) => r.journalEntryId);
+			.where(eq(finJournalLines.accountId, accountId));
+		const entryIds = entryIdRows.map((r) => r.journalEntryId);
 
 		if (entryIds.length === 0) {
 			return json({ data: [], total: 0 });
@@ -55,11 +54,10 @@ export const GET: RequestHandler = async (event) => {
 			: undefined;
 
 	// Count total
-	const totalResult = db
+	const [totalResult] = await db
 		.select({ n: count() })
 		.from(finJournalEntries)
-		.where(where)
-		.get();
+		.where(where);
 	const total = totalResult?.n ?? 0;
 
 	// Sort
@@ -73,14 +71,13 @@ export const GET: RequestHandler = async (event) => {
 					: finJournalEntries.date;
 	const orderFn = dir === 'asc' ? asc : desc;
 
-	const entries = db
+	const entries = await db
 		.select()
 		.from(finJournalEntries)
 		.where(where)
 		.orderBy(orderFn(sortCol))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
 	// Fetch lines for all returned entries
 	if (entries.length === 0) {
@@ -88,7 +85,7 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	const entryIds = entries.map((e) => e.id);
-	const lines = db
+	const lines = await db
 		.select({
 			id: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -103,8 +100,7 @@ export const GET: RequestHandler = async (event) => {
 		.from(finJournalLines)
 		.innerJoin(finAccounts, eq(finJournalLines.accountId, finAccounts.id))
 		.where(sql`${finJournalLines.journalEntryId} IN (${sql.join(entryIds.map((id) => sql`${id}`), sql`,`)})`)
-		.orderBy(asc(finJournalLines.position))
-		.all();
+		.orderBy(asc(finJournalLines.position));
 
 	// Group lines by entry
 	const linesByEntry = new Map<string, typeof lines>();
@@ -166,7 +162,7 @@ export const POST: RequestHandler = async (event) => {
 
 	const now = Date.now();
 	const entryId = nanoid(12);
-	const entryNumber = getNextEntryNumber();
+	const entryNumber = await getNextEntryNumber();
 
 	const entry = {
 		id: entryId,
@@ -182,7 +178,7 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(finJournalEntries).values(entry).run();
+	await db.insert(finJournalEntries).values(entry);
 
 	const lineRecords = lines.map((line: { accountId: string; debit?: number; credit?: number; memo?: string }, i: number) => ({
 		id: nanoid(12),
@@ -195,7 +191,7 @@ export const POST: RequestHandler = async (event) => {
 		createdAt: now
 	}));
 
-	db.insert(finJournalLines).values(lineRecords).run();
+	await db.insert(finJournalLines).values(lineRecords);
 
 	return json({ ...entry, lines: lineRecords }, { status: 201 });
 };

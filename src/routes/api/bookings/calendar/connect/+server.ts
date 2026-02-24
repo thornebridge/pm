@@ -7,7 +7,7 @@ import { nanoid } from 'nanoid';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const config = getGoogleConfig();
+	const config = await getGoogleConfig();
 	if (!config) {
 		return new Response(JSON.stringify({ error: 'Google Calendar not configured' }), {
 			status: 400,

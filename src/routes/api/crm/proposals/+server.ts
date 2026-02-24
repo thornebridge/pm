@@ -48,7 +48,7 @@ export const GET: RequestHandler = async (event) => {
 		query = query.where(eq(crmProposals.opportunityId, opportunityId)) as typeof query;
 	}
 
-	const rows = query.all();
+	const rows = await query;
 	return json(rows);
 };
 
@@ -76,6 +76,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(crmProposals).values(proposal).run();
+	await db.insert(crmProposals).values(proposal);
 	return json(proposal, { status: 201 });
 };

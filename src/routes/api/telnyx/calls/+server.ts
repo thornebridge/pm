@@ -22,7 +22,7 @@ export const GET: RequestHandler = async (event) => {
 
 	const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-	const calls = db
+	const calls = await db
 		.select({
 			id: telnyxCallLogs.id,
 			direction: telnyxCallLogs.direction,
@@ -51,8 +51,7 @@ export const GET: RequestHandler = async (event) => {
 		.where(where)
 		.orderBy(desc(telnyxCallLogs.createdAt))
 		.limit(limit)
-		.offset(offset)
-		.all();
+		.offset(offset);
 
 	return json(calls);
 };
@@ -60,7 +59,7 @@ export const GET: RequestHandler = async (event) => {
 /** POST — create a call log record (browser registers call before webhooks fire) */
 export const POST: RequestHandler = async (event) => {
 	const user = requireAuth(event);
-	const config = getTelnyxConfig();
+	const config = await getTelnyxConfig();
 	if (!config) {
 		return json({ error: 'Telnyx integration is not configured' }, { status: 503 });
 	}
@@ -76,7 +75,7 @@ export const POST: RequestHandler = async (event) => {
 	const id = crypto.randomUUID();
 	const fromNumber = getNextCallerNumber(config);
 
-	db.insert(telnyxCallLogs)
+	await db.insert(telnyxCallLogs)
 		.values({
 			id,
 			direction: direction || 'outbound',
@@ -89,8 +88,7 @@ export const POST: RequestHandler = async (event) => {
 			userId: user.id,
 			createdAt: now,
 			updatedAt: now
-		})
-		.run();
+		});
 
 	return json({ id, status: 'initiated' }, { status: 201 });
 };

@@ -9,7 +9,7 @@ import { nanoid } from 'nanoid';
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
 
-	const rows = db
+	const rows = await db
 		.select({
 			id: bookingEventTypes.id,
 			title: bookingEventTypes.title,
@@ -27,8 +27,7 @@ export const GET: RequestHandler = async (event) => {
 		})
 		.from(bookingEventTypes)
 		.where(eq(bookingEventTypes.userId, user.id))
-		.orderBy(bookingEventTypes.createdAt)
-		.all();
+		.orderBy(bookingEventTypes.createdAt);
 
 	return json(rows);
 };
@@ -54,11 +53,10 @@ export const POST: RequestHandler = async (event) => {
 	}
 
 	// Check slug uniqueness
-	const existing = db
+	const [existing] = await db
 		.select({ id: bookingEventTypes.id })
 		.from(bookingEventTypes)
-		.where(eq(bookingEventTypes.slug, slug))
-		.get();
+		.where(eq(bookingEventTypes.slug, slug));
 	if (existing) {
 		return json({ error: 'This URL slug is already taken' }, { status: 409 });
 	}
@@ -81,6 +79,6 @@ export const POST: RequestHandler = async (event) => {
 		updatedAt: now
 	};
 
-	db.insert(bookingEventTypes).values(eventType).run();
+	await db.insert(bookingEventTypes).values(eventType);
 	return json(eventType, { status: 201 });
 };

@@ -1,4 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { finReconciliations, finJournalLines, finJournalEntries, finAccounts } from '$lib/server/db/schema.js';
@@ -7,18 +8,17 @@ import { eq, and, lte } from 'drizzle-orm';
 export const GET: RequestHandler = async (event) => {
 	requireAuth(event);
 
-	const recon = db
+	const [recon] = await db
 		.select()
 		.from(finReconciliations)
-		.where(eq(finReconciliations.id, event.params.reconId))
-		.get();
+		.where(eq(finReconciliations.id, event.params.reconId));
 
 	if (!recon) {
 		return json({ error: 'Reconciliation not found' }, { status: 404 });
 	}
 
 	// Get all unreconciled posted journal lines for this bank account up to statement date
-	const lines = db
+	const lines = await db
 		.select({
 			lineId: finJournalLines.id,
 			journalEntryId: finJournalLines.journalEntryId,
@@ -38,8 +38,7 @@ export const GET: RequestHandler = async (event) => {
 				eq(finJournalEntries.status, 'posted'),
 				lte(finJournalEntries.date, recon.statementDate)
 			)
-		)
-		.all();
+		);
 
 	return json({ ...recon, lines });
 };
@@ -48,11 +47,10 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const body = await event.request.json();
 
-	const recon = db
+	const [recon] = await db
 		.select()
 		.from(finReconciliations)
-		.where(eq(finReconciliations.id, event.params.reconId))
-		.get();
+		.where(eq(finReconciliations.id, event.params.reconId));
 
 	if (!recon) {
 		return json({ error: 'Reconciliation not found' }, { status: 404 });
@@ -66,20 +64,18 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.lineIds && Array.isArray(body.lineIds)) {
 		const now = Date.now();
 		for (const lineId of body.lineIds) {
-			const line = db
+			const [line] = await db
 				.select({ reconciled: finJournalLines.reconciled })
 				.from(finJournalLines)
-				.where(eq(finJournalLines.id, lineId))
-				.get();
+				.where(eq(finJournalLines.id, lineId));
 
 			if (line) {
-				db.update(finJournalLines)
+				await db.update(finJournalLines)
 					.set({
 						reconciled: !line.reconciled,
 						reconciledAt: !line.reconciled ? now : null
 					})
-					.where(eq(finJournalLines.id, lineId))
-					.run();
+					.where(eq(finJournalLines.id, lineId));
 			}
 		}
 	}

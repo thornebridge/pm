@@ -9,7 +9,7 @@ export const PATCH: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId } = event.params;
 
-	const existing = db.select().from(crmProposals).where(eq(crmProposals.id, proposalId)).get();
+	const [existing] = await db.select().from(crmProposals).where(eq(crmProposals.id, proposalId));
 	if (!existing) return json({ error: 'Proposal not found' }, { status: 404 });
 
 	const body = await event.request.json();
@@ -39,8 +39,8 @@ export const PATCH: RequestHandler = async (event) => {
 		}
 	}
 
-	db.update(crmProposals).set(updates).where(eq(crmProposals.id, proposalId)).run();
-	const updated = db.select().from(crmProposals).where(eq(crmProposals.id, proposalId)).get();
+	await db.update(crmProposals).set(updates).where(eq(crmProposals.id, proposalId));
+	const [updated] = await db.select().from(crmProposals).where(eq(crmProposals.id, proposalId));
 	return json(updated);
 };
 
@@ -48,9 +48,9 @@ export const DELETE: RequestHandler = async (event) => {
 	requireAuth(event);
 	const { proposalId } = event.params;
 
-	const existing = db.select().from(crmProposals).where(eq(crmProposals.id, proposalId)).get();
+	const [existing] = await db.select().from(crmProposals).where(eq(crmProposals.id, proposalId));
 	if (!existing) return json({ error: 'Proposal not found' }, { status: 404 });
 
-	db.delete(crmProposals).where(eq(crmProposals.id, proposalId)).run();
+	await db.delete(crmProposals).where(eq(crmProposals.id, proposalId));
 	return json({ ok: true });
 };

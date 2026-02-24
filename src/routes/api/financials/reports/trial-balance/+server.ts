@@ -22,7 +22,7 @@ export const GET: RequestHandler = async (event) => {
 		return json({ error: 'from and to must be valid integer timestamps' }, { status: 400 });
 	}
 
-	const rows = db
+	const rows = await db
 		.select({
 			accountId: finAccounts.id,
 			accountNumber: finAccounts.accountNumber,
@@ -45,8 +45,7 @@ export const GET: RequestHandler = async (event) => {
 			)
 		)
 		.groupBy(finAccounts.id)
-		.orderBy(asc(finAccounts.accountNumber))
-		.all();
+		.orderBy(asc(finAccounts.accountNumber));
 
 	const accounts = rows.map((r) => ({
 		accountId: r.accountId,

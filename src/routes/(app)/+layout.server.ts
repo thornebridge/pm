@@ -10,8 +10,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		throw redirect(302, '/login');
 	}
 
-	const allFolders = db.select().from(folders).orderBy(folders.position).all();
-	const allProjects = db
+	const allFolders = await db.select().from(folders).orderBy(folders.position);
+	const allProjects = await db
 		.select({
 			id: projects.id,
 			name: projects.name,
@@ -21,8 +21,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			archived: projects.archived
 		})
 		.from(projects)
-		.orderBy(desc(projects.updatedAt))
-		.all();
+		.orderBy(desc(projects.updatedAt));
 
 	// Sidebar only shows non-archived projects
 	const sidebarProjects = allProjects.filter((p) => !p.archived);
@@ -31,11 +30,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	let themeVariables: Record<string, string> | null = null;
 	let themeMode: 'dark' | 'light' = 'dark';
 
-	const userRow = db
+	const [userRow] = await db
 		.select({ activeThemeId: users.activeThemeId })
 		.from(users)
-		.where(eq(users.id, locals.user.id))
-		.get();
+		.where(eq(users.id, locals.user.id));
 
 	const activeThemeId = userRow?.activeThemeId;
 
@@ -50,11 +48,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			themeMode = builtin.mode;
 		} else {
 			// Check custom themes
-			const custom = db
+			const [custom] = await db
 				.select()
 				.from(userThemes)
-				.where(and(eq(userThemes.id, activeThemeId), eq(userThemes.userId, locals.user.id)))
-				.get();
+				.where(and(eq(userThemes.id, activeThemeId), eq(userThemes.userId, locals.user.id)));
 
 			if (custom) {
 				themeVariables = JSON.parse(custom.variables);
@@ -66,7 +63,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	}
 
 	// Load org settings
-	const org = db.select().from(orgSettings).where(eq(orgSettings.id, 'default')).get();
+	const [org] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'default'));
 	const platformName = org?.platformName || 'PM';
 	const telnyxEnabled = org?.telnyxEnabled ?? false;
 

@@ -7,20 +7,19 @@ import { eq, desc, and } from 'drizzle-orm';
 export const load: PageServerLoad = async (event) => {
 	if (!event.locals.user) redirect(302, '/login');
 
-	const integration = db.select({
+	const [integration] = await db.select({
 		email: gmailIntegrations.email,
 		lastSyncAt: gmailIntegrations.lastSyncAt
 	}).from(gmailIntegrations)
-		.where(eq(gmailIntegrations.userId, event.locals.user.id))
-		.get();
+		.where(eq(gmailIntegrations.userId, event.locals.user.id));
 
 	// Load contacts for compose autocomplete
-	const contacts = db.select({
+	const contacts = await db.select({
 		id: crmContacts.id,
 		firstName: crmContacts.firstName,
 		lastName: crmContacts.lastName,
 		email: crmContacts.email
-	}).from(crmContacts).all();
+	}).from(crmContacts);
 
 	return {
 		gmailConnected: !!integration,
