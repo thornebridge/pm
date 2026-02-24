@@ -32,39 +32,41 @@ export const GET: RequestHandler = async (event) => {
 		redirect(302, '/crm/email?error=not_configured');
 	}
 
+	const redirectUri = `${event.url.origin}/api/crm/gmail/callback`;
+	let tokens;
 	try {
-		const redirectUri = `${event.url.origin}/api/crm/gmail/callback`;
-		const tokens = await exchangeCodeForTokens(config, code, redirectUri);
-		const now = Date.now();
-
-		// Upsert: delete existing then insert
-		await db.delete(gmailIntegrations).where(eq(gmailIntegrations.userId, user.id));
-		const integrationId = nanoid(12);
-		await db.insert(gmailIntegrations)
-			.values({
-				id: integrationId,
-				userId: user.id,
-				email: '', // will be updated below
-				accessToken: tokens.accessToken,
-				refreshToken: tokens.refreshToken,
-				tokenExpiry: now + tokens.expiresIn * 1000,
-				createdAt: now,
-				updatedAt: now
-			});
-
-		// Fetch Gmail profile to get the user's email address
-		try {
-			const profile = await getProfile(user.id);
-			await db.update(gmailIntegrations)
-				.set({ email: profile.email, historyId: profile.historyId, updatedAt: Date.now() })
-				.where(eq(gmailIntegrations.userId, user.id));
-		} catch (err) {
-			console.error('[gmail] Failed to fetch profile:', err);
-		}
-
-		redirect(302, '/crm/email?success=gmail_connected');
+		tokens = await exchangeCodeForTokens(config, code, redirectUri);
 	} catch (err) {
 		console.error('[gmail] Token exchange failed:', err);
 		redirect(302, '/crm/email?error=token_exchange');
 	}
+
+	const now = Date.now();
+
+	// Upsert: delete existing then insert
+	await db.delete(gmailIntegrations).where(eq(gmailIntegrations.userId, user.id));
+	const integrationId = nanoid(12);
+	await db.insert(gmailIntegrations)
+		.values({
+			id: integrationId,
+			userId: user.id,
+			email: '', // will be updated below
+			accessToken: tokens.accessToken,
+			refreshToken: tokens.refreshToken,
+			tokenExpiry: now + tokens.expiresIn * 1000,
+			createdAt: now,
+			updatedAt: now
+		});
+
+	// Fetch Gmail profile to get the user's email address
+	try {
+		const profile = await getProfile(user.id);
+		await db.update(gmailIntegrations)
+			.set({ email: profile.email, historyId: profile.historyId, updatedAt: Date.now() })
+			.where(eq(gmailIntegrations.userId, user.id));
+	} catch (err) {
+		console.error('[gmail] Failed to fetch profile:', err);
+	}
+
+	redirect(302, '/crm/email?success=gmail_connected');
 };

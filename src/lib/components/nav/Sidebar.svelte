@@ -62,26 +62,61 @@
 			: baseCrmLinks
 	);
 
-	// Persisted section collapse state
-	let sections = $state<Record<string, boolean>>(
-		browser ? JSON.parse(localStorage.getItem('pm-sidebar-sections') || '{}') : {}
+	const adminLinks = [
+		{ href: '/admin', label: 'Admin', icon: 'M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z' }
+	];
+
+	type SidebarMode = 'ops' | 'sales' | 'finance' | 'admin';
+
+	const modes: Array<{ key: SidebarMode; label: string; icon: string }> = [
+		{ key: 'ops', label: 'Ops', icon: 'M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z' },
+		{ key: 'sales', label: 'Sales', icon: 'M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z' },
+		{ key: 'finance', label: 'Finance', icon: 'M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z' }
+	];
+
+	const adminMode: { key: SidebarMode; label: string; icon: string } = { key: 'admin', label: 'Admin', icon: 'M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z' };
+
+	const hasWorkspace = $derived(folders.length > 0 || projects.length > 0);
+	const isAdmin = $derived(user?.role === 'admin');
+
+	const visibleModes = $derived(isAdmin ? [...modes, adminMode] : modes);
+
+	// Mode state with URL auto-detection
+	let activeMode = $state<SidebarMode>(
+		browser ? (localStorage.getItem('pm-sidebar-mode') as SidebarMode) || 'ops' : 'ops'
 	);
 
-	function toggleSection(key: string) {
-		sections[key] = !sections[key];
-		localStorage.setItem('pm-sidebar-sections', JSON.stringify(sections));
+	const detectedMode = $derived.by((): SidebarMode => {
+		const path = page.url.pathname;
+		if (path.startsWith('/crm')) return 'sales';
+		if (path.startsWith('/financials')) return 'finance';
+		if (path.startsWith('/admin')) return 'admin';
+		return 'ops';
+	});
+
+	$effect(() => {
+		activeMode = detectedMode;
+		if (browser) localStorage.setItem('pm-sidebar-mode', activeMode);
+	});
+
+	function setMode(mode: SidebarMode) {
+		activeMode = mode;
+		if (browser) localStorage.setItem('pm-sidebar-mode', mode);
 	}
+
+	const activeLinks = $derived.by(() => {
+		switch (activeMode) {
+			case 'ops': return operationsLinks;
+			case 'sales': return crmLinks;
+			case 'finance': return financialsLinks;
+			case 'admin': return adminLinks;
+			default: return operationsLinks;
+		}
+	});
 
 	function isActive(href: string): boolean {
 		return page.url.pathname === href || page.url.pathname.startsWith(href + '/');
 	}
-
-	function isCrmActive(href: string): boolean {
-		return page.url.pathname.startsWith(href);
-	}
-
-	const hasWorkspace = $derived(folders.length > 0 || projects.length > 0);
-	const hasTools = $derived(user?.role === 'admin');
 </script>
 
 <aside class="fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-surface-800 bg-surface-900 transition-all md:static md:translate-x-0 {open ? 'translate-x-0 w-60' : '-translate-x-full w-60'} {collapsed ? 'md:w-14' : 'md:w-60'}">
@@ -103,162 +138,60 @@
 		{/if}
 	</div>
 
+	<!-- Mode selector -->
+	<div class="border-b border-surface-800 px-2 pb-2">
+		{#if collapsed}
+			<div class="flex flex-col items-center gap-0.5">
+				{#each visibleModes as mode (mode.key)}
+					<button
+						onclick={() => setMode(mode.key)}
+						title={mode.label}
+						class="rounded-md p-1.5 transition {activeMode === mode.key ? 'bg-surface-700 text-surface-100' : 'text-surface-500 hover:bg-surface-800 hover:text-surface-300'}"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d={mode.icon} clip-rule="evenodd" />
+						</svg>
+					</button>
+				{/each}
+			</div>
+		{:else}
+			<div class="flex gap-1">
+				{#each visibleModes as mode (mode.key)}
+					<button
+						onclick={() => setMode(mode.key)}
+						class="rounded-md px-2.5 py-1 text-xs font-medium transition {activeMode === mode.key ? 'bg-surface-700 text-surface-100' : 'text-surface-500 hover:bg-surface-800/50 hover:text-surface-300'}"
+					>
+						{mode.label}
+					</button>
+				{/each}
+			</div>
+		{/if}
+	</div>
+
 	<nav class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-		<!-- Operations section -->
-		{#if !collapsed}
-			<button
-				onclick={() => toggleSection('operations')}
-				class="group flex w-full items-center gap-1 px-2 pt-1 pb-1"
+		{#each activeLinks as link (link.href)}
+			<a
+				href={link.href}
+				onclick={onclose}
+				class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition {isActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'} {collapsed ? 'justify-center' : ''}"
+				title={collapsed ? link.label : undefined}
 			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.operations ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+					<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
 				</svg>
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Operations</span>
-			</button>
-		{/if}
-		{#if !sections.operations}
-			{#each operationsLinks as link (link.href)}
-				<a
-					href={link.href}
-					onclick={onclose}
-					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'} {collapsed ? 'justify-center' : ''}"
-					title={collapsed ? link.label : undefined}
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
-					</svg>
-					{#if !collapsed}<span>{link.label}</span>{/if}
-				</a>
-			{/each}
-		{/if}
+				{#if !collapsed}<span>{link.label}</span>{/if}
+			</a>
+		{/each}
 
-		<!-- Sales / CRM section -->
-		{#if !collapsed}
-			<button
-				onclick={() => toggleSection('sales')}
-				class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.sales ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-				</svg>
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Sales</span>
-			</button>
-			{#if !sections.sales}
-				{#each crmLinks as link (link.href)}
-					<a
-						href={link.href}
-						onclick={onclose}
-						class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
-					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
-						</svg>
-						<span>{link.label}</span>
-					</a>
-				{/each}
-			{/if}
-		{:else}
-			<div class="mt-3 flex flex-col items-center gap-0.5">
-				{#each crmLinks as link (link.href)}
-					<a
-						href={link.href}
-						onclick={onclose}
-						title={link.label}
-						class="flex items-center justify-center rounded-md p-2 {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
-					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
-						</svg>
-					</a>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- Financials section -->
-		{#if !collapsed}
-			<button
-				onclick={() => toggleSection('financials')}
-				class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.financials ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
-					<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-				</svg>
-				<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Financials</span>
-			</button>
-			{#if !sections.financials}
-				{#each financialsLinks as link (link.href)}
-					<a
-						href={link.href}
-						onclick={onclose}
-						class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
-					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
-						</svg>
-						<span>{link.label}</span>
-					</a>
-				{/each}
-			{/if}
-		{:else}
-			<div class="mt-3 flex flex-col items-center gap-0.5">
-				{#each financialsLinks as link (link.href)}
-					<a
-						href={link.href}
-						onclick={onclose}
-						title={link.label}
-						class="flex items-center justify-center rounded-md p-2 {isCrmActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'}"
-					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-							<path fill-rule="evenodd" d={link.icon} clip-rule="evenodd" />
-						</svg>
-					</a>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- Tools section (admin only) -->
-		{#if hasTools}
-			{#if !collapsed}
-				<button
-					onclick={() => toggleSection('tools')}
-					class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.tools ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-					</svg>
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Tools</span>
-				</button>
-			{/if}
-			{#if !sections.tools}
-				<a
-					href="/admin"
-					onclick={onclose}
-					class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-300 hover:bg-surface-800 hover:text-surface-100 {collapsed ? 'justify-center' : ''}"
-					title={collapsed ? 'Admin' : undefined}
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
-					</svg>
-					{#if !collapsed}<span>Admin</span>{/if}
-				</a>
-			{/if}
-		{/if}
-
-		<!-- Workspace section -->
+		<!-- Workspace (always visible) -->
 		{#if hasWorkspace}
 			{#if !collapsed}
-				<button
-					onclick={() => toggleSection('workspace')}
-					class="group flex w-full items-center gap-1 px-2 pt-3 pb-1"
-				>
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 shrink-0 text-surface-600 opacity-0 transition-all group-hover:opacity-100 {sections.workspace ? '-rotate-90' : ''}" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-					</svg>
-					<span class="text-[10px] font-semibold uppercase tracking-wider text-surface-500">Workspace</span>
-				</button>
-				{#if !sections.workspace}
-					<FolderTree {folders} {projects} onnavigate={onclose} />
-				{/if}
+				<div class="pt-3">
+					<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Workspace</span>
+					<div class="mt-1">
+						<FolderTree {folders} {projects} onnavigate={onclose} />
+					</div>
+				</div>
 			{:else}
 				{#if projects.length > 0}
 					<div class="mt-3 flex flex-col items-center gap-1.5">

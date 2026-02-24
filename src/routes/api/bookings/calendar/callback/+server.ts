@@ -31,29 +31,31 @@ export const GET: RequestHandler = async (event) => {
 		redirect(302, '/bookings?error=not_configured');
 	}
 
+	const redirectUri = `${event.url.origin}/api/bookings/calendar/callback`;
+	let tokens;
 	try {
-		const redirectUri = `${event.url.origin}/api/bookings/calendar/callback`;
-		const tokens = await exchangeCodeForTokens(config, code, redirectUri);
-		const now = Date.now();
-
-		// Upsert: delete existing then insert
-		await db.delete(calendarIntegrations).where(eq(calendarIntegrations.userId, user.id));
-		await db.insert(calendarIntegrations)
-			.values({
-				id: nanoid(12),
-				userId: user.id,
-				provider: 'google',
-				accessToken: tokens.accessToken,
-				refreshToken: tokens.refreshToken,
-				tokenExpiry: now + tokens.expiresIn * 1000,
-				calendarId: 'primary',
-				createdAt: now,
-				updatedAt: now
-			});
-
-		redirect(302, '/bookings?success=calendar_connected');
+		tokens = await exchangeCodeForTokens(config, code, redirectUri);
 	} catch (err) {
 		console.error('[google-calendar] Token exchange failed:', err);
 		redirect(302, '/bookings?error=token_exchange');
 	}
+
+	const now = Date.now();
+
+	// Upsert: delete existing then insert
+	await db.delete(calendarIntegrations).where(eq(calendarIntegrations.userId, user.id));
+	await db.insert(calendarIntegrations)
+		.values({
+			id: nanoid(12),
+			userId: user.id,
+			provider: 'google',
+			accessToken: tokens.accessToken,
+			refreshToken: tokens.refreshToken,
+			tokenExpiry: now + tokens.expiresIn * 1000,
+			calendarId: 'primary',
+			createdAt: now,
+			updatedAt: now
+		});
+
+	redirect(302, '/bookings?success=calendar_connected');
 };
