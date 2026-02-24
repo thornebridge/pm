@@ -974,6 +974,9 @@ export const orgSettings = pgTable('org_settings', {
 	emailProvider: text('email_provider'), // 'resend' | null
 	emailFromAddress: text('email_from_address'),
 	resendApiKey: text('resend_api_key'),
+	// Branding
+	logoData: text('logo_data'), // base64-encoded image (SVG/PNG/JPG, max 512KB)
+	logoMimeType: text('logo_mime_type'), // e.g. 'image/svg+xml', 'image/png'
 	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
@@ -1292,6 +1295,13 @@ export const bookingEventTypes = pgTable(
 		minNoticeHours: integer('min_notice_hours').notNull().default(4),
 		maxDaysOut: integer('max_days_out').notNull().default(60),
 		isActive: boolean('is_active').notNull().default(true),
+		schedulingType: text('scheduling_type', { enum: ['individual', 'round_robin'] })
+			.notNull()
+			.default('individual'),
+		roundRobinMode: text('round_robin_mode', { enum: ['rotation', 'load_balanced'] }),
+		lastAssignedUserId: text('last_assigned_user_id'),
+		logoData: text('logo_data'),
+		logoMimeType: text('logo_mime_type'),
 		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 	},
@@ -1316,6 +1326,8 @@ export const bookings = pgTable(
 		status: text('status', { enum: ['confirmed', 'cancelled'] }).notNull().default('confirmed'),
 		notes: text('notes'),
 		googleEventId: text('google_event_id'),
+		meetLink: text('meet_link'),
+		assignedUserId: text('assigned_user_id').references(() => users.id, { onDelete: 'set null' }),
 		createdAt: bigint('created_at', { mode: 'number' }).notNull()
 	},
 	(t) => [
@@ -1339,6 +1351,92 @@ export const calendarIntegrations = pgTable('calendar_integrations', {
 	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
+
+export const bookingAvailabilitySchedules = pgTable(
+	'booking_availability_schedules',
+	{
+		id: text('id').primaryKey(),
+		eventTypeId: text('event_type_id')
+			.notNull()
+			.references(() => bookingEventTypes.id, { onDelete: 'cascade' }),
+		userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+		dayOfWeek: integer('day_of_week').notNull(),
+		startTime: text('start_time').notNull(),
+		endTime: text('end_time').notNull(),
+		enabled: boolean('enabled').notNull().default(true)
+	},
+	(t) => [index('idx_avail_sched_event_type').on(t.eventTypeId, t.userId, t.dayOfWeek)]
+);
+
+export const bookingAvailabilityOverrides = pgTable(
+	'booking_availability_overrides',
+	{
+		id: text('id').primaryKey(),
+		eventTypeId: text('event_type_id')
+			.notNull()
+			.references(() => bookingEventTypes.id, { onDelete: 'cascade' }),
+		userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+		date: text('date').notNull(),
+		startTime: text('start_time'),
+		endTime: text('end_time'),
+		isBlocked: boolean('is_blocked').notNull().default(false)
+	},
+	(t) => [index('idx_avail_override_event_date').on(t.eventTypeId, t.userId, t.date)]
+);
+
+export const bookingEventTypeMembers = pgTable(
+	'booking_event_type_members',
+	{
+		id: text('id').primaryKey(),
+		eventTypeId: text('event_type_id')
+			.notNull()
+			.references(() => bookingEventTypes.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		position: integer('position').notNull().default(0)
+	},
+	(t) => [
+		uniqueIndex('idx_event_type_member_unique').on(t.eventTypeId, t.userId),
+		index('idx_event_type_members_event').on(t.eventTypeId, t.position)
+	]
+);
+
+export const bookingCustomFields = pgTable(
+	'booking_custom_fields',
+	{
+		id: text('id').primaryKey(),
+		eventTypeId: text('event_type_id')
+			.notNull()
+			.references(() => bookingEventTypes.id, { onDelete: 'cascade' }),
+		label: text('label').notNull(),
+		type: text('type', {
+			enum: ['text', 'textarea', 'phone', 'email', 'number', 'checkbox', 'select', 'radio']
+		}).notNull(),
+		required: boolean('required').notNull().default(false),
+		placeholder: text('placeholder'),
+		options: text('options'),
+		position: integer('position').notNull().default(0),
+		conditionalFieldId: text('conditional_field_id'),
+		conditionalValue: text('conditional_value')
+	},
+	(t) => [index('idx_custom_fields_event').on(t.eventTypeId, t.position)]
+);
+
+export const bookingCustomFieldValues = pgTable(
+	'booking_custom_field_values',
+	{
+		id: text('id').primaryKey(),
+		bookingId: text('booking_id')
+			.notNull()
+			.references(() => bookings.id, { onDelete: 'cascade' }),
+		fieldId: text('field_id')
+			.notNull()
+			.references(() => bookingCustomFields.id, { onDelete: 'cascade' }),
+		value: text('value').notNull()
+	},
+	(t) => [index('idx_custom_field_values_booking').on(t.bookingId)]
+);
 
 // ─── Gmail Integration ───────────────────────────────────────────────────────
 

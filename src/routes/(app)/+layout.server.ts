@@ -66,6 +66,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	const [org] = await db.select().from(orgSettings).where(eq(orgSettings.id, 'default'));
 	const platformName = org?.platformName || 'PM';
 	const telnyxEnabled = org?.telnyxEnabled ?? false;
+	const hasLogo = !!(org?.logoData);
 
 	return {
 		user: locals.user,
@@ -74,6 +75,7 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 		themeVariables,
 		themeMode,
 		platformName,
-		telnyxEnabled
+		telnyxEnabled,
+		hasLogo
 	};
 };

@@ -7,12 +7,21 @@ const REQUIRED_COLOR_KEYS = [
 	'surface-500', 'surface-600', 'surface-700', 'surface-800', 'surface-900'
 ] as const;
 
+export type ThemeTexture = 'none' | 'grid' | 'dots';
+export type ThemeCardStyle = 'rounded' | 'square';
+export type ThemeDepthStyle = 'shadow' | 'flat' | 'glass';
+export type ThemeGradient = 'none' | 'subtle' | 'vivid';
+
 export interface ParsedTheme {
 	name: string;
 	description: string;
 	colors: Record<string, string>;
 	font?: string;
 	mode?: 'dark' | 'light';
+	texture?: ThemeTexture;
+	cardStyle?: ThemeCardStyle;
+	depthStyle?: ThemeDepthStyle;
+	gradient?: ThemeGradient;
 }
 
 export interface ThemeValidationResult {
@@ -52,6 +61,15 @@ export function parsePmTheme(source: string): ParsedTheme {
 	const colors: Record<string, string> = {};
 	let font: string | undefined;
 	let mode: 'dark' | 'light' | undefined;
+	let texture: ThemeTexture | undefined;
+	let cardStyle: ThemeCardStyle | undefined;
+	let depthStyle: ThemeDepthStyle | undefined;
+	let gradient: ThemeGradient | undefined;
+
+	const TEXTURES: ThemeTexture[] = ['none', 'grid', 'dots'];
+	const CARD_STYLES: ThemeCardStyle[] = ['rounded', 'square'];
+	const DEPTH_STYLES: ThemeDepthStyle[] = ['shadow', 'flat', 'glass'];
+	const GRADIENTS: ThemeGradient[] = ['none', 'subtle', 'vivid'];
 
 	const blockRegex = /```pmtheme\s*\n([\s\S]*?)```/g;
 	let match: RegExpExecArray | null;
@@ -72,13 +90,21 @@ export function parsePmTheme(source: string): ParsedTheme {
 				font = value;
 			} else if (key === 'mode' && (value === 'dark' || value === 'light')) {
 				mode = value;
+			} else if (key === 'texture' && TEXTURES.includes(value as ThemeTexture)) {
+				texture = value as ThemeTexture;
+			} else if (key === 'card-style' && CARD_STYLES.includes(value as ThemeCardStyle)) {
+				cardStyle = value as ThemeCardStyle;
+			} else if (key === 'depth-style' && DEPTH_STYLES.includes(value as ThemeDepthStyle)) {
+				depthStyle = value as ThemeDepthStyle;
+			} else if (key === 'gradient' && GRADIENTS.includes(value as ThemeGradient)) {
+				gradient = value as ThemeGradient;
 			} else if (key.startsWith('brand-') || key.startsWith('surface-')) {
 				colors[key] = value;
 			}
 		}
 	}
 
-	return { name, description, colors, font, mode };
+	return { name, description, colors, font, mode, texture, cardStyle, depthStyle, gradient };
 }
 
 /**
@@ -137,6 +163,11 @@ export function themeToVariables(theme: ParsedTheme): Record<string, string> {
 	if (theme.font) {
 		vars['--font-sans'] = theme.font;
 	}
+
+	if (theme.texture) vars['--pm-texture'] = theme.texture;
+	if (theme.cardStyle) vars['--pm-card-style'] = theme.cardStyle;
+	if (theme.depthStyle) vars['--pm-depth-style'] = theme.depthStyle;
+	if (theme.gradient) vars['--pm-gradient'] = theme.gradient;
 
 	return vars;
 }

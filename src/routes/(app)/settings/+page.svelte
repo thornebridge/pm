@@ -39,6 +39,54 @@
 	let showImport = $state(false);
 	let showFormatHelp = $state(false);
 
+	// Logo state (admin only)
+	let logoUploading = $state(false);
+	let hasLogo = $state(data.hasLogo ?? false);
+
+	async function uploadLogo(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		if (file.size > 512 * 1024) {
+			showToast('Logo must be under 512KB', 'error');
+			return;
+		}
+
+		logoUploading = true;
+		try {
+			const formData = new FormData();
+			formData.append('logo', file);
+			const csrfToken = document.cookie.match(/pm-csrf=([^;]+)/)?.[1] || '';
+			await fetch('/api/admin/logo', {
+				method: 'POST',
+				body: formData,
+				headers: { 'X-CSRF-Token': csrfToken }
+			}).then(async (res) => {
+				if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
+			});
+			hasLogo = true;
+			await invalidateAll();
+			showToast('Logo uploaded');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to upload logo', 'error');
+		} finally {
+			logoUploading = false;
+			input.value = '';
+		}
+	}
+
+	async function removeLogo() {
+		try {
+			await api('/api/admin/logo', { method: 'DELETE' });
+			hasLogo = false;
+			await invalidateAll();
+			showToast('Logo removed');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to remove logo', 'error');
+		}
+	}
+
 	// Determine active theme ID from current data
 	const activeThemeId = $derived.by(() => {
 		// If no themeVariables override, it's Forest (default)
@@ -200,10 +248,20 @@
 
 	function getSwatches(variables: Record<string, string>): string[] {
 		return [
+			variables['--color-brand-300'] || '#999',
 			variables['--color-brand-400'] || '#888',
 			variables['--color-brand-500'] || '#777',
 			variables['--color-brand-600'] || '#666',
+			variables['--color-brand-700'] || '#555',
 			variables['--color-brand-800'] || '#444'
+		];
+	}
+
+	function getSurfaceSwatches(variables: Record<string, string>): string[] {
+		return [
+			variables['--color-surface-100'] || '#eee',
+			variables['--color-surface-500'] || '#888',
+			variables['--color-surface-900'] || '#111'
 		];
 	}
 
@@ -217,14 +275,14 @@
 	<title>Settings</title>
 </svelte:head>
 
-<div class="mx-auto max-w-md p-6">
+<div class="mx-auto max-w-2xl p-6">
 	<h1 class="mb-6 text-lg font-semibold text-surface-900 dark:text-surface-100">Settings</h1>
 
 	<!-- Appearance -->
 	<section class="mb-6">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Appearance</h2>
 		{#if themesLoaded}
-			<div class="grid grid-cols-4 gap-2 sm:grid-cols-5">
+			<div class="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
 				{#each themes as theme (theme.id)}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<div
@@ -232,29 +290,45 @@
 						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateTheme(theme.id); } }}
 						role="button"
 						tabindex="0"
-						class="group relative cursor-pointer overflow-hidden rounded-md border transition-colors {activeThemeId === theme.id ? 'border-brand-500 ring-1 ring-brand-500' : 'border-surface-300 hover:border-surface-400 dark:border-surface-700 dark:hover:border-surface-600'}"
+						class="group relative cursor-pointer overflow-hidden rounded-lg border transition-all {activeThemeId === theme.id ? 'border-brand-500 ring-2 ring-brand-500/30' : 'border-surface-300 hover:border-surface-400 dark:border-surface-700 dark:hover:border-surface-600'}"
 					>
-						<!-- Color bar -->
-						<div class="flex h-5">
+						<!-- Brand color swatch bar -->
+						<div class="flex h-8">
 							{#each getSwatches(theme.variables) as color}
 								<div class="flex-1" style="background-color: {color}"></div>
 							{/each}
 						</div>
-						<span class="block truncate px-1 py-1 text-[10px] font-medium text-surface-700 dark:text-surface-300">{theme.name}</span>
-						<!-- Hover actions -->
-						<div class="absolute inset-0 flex items-center justify-center gap-1 bg-surface-900/70 opacity-0 transition-opacity group-hover:opacity-100">
-							<button
-								onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
-								class="rounded bg-surface-800/80 px-1.5 py-0.5 text-[9px] text-surface-200 hover:bg-surface-700"
-								title="Copy to clipboard"
-							>Export</button>
-							{#if !theme.builtin}
+						<!-- Surface color strip -->
+						<div class="flex h-1.5">
+							{#each getSurfaceSwatches(theme.variables) as color}
+								<div class="flex-1" style="background-color: {color}"></div>
+							{/each}
+						</div>
+						<!-- Name + actions row -->
+						<div class="flex items-center justify-between px-2 py-1.5">
+							<span class="truncate text-xs font-medium text-surface-700 dark:text-surface-300">{theme.name}</span>
+							<div class="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
 								<button
-									onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
-									class="rounded bg-red-900/80 px-1.5 py-0.5 text-[9px] text-red-200 hover:bg-red-800"
-									title="Delete theme"
-								>Delete</button>
-							{/if}
+									onclick={(e) => { e.stopPropagation(); exportTheme(theme.id); }}
+									class="rounded p-0.5 text-surface-400 hover:bg-surface-200 hover:text-surface-600 dark:hover:bg-surface-700 dark:hover:text-surface-300"
+									title="Copy to clipboard"
+								>
+									<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+									</svg>
+								</button>
+								{#if !theme.builtin}
+									<button
+										onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
+										class="rounded p-0.5 text-surface-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+										title="Delete theme"
+									>
+										<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+										</svg>
+									</button>
+								{/if}
+							</div>
 						</div>
 					</div>
 				{/each}
@@ -305,6 +379,37 @@
 			<p class="text-sm text-surface-400">Loading themes...</p>
 		{/if}
 	</section>
+
+	<!-- Logo (admin only) -->
+	{#if data.user?.role === 'admin'}
+		<section class="mb-6">
+			<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Logo</h2>
+			<div class="flex items-center gap-4">
+				{#if hasLogo}
+					<img src="/api/admin/logo" alt="Org logo" class="h-10 w-10 rounded object-contain border border-surface-300 dark:border-surface-700" />
+				{:else}
+					<div class="flex h-10 w-10 items-center justify-center rounded border border-dashed border-surface-400 text-xs text-surface-400 dark:border-surface-600">
+						<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+						</svg>
+					</div>
+				{/if}
+				<div class="flex items-center gap-2">
+					<label class="cursor-pointer rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-700 hover:border-surface-400 dark:border-surface-700 dark:text-surface-300 dark:hover:border-surface-600">
+						{logoUploading ? 'Uploading...' : 'Upload'}
+						<input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" class="hidden" onchange={uploadLogo} disabled={logoUploading} />
+					</label>
+					{#if hasLogo}
+						<button
+							onclick={removeLogo}
+							class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-red-600 hover:border-red-400 dark:border-surface-700 dark:text-red-400 dark:hover:border-red-800"
+						>Remove</button>
+					{/if}
+				</div>
+			</div>
+			<p class="mt-1.5 text-xs text-surface-400 dark:text-surface-600">SVG, PNG, JPEG, or WebP. Max 512KB. Shown in sidebar.</p>
+		</section>
+	{/if}
 
 	<!-- Profile -->
 	<section class="mb-6">
@@ -552,7 +657,11 @@
 			<p class="mb-1 font-semibold text-surface-900 dark:text-surface-100">Optional Fields</p>
 			<ul class="list-inside list-disc space-y-0.5 text-xs">
 				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">font</code> — CSS font-family value</li>
-				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">mode</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">dark</code> (default) or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">light</code></li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">mode</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">dark</code> or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">light</code></li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">texture</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">none</code>, <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">grid</code>, or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">dots</code></li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">card-style</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">rounded</code> or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">square</code></li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">depth-style</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">shadow</code>, <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">flat</code>, or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">glass</code></li>
+				<li><code class="rounded bg-surface-200 px-1 dark:bg-surface-800">gradient</code> — <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">none</code>, <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">subtle</code>, or <code class="rounded bg-surface-200 px-1 dark:bg-surface-800">vivid</code></li>
 			</ul>
 		</div>
 

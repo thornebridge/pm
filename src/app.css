@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant light (&:is(.light *));
 
 @theme {
 	/* Brand (forest green) */
@@ -67,4 +68,78 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
 	background-color: var(--color-surface-600);
+}
+
+/* ─── Theme Style Options ─────────────────────────────────────────────────── */
+
+/* Background textures — applied to main content area */
+.pm-texture-grid {
+	background-image:
+		linear-gradient(var(--color-surface-800) 1px, transparent 1px),
+		linear-gradient(90deg, var(--color-surface-800) 1px, transparent 1px);
+	background-size: 40px 40px;
+	background-position: -1px -1px;
+}
+
+.light .pm-texture-grid {
+	background-image:
+		linear-gradient(var(--color-surface-200) 1px, transparent 1px),
+		linear-gradient(90deg, var(--color-surface-200) 1px, transparent 1px);
+}
+
+.pm-texture-dots {
+	background-image: radial-gradient(circle, var(--color-surface-700) 1px, transparent 1px);
+	background-size: 24px 24px;
+}
+
+.light .pm-texture-dots {
+	background-image: radial-gradient(circle, var(--color-surface-300) 1px, transparent 1px);
+}
+
+/* Card style — square corners */
+html[data-card-style='square'] .pm-card {
+	border-radius: 0;
+}
+
+/* Depth styles */
+html[data-depth-style='flat'] .pm-card {
+	box-shadow: none;
+}
+
+html[data-depth-style='shadow'] .pm-card {
+	box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+html[data-depth-style='glass'] .pm-card {
+	background: color-mix(in srgb, var(--color-surface-50) 70%, transparent);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border-color: color-mix(in srgb, var(--color-surface-300) 50%, transparent);
+}
+
+.dark html[data-depth-style='glass'] .pm-card,
+html.dark[data-depth-style='glass'] .pm-card {
+	background: color-mix(in srgb, var(--color-surface-900) 60%, transparent);
+	border-color: color-mix(in srgb, var(--color-surface-700) 40%, transparent);
+}
+
+/* Gradient overlays */
+html[data-gradient='subtle'] .pm-gradient::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(135deg, var(--color-brand-500) 0%, transparent 60%);
+	opacity: 0.04;
+	pointer-events: none;
+	border-radius: inherit;
+}
+
+html[data-gradient='vivid'] .pm-gradient::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(135deg, var(--color-brand-400) 0%, var(--color-brand-700) 100%);
+	opacity: 0.07;
+	pointer-events: none;
+	border-radius: inherit;
 }

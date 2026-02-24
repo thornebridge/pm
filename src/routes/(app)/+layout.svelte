@@ -43,6 +43,7 @@
 		const parts: string[] = [];
 		if (data.themeVariables) {
 			const entries = Object.entries(data.themeVariables)
+				.filter(([k]) => !k.startsWith('--pm-'))
 				.map(([k, v]) => `${k}: ${v};`)
 				.join(' ');
 			parts.push(`:root { ${entries} }`);
@@ -53,7 +54,18 @@
 		return parts.join('\n');
 	});
 
-	// Manage dark/light class on <html> element
+	// Dynamic theme-color for browser bar / PWA
+	const themeColor = $derived(data.themeVariables?.['--color-brand-600'] || '#2d4f3e');
+
+	// Style option derivations from theme variables
+	const textureClass = $derived.by(() => {
+		const texture = data.themeVariables?.['--pm-texture'];
+		if (texture === 'grid') return 'pm-texture-grid';
+		if (texture === 'dots') return 'pm-texture-dots';
+		return '';
+	});
+
+	// Manage dark/light class + style data attributes on <html> element
 	$effect(() => {
 		if (!browser) return;
 		const html = document.documentElement;
@@ -64,6 +76,12 @@
 			html.classList.remove('light');
 			html.classList.add('dark');
 		}
+
+		// Set style option data attributes
+		const vars = data.themeVariables;
+		html.dataset.cardStyle = vars?.['--pm-card-style'] || 'rounded';
+		html.dataset.depthStyle = vars?.['--pm-depth-style'] || 'shadow';
+		html.dataset.gradient = vars?.['--pm-gradient'] || 'none';
 	});
 
 	onMount(() => {
@@ -101,6 +119,7 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <svelte:head>
+	<meta name="theme-color" content={themeColor} />
 	{#if themeCss}
 		{@html `<style>${themeCss}</style>`}
 	{/if}
@@ -125,6 +144,7 @@
 		ontogglecollapse={toggleSidebarCollapse}
 		platformName={data.platformName}
 		telnyxEnabled={data.telnyxEnabled}
+		hasLogo={data.hasLogo}
 	/>
 
 	<!-- Main content -->
@@ -138,7 +158,7 @@
 			</button>
 			<span class="ml-3 text-sm font-semibold text-surface-900 dark:text-surface-100">{data.platformName}</span>
 		</header>
-		<main class="flex-1 overflow-auto">
+		<main class="flex-1 overflow-auto {textureClass}">
 			{@render children()}
 		</main>
 	</div>

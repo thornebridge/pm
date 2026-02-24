@@ -182,6 +182,8 @@ surface-900: #18181b
 \`\`\`pmtheme
 font: Inter, ui-sans-serif, system-ui, sans-serif
 mode: dark
+card-style: square
+depth-style: flat
 \`\`\`
 `;
 
@@ -256,6 +258,8 @@ surface-900: #0d0d1a
 \`\`\`pmtheme
 font: Inter, ui-sans-serif, system-ui, sans-serif
 mode: dark
+texture: dots
+depth-style: glass
 \`\`\`
 `;
 
@@ -293,6 +297,7 @@ surface-900: #1f1a18
 \`\`\`pmtheme
 font: Inter, ui-sans-serif, system-ui, sans-serif
 mode: dark
+gradient: subtle
 \`\`\`
 `;
 
@@ -367,6 +372,7 @@ surface-900: #111827
 \`\`\`pmtheme
 font: Inter, ui-sans-serif, system-ui, sans-serif
 mode: light
+depth-style: flat
 \`\`\`
 `;
 
@@ -441,6 +447,9 @@ surface-900: #0a0e1f
 \`\`\`pmtheme
 font: Inter, ui-sans-serif, system-ui, sans-serif
 mode: dark
+texture: grid
+depth-style: glass
+gradient: vivid
 \`\`\`
 `;
 
@@ -552,6 +561,7 @@ surface-900: #0e1320
 \`\`\`pmtheme
 font: Inter, ui-sans-serif, system-ui, sans-serif
 mode: dark
+texture: grid
 \`\`\`
 `;
 
