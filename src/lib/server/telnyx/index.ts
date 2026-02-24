@@ -62,8 +62,13 @@ export async function generateWebRtcToken(config: TelnyxConfig): Promise<string>
 		const text = await res.text();
 		throw new Error(`Telnyx token generation failed (${res.status}): ${text}`);
 	}
-	const data = await res.json();
-	return data.data;
+	const contentType = res.headers.get('content-type') || '';
+	if (contentType.includes('application/json')) {
+		const data = await res.json();
+		return typeof data === 'string' ? data : data.data;
+	}
+	// Telnyx returns the JWT as plain text
+	return await res.text();
 }
 
 export async function validateTelnyxCredentials(apiKey: string, credentialId: string): Promise<{ valid: boolean; error?: string }> {
