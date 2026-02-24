@@ -11,7 +11,7 @@ export const GET: RequestHandler = async (event) => {
 	const q = event.url.searchParams.get('q')?.trim();
 
 	if (!q || q.length < 2) {
-		return json({ tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] });
+		return json({ tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [], leads: [] });
 	}
 
 	// Try Meilisearch first
@@ -25,7 +25,8 @@ export const GET: RequestHandler = async (event) => {
 					{ indexUid: 'comments', q, limit: 5 },
 					{ indexUid: 'contacts', q, limit: 5 },
 					{ indexUid: 'companies', q, limit: 5 },
-					{ indexUid: 'opportunities', q, limit: 5 }
+					{ indexUid: 'opportunities', q, limit: 5 },
+					{ indexUid: 'leads', q, limit: 5 }
 				]
 			});
 
@@ -35,7 +36,8 @@ export const GET: RequestHandler = async (event) => {
 				comments: results.results[2]?.hits || [],
 				contacts: results.results[3]?.hits || [],
 				companies: results.results[4]?.hits || [],
-				opportunities: results.results[5]?.hits || []
+				opportunities: results.results[5]?.hits || [],
+				leads: results.results[6]?.hits || []
 			});
 		} catch (err) {
 			console.error('[search] Meilisearch query failed, falling back to SQL:', (err as Error).message);
@@ -92,6 +94,7 @@ export const GET: RequestHandler = async (event) => {
 		comments: matchedComments,
 		contacts: [],
 		companies: [],
-		opportunities: []
+		opportunities: [],
+		leads: []
 	});
 };

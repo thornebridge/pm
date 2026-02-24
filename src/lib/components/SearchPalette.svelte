@@ -20,7 +20,8 @@
 		contacts: Array<{ id: string; firstName: string; lastName: string; email: string | null; title: string | null }>;
 		companies: Array<{ id: string; name: string }>;
 		opportunities: Array<{ id: string; title: string; value: number | null; currency: string }>;
-	}>({ tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] });
+		leads: Array<{ id: string; firstName: string; lastName: string; email: string | null; companyName: string | null }>;
+	}>({ tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [], leads: [] });
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let inputEl: HTMLInputElement | undefined = $state();
 	let selectedIndex = $state(-1);
@@ -87,7 +88,7 @@
 	// Flat items for search mode
 	interface FlatItem {
 		url: string;
-		type: 'project' | 'task' | 'comment' | 'contact' | 'company' | 'opportunity';
+		type: 'project' | 'task' | 'comment' | 'contact' | 'company' | 'opportunity' | 'lead';
 	}
 
 	const flatResults = $derived<FlatItem[]>([
@@ -96,7 +97,8 @@
 		...results.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const })),
 		...results.contacts.map((c) => ({ url: `/crm/contacts/${c.id}`, type: 'contact' as const })),
 		...results.companies.map((c) => ({ url: `/crm/companies/${c.id}`, type: 'company' as const })),
-		...results.opportunities.map((o) => ({ url: `/crm/opportunities/${o.id}`, type: 'opportunity' as const }))
+		...results.opportunities.map((o) => ({ url: `/crm/opportunities/${o.id}`, type: 'opportunity' as const })),
+		...results.leads.map((l) => ({ url: `/crm/leads/${l.id}`, type: 'lead' as const }))
 	]);
 
 	const totalItems = $derived(isCommandMode ? filteredCommands.length : flatResults.length);
@@ -106,7 +108,7 @@
 			requestAnimationFrame(() => inputEl?.focus());
 		} else {
 			query = '';
-			results = { tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] };
+			results = { tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [], leads: [] };
 			selectedIndex = -1;
 		}
 	});
@@ -126,7 +128,7 @@
 		if (debounceTimer) clearTimeout(debounceTimer);
 		debounceTimer = setTimeout(async () => {
 			if (query.trim().length < 2) {
-				results = { tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [] };
+				results = { tasks: [], projects: [], comments: [], contacts: [], companies: [], opportunities: [], leads: [] };
 				return;
 			}
 			try {
@@ -173,7 +175,8 @@
 
 	const hasResults = $derived(
 		results.tasks.length > 0 || results.projects.length > 0 || results.comments.length > 0 ||
-		results.contacts.length > 0 || results.companies.length > 0 || results.opportunities.length > 0
+		results.contacts.length > 0 || results.companies.length > 0 || results.opportunities.length > 0 ||
+		results.leads.length > 0
 	);
 	const projectsOffset = 0;
 	const tasksOffset = $derived(results.projects.length);
@@ -181,6 +184,7 @@
 	const contactsOffset = $derived(results.projects.length + results.tasks.length + results.comments.length);
 	const companiesOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length);
 	const opportunitiesOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length + results.companies.length);
+	const leadsOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length + results.companies.length + results.opportunities.length);
 </script>
 
 {#if open}
@@ -316,7 +320,7 @@
 					{/if}
 
 					{#if results.opportunities.length > 0}
-						<div>
+						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Opportunities</span>
 							{#each results.opportunities as opp, i}
 								<button
@@ -324,6 +328,23 @@
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(opportunitiesOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
 								>
 									<span class="flex-1 truncate">{opp.title}</span>
+								</button>
+							{/each}
+						</div>
+					{/if}
+
+					{#if results.leads.length > 0}
+						<div>
+							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Leads</span>
+							{#each results.leads as lead, i}
+								<button
+									onclick={() => navigate(`/crm/leads/${lead.id}`)}
+									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(leadsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
+								>
+									<span class="flex-1 truncate">{lead.firstName} {lead.lastName}</span>
+									{#if lead.companyName}
+										<span class="text-[10px] {isSelected(leadsOffset, i) ? 'text-brand-500' : 'text-surface-400'}">{lead.companyName}</span>
+									{/if}
 								</button>
 							{/each}
 						</div>

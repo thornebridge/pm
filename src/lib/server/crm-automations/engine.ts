@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { crmAutomationRules, crmAutomationExecutions, crmOpportunities } from '../db/schema.js';
+import { crmAutomationRules, crmAutomationExecutions, crmOpportunities, crmLeads } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { executeCrmAction } from './actions.js';
@@ -64,28 +64,49 @@ export async function processCrmAutomations(payload: CrmAutomationPayload): Prom
 					// Re-emit events for field mutations (non-terminal only)
 					if (
 						!CRM_TERMINAL_ACTIONS.includes(action.type as CrmActionType) &&
-						action.type === 'set_field' &&
-						payload.entityType === 'opportunity'
+						action.type === 'set_field'
 					) {
-						const [updatedOpp] = await db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId));
-						if (updatedOpp) {
-							const fieldToEvent: Record<string, string> = {
-								stageId: 'opportunity.stage_changed',
-								priority: 'opportunity.priority_changed',
-								ownerId: 'opportunity.owner_changed',
-								value: 'opportunity.value_changed'
-							};
-							const newEvent = fieldToEvent[(action as { field: string }).field];
-							if (newEvent) {
-								processCrmAutomations({
-									event: newEvent as CrmAutomationPayload['event'],
-									entityType: 'opportunity',
-									entityId: payload.entityId,
-									entity: updatedOpp as unknown as Record<string, unknown>,
-									changes: { [(action as { field: string }).field]: (action as { value: unknown }).value },
-									userId: payload.userId,
-									chainDepth: depth + 1
-								}).catch(() => {});
+						if (payload.entityType === 'opportunity') {
+							const [updatedOpp] = await db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId));
+							if (updatedOpp) {
+								const fieldToEvent: Record<string, string> = {
+									stageId: 'opportunity.stage_changed',
+									priority: 'opportunity.priority_changed',
+									ownerId: 'opportunity.owner_changed',
+									value: 'opportunity.value_changed'
+								};
+								const newEvent = fieldToEvent[(action as { field: string }).field];
+								if (newEvent) {
+									processCrmAutomations({
+										event: newEvent as CrmAutomationPayload['event'],
+										entityType: 'opportunity',
+										entityId: payload.entityId,
+										entity: updatedOpp as unknown as Record<string, unknown>,
+										changes: { [(action as { field: string }).field]: (action as { value: unknown }).value },
+										userId: payload.userId,
+										chainDepth: depth + 1
+									}).catch(() => {});
+								}
+							}
+						} else if (payload.entityType === 'lead') {
+							const [updatedLead] = await db.select().from(crmLeads).where(eq(crmLeads.id, payload.entityId));
+							if (updatedLead) {
+								const fieldToEvent: Record<string, string> = {
+									statusId: 'lead.status_changed',
+									ownerId: 'lead.owner_changed'
+								};
+								const newEvent = fieldToEvent[(action as { field: string }).field];
+								if (newEvent) {
+									processCrmAutomations({
+										event: newEvent as CrmAutomationPayload['event'],
+										entityType: 'lead',
+										entityId: payload.entityId,
+										entity: updatedLead as unknown as Record<string, unknown>,
+										changes: { [(action as { field: string }).field]: (action as { value: unknown }).value },
+										userId: payload.userId,
+										chainDepth: depth + 1
+									}).catch(() => {});
+								}
 							}
 						}
 					}
@@ -120,6 +141,10 @@ function matchesTrigger(trigger: CrmTriggerDef, payload: CrmAutomationPayload): 
 		if (trigger.event === 'activity.logged' && trigger.config.activityType) {
 			const activityType = payload.entity.type;
 			if (activityType !== trigger.config.activityType) return false;
+		}
+		if (trigger.event === 'lead.status_changed' && trigger.config.stageId) {
+			const newStatus = payload.changes?.statusId ?? payload.entity.statusId;
+			if (newStatus !== trigger.config.stageId) return false;
 		}
 	}
 

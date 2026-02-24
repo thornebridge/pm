@@ -16,7 +16,7 @@ export const GET: RequestHandler = async (event) => {
 		.orderBy(asc(crmCustomFieldDefs.position));
 
 	if (entityType) {
-		query = query.where(eq(crmCustomFieldDefs.entityType, entityType as 'company' | 'contact' | 'opportunity')) as typeof query;
+		query = query.where(eq(crmCustomFieldDefs.entityType, entityType as 'company' | 'contact' | 'opportunity' | 'lead')) as typeof query;
 	}
 
 	return json(await query);

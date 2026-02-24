@@ -558,6 +558,60 @@ export const crmCompanies = pgTable(
 	(t) => [index('idx_crm_companies_owner').on(t.ownerId)]
 );
 
+export const crmLeadStatuses = pgTable(
+	'crm_lead_statuses',
+	{
+		id: text('id').primaryKey(),
+		name: text('name').notNull(),
+		color: text('color').notNull(),
+		position: integer('position').notNull(),
+		isConverted: boolean('is_converted').notNull().default(false),
+		isDisqualified: boolean('is_disqualified').notNull().default(false),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [index('idx_crm_lead_statuses_position').on(t.position)]
+);
+
+export const crmLeads = pgTable(
+	'crm_leads',
+	{
+		id: text('id').primaryKey(),
+		firstName: text('first_name').notNull(),
+		lastName: text('last_name').notNull(),
+		email: text('email'),
+		phone: text('phone'),
+		title: text('title'),
+		companyName: text('company_name'),
+		website: text('website'),
+		industry: text('industry'),
+		companySize: text('company_size', { enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'] }),
+		address: text('address'),
+		source: text('source', {
+			enum: ['referral', 'inbound', 'outbound', 'website', 'event', 'csv_import', 'other']
+		}),
+		statusId: text('status_id')
+			.notNull()
+			.references(() => crmLeadStatuses.id),
+		notes: text('notes'),
+		convertedAt: bigint('converted_at', { mode: 'number' }),
+		convertedCompanyId: text('converted_company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+		convertedContactId: text('converted_contact_id'),
+		convertedOpportunityId: text('converted_opportunity_id'),
+		ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+		createdBy: text('created_by')
+			.notNull()
+			.references(() => users.id),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_crm_leads_status').on(t.statusId),
+		index('idx_crm_leads_owner').on(t.ownerId),
+		index('idx_crm_leads_email').on(t.email),
+		index('idx_crm_leads_converted').on(t.convertedAt)
+	]
+);
+
 export const crmContacts = pgTable(
 	'crm_contacts',
 	{
@@ -676,6 +730,7 @@ export const crmActivities = pgTable(
 		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, {
 			onDelete: 'set null'
 		}),
+		leadId: text('lead_id').references(() => crmLeads.id, { onDelete: 'set null' }),
 		scheduledAt: bigint('scheduled_at', { mode: 'number' }),
 		completedAt: bigint('completed_at', { mode: 'number' }),
 		durationMinutes: integer('duration_minutes'),
@@ -689,6 +744,7 @@ export const crmActivities = pgTable(
 		index('idx_crm_act_company').on(t.companyId),
 		index('idx_crm_act_contact').on(t.contactId),
 		index('idx_crm_act_opp').on(t.opportunityId),
+		index('idx_crm_act_lead').on(t.leadId),
 		index('idx_crm_act_user_date').on(t.userId, t.createdAt)
 	]
 );
@@ -1401,7 +1457,7 @@ export const crmCustomFieldDefs = pgTable(
 	'crm_custom_field_defs',
 	{
 		id: text('id').primaryKey(),
-		entityType: text('entity_type', { enum: ['company', 'contact', 'opportunity'] }).notNull(),
+		entityType: text('entity_type', { enum: ['company', 'contact', 'opportunity', 'lead'] }).notNull(),
 		fieldName: text('field_name').notNull(),
 		label: text('label').notNull(),
 		fieldType: text('field_type', {
@@ -1451,7 +1507,7 @@ export const crmAutomationRules = pgTable(
 		name: text('name').notNull(),
 		description: text('description'),
 		entityType: text('entity_type', {
-			enum: ['opportunity', 'contact', 'company', 'activity']
+			enum: ['opportunity', 'contact', 'company', 'activity', 'lead']
 		}).notNull(),
 		trigger: text('trigger').notNull(), // JSON: { event, config? }
 		conditions: text('conditions'), // JSON: [{ field, operator, value }]

@@ -15,7 +15,7 @@
 	}
 
 	interface Props {
-		entityType: 'company' | 'contact' | 'opportunity';
+		entityType: 'company' | 'contact' | 'opportunity' | 'lead';
 		entityId: string;
 	}
 

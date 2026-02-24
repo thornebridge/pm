@@ -51,6 +51,13 @@ export const INDEXES: Record<string, IndexConfig> = {
 		filterableAttributes: ['archived'],
 		sortableAttributes: ['updatedAt']
 	},
+	leads: {
+		uid: 'leads',
+		primaryKey: 'id',
+		searchableAttributes: ['firstName', 'lastName', 'email', 'phone', 'title', 'companyName', 'notes'],
+		filterableAttributes: ['statusId', 'ownerId', 'source', 'convertedAt'],
+		sortableAttributes: ['updatedAt', 'createdAt']
+	},
 	comments: {
 		uid: 'comments',
 		primaryKey: 'id',

@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 import {
-	crmOpportunities, crmActivities, crmTasks, crmCompanies, notifications
+	crmOpportunities, crmActivities, crmTasks, crmCompanies, crmLeads, notifications
 } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
@@ -60,6 +60,10 @@ async function executeSetField(action: CrmActionSetField, payload: CrmAutomation
 		await db.update(crmOpportunities).set(updates).where(eq(crmOpportunities.id, payload.entityId));
 		const [updated] = await db.select().from(crmOpportunities).where(eq(crmOpportunities.id, payload.entityId));
 		if (updated) indexDocument('opportunities', { id: updated.id, title: updated.title, description: updated.description, value: updated.value, currency: updated.currency, priority: updated.priority, source: updated.source, companyId: updated.companyId, stageId: updated.stageId, ownerId: updated.ownerId, nextStep: updated.nextStep, expectedCloseDate: updated.expectedCloseDate, updatedAt: updated.updatedAt });
+	} else if (payload.entityType === 'lead') {
+		await db.update(crmLeads).set(updates).where(eq(crmLeads.id, payload.entityId));
+		const [updated] = await db.select().from(crmLeads).where(eq(crmLeads.id, payload.entityId));
+		if (updated) indexDocument('leads', { id: updated.id, firstName: updated.firstName, lastName: updated.lastName, email: updated.email, phone: updated.phone, title: updated.title, companyName: updated.companyName, source: updated.source, statusId: updated.statusId, ownerId: updated.ownerId, notes: updated.notes, convertedAt: updated.convertedAt, updatedAt: updated.updatedAt, createdAt: updated.createdAt });
 	}
 
 	return { action: 'set_field', result: `Set ${action.field} to ${action.value}` };
@@ -86,6 +90,8 @@ async function executeLogActivity(action: CrmActionLogActivity, payload: CrmAuto
 		activity.companyId = payload.entityId;
 	} else if (payload.entityType === 'contact') {
 		activity.contactId = payload.entityId;
+	} else if (payload.entityType === 'lead') {
+		activity.leadId = payload.entityId;
 	}
 
 	await db.insert(crmActivities).values(activity);
@@ -116,6 +122,8 @@ async function executeCreateTask(action: CrmActionCreateTask, payload: CrmAutoma
 		task.companyId = payload.entityId;
 	} else if (payload.entityType === 'contact') {
 		task.contactId = payload.entityId;
+	} else if (payload.entityType === 'lead') {
+		// Tasks for leads — no direct FK, link via description
 	}
 
 	await db.insert(crmTasks).values(task);
@@ -146,7 +154,7 @@ async function executeSendNotification(
 		type: 'status_change',
 		title,
 		body,
-		url: `/crm/opportunities/${payload.entityId}`,
+		url: payload.entityType === 'lead' ? `/crm/leads/${payload.entityId}` : `/crm/opportunities/${payload.entityId}`,
 		taskId: null,
 		actorId: AUTOMATION_USER_ID,
 		read: false,

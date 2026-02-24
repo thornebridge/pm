@@ -11,6 +11,10 @@ export type CrmTriggerEvent =
 	| 'contact.created'
 	| 'company.created'
 	| 'activity.logged'
+	| 'lead.created'
+	| 'lead.status_changed'
+	| 'lead.converted'
+	| 'lead.owner_changed'
 	| 'deal.stale'        // polling: no activity in X days
 	| 'deal.no_next_step' // polling: no next step set
 	| 'close_date.approaching'; // polling: expected close date approaching
@@ -40,6 +44,7 @@ export type CrmConditionOperator =
 
 export type CrmConditionField =
 	| 'stageId'
+	| 'statusId'
 	| 'priority'
 	| 'ownerId'
 	| 'source'
@@ -111,7 +116,7 @@ export type CrmActionDef =
 
 export interface CrmAutomationPayload {
 	event: CrmTriggerEvent;
-	entityType: 'opportunity' | 'contact' | 'company' | 'activity';
+	entityType: 'opportunity' | 'contact' | 'company' | 'activity' | 'lead';
 	entityId: string;
 	entity: Record<string, unknown>;
 	changes?: Record<string, unknown>;

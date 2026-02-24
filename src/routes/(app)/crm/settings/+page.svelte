@@ -6,7 +6,111 @@
 	let { data } = $props();
 
 	// -- Top-level tab --
-	let settingsTab = $state<'pipeline' | 'custom-fields'>('pipeline');
+	let settingsTab = $state<'pipeline' | 'lead-statuses' | 'custom-fields'>('pipeline');
+
+	// ========== Lead Statuses ==========
+	let lsEditingId = $state<string | null>(null);
+	let lsEditName = $state('');
+	let lsEditColor = $state('');
+	let lsEditIsConverted = $state(false);
+	let lsEditIsDisqualified = $state(false);
+
+	let lsShowAdd = $state(false);
+	let lsNewName = $state('');
+	let lsNewColor = $state('#6366f1');
+	let lsNewIsConverted = $state(false);
+	let lsNewIsDisqualified = $state(false);
+
+	function startLsEdit(status: typeof data.leadStatuses[0]) {
+		lsEditingId = status.id;
+		lsEditName = status.name;
+		lsEditColor = status.color;
+		lsEditIsConverted = status.isConverted;
+		lsEditIsDisqualified = status.isDisqualified;
+	}
+
+	async function saveLsEdit() {
+		if (!lsEditingId || !lsEditName.trim()) return;
+		try {
+			await api('/api/crm/lead-statuses', {
+				method: 'PATCH',
+				body: JSON.stringify({
+					statuses: [{
+						id: lsEditingId,
+						name: lsEditName.trim(),
+						color: lsEditColor,
+						isConverted: lsEditIsConverted,
+						isDisqualified: lsEditIsDisqualified
+					}]
+				})
+			});
+			lsEditingId = null;
+			showToast('Status updated');
+			await invalidateAll();
+		} catch {
+			showToast('Failed to update status', 'error');
+		}
+	}
+
+	async function addLeadStatus() {
+		if (!lsNewName.trim()) return;
+		try {
+			await api('/api/crm/lead-statuses', {
+				method: 'POST',
+				body: JSON.stringify({
+					name: lsNewName.trim(),
+					color: lsNewColor,
+					isConverted: lsNewIsConverted,
+					isDisqualified: lsNewIsDisqualified
+				})
+			});
+			lsShowAdd = false;
+			lsNewName = '';
+			lsNewColor = '#6366f1';
+			lsNewIsConverted = false;
+			lsNewIsDisqualified = false;
+			showToast('Status created');
+			await invalidateAll();
+		} catch {
+			showToast('Failed to create status', 'error');
+		}
+	}
+
+	async function deleteLeadStatus(id: string) {
+		if (!confirm('Delete this lead status?')) return;
+		try {
+			await api('/api/crm/lead-statuses', {
+				method: 'DELETE',
+				body: JSON.stringify({ id })
+			});
+			showToast('Status deleted');
+			await invalidateAll();
+		} catch {
+			showToast('Failed to delete status', 'error');
+		}
+	}
+
+	async function moveLeadStatus(id: string, direction: 'up' | 'down') {
+		const sorted = [...data.leadStatuses].sort((a, b) => a.position - b.position);
+		const idx = sorted.findIndex((s) => s.id === id);
+		const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+		if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+		try {
+			await api('/api/crm/lead-statuses', {
+				method: 'PATCH',
+				body: JSON.stringify({
+					statuses: [
+						{ id: sorted[idx].id, position: sorted[swapIdx].position },
+						{ id: sorted[swapIdx].id, position: sorted[idx].position }
+					]
+				})
+			});
+			await invalidateAll();
+		} catch {
+			showToast('Failed to reorder statuses', 'error');
+		}
+	}
 
 	// ========== Pipeline Stages ==========
 	let editingId = $state<string | null>(null);
@@ -137,7 +241,7 @@
 		{ value: 'email', label: 'Email' }
 	];
 
-	let cfEntityTab = $state<'company' | 'contact' | 'opportunity'>('company');
+	let cfEntityTab = $state<'company' | 'contact' | 'opportunity' | 'lead'>('company');
 	let cfFields = $state<FieldDef[]>([]);
 	let cfLoading = $state(false);
 
@@ -346,7 +450,7 @@
 
 	<!-- Top-level tabs -->
 	<div class="mb-6 flex gap-4 border-b border-surface-300 dark:border-surface-800">
-		{#each [{ key: 'pipeline', label: 'Pipeline Stages' }, { key: 'custom-fields', label: 'Custom Fields' }] as t}
+		{#each [{ key: 'pipeline', label: 'Pipeline Stages' }, { key: 'lead-statuses', label: 'Lead Statuses' }, { key: 'custom-fields', label: 'Custom Fields' }] as t}
 			<button
 				onclick={() => (settingsTab = t.key as typeof settingsTab)}
 				class="border-b-2 px-1 pb-2 text-sm font-medium transition {settingsTab === t.key ? 'border-brand-500 text-brand-600 dark:text-brand-400' : 'border-transparent text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'}"
@@ -452,12 +556,99 @@
 		{/if}
 	{/if}
 
+	<!-- ======== Lead Statuses ======== -->
+	{#if settingsTab === 'lead-statuses'}
+		<div class="rounded-lg border border-surface-300 dark:border-surface-800">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="border-b border-surface-300 bg-surface-100 dark:border-surface-800 dark:bg-surface-900">
+						<th class="px-4 py-2 text-left font-medium text-surface-600 dark:text-surface-400">Order</th>
+						<th class="px-4 py-2 text-left font-medium text-surface-600 dark:text-surface-400">Name</th>
+						<th class="px-4 py-2 text-left font-medium text-surface-600 dark:text-surface-400">Color</th>
+						<th class="px-4 py-2 text-center font-medium text-surface-600 dark:text-surface-400">Converted</th>
+						<th class="px-4 py-2 text-center font-medium text-surface-600 dark:text-surface-400">Disqualified</th>
+						<th class="px-4 py-2 text-right font-medium text-surface-600 dark:text-surface-400">Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each [...data.leadStatuses].sort((a, b) => a.position - b.position) as status, i (status.id)}
+						<tr class="border-b border-surface-200 dark:border-surface-800">
+							{#if lsEditingId === status.id}
+								<td class="px-4 py-2">{i + 1}</td>
+								<td class="px-4 py-2">
+									<input bind:value={lsEditName} class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+								</td>
+								<td class="px-4 py-2">
+									<input type="color" bind:value={lsEditColor} class="h-6 w-8 cursor-pointer" />
+								</td>
+								<td class="px-4 py-2 text-center">
+									<input type="checkbox" bind:checked={lsEditIsConverted} />
+								</td>
+								<td class="px-4 py-2 text-center">
+									<input type="checkbox" bind:checked={lsEditIsDisqualified} />
+								</td>
+								<td class="px-4 py-2 text-right">
+									<button onclick={saveLsEdit} class="text-xs text-brand-500 hover:underline">Save</button>
+									<button onclick={() => (lsEditingId = null)} class="ml-2 text-xs text-surface-500 hover:underline">Cancel</button>
+								</td>
+							{:else}
+								<td class="px-4 py-2 text-surface-500">
+									<div class="flex items-center gap-1">
+										<button onclick={() => moveLeadStatus(status.id, 'up')} disabled={i === 0} class="text-surface-400 hover:text-surface-600 disabled:opacity-30">&uarr;</button>
+										<button onclick={() => moveLeadStatus(status.id, 'down')} disabled={i === data.leadStatuses.length - 1} class="text-surface-400 hover:text-surface-600 disabled:opacity-30">&darr;</button>
+									</div>
+								</td>
+								<td class="px-4 py-2 text-surface-900 dark:text-surface-100">{status.name}</td>
+								<td class="px-4 py-2">
+									<div class="h-4 w-4 rounded-full" style="background-color: {status.color}"></div>
+								</td>
+								<td class="px-4 py-2 text-center text-surface-600 dark:text-surface-400">{status.isConverted ? 'Yes' : ''}</td>
+								<td class="px-4 py-2 text-center text-surface-600 dark:text-surface-400">{status.isDisqualified ? 'Yes' : ''}</td>
+								<td class="px-4 py-2 text-right">
+									<button onclick={() => startLsEdit(status)} class="text-xs text-brand-500 hover:underline">Edit</button>
+									<button onclick={() => deleteLeadStatus(status.id)} class="ml-2 text-xs text-red-500 hover:underline">Delete</button>
+								</td>
+							{/if}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+
+		{#if lsShowAdd}
+			<div class="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
+				<div>
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name</label>
+					<input bind:value={lsNewName} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+				</div>
+				<div>
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Color</label>
+					<input type="color" bind:value={lsNewColor} class="h-8 w-10" />
+				</div>
+				<label class="flex items-center gap-1 text-sm text-surface-700 dark:text-surface-300">
+					<input type="checkbox" bind:checked={lsNewIsConverted} /> Converted
+				</label>
+				<label class="flex items-center gap-1 text-sm text-surface-700 dark:text-surface-300">
+					<input type="checkbox" bind:checked={lsNewIsDisqualified} /> Disqualified
+				</label>
+				<button onclick={addLeadStatus} disabled={!lsNewName.trim()} class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50">
+					Add Status
+				</button>
+				<button onclick={() => (lsShowAdd = false)} class="text-sm text-surface-500 hover:text-surface-700">Cancel</button>
+			</div>
+		{:else}
+			<button onclick={() => (lsShowAdd = true)} class="mt-4 rounded-md border border-dashed border-surface-400 px-3 py-1.5 text-sm text-surface-600 hover:bg-surface-100 dark:border-surface-600 dark:text-surface-400 dark:hover:bg-surface-800">
+				+ Add Status
+			</button>
+		{/if}
+	{/if}
+
 	<!-- ======== Custom Fields ======== -->
 	{#if settingsTab === 'custom-fields'}
 		<!-- Entity type sub-tabs -->
 		<div class="mb-4 flex items-center justify-between">
 			<div class="flex gap-2">
-				{#each [{ key: 'company', label: 'Company' }, { key: 'contact', label: 'Contact' }, { key: 'opportunity', label: 'Opportunity' }] as et}
+				{#each [{ key: 'company', label: 'Company' }, { key: 'contact', label: 'Contact' }, { key: 'opportunity', label: 'Opportunity' }, { key: 'lead', label: 'Lead' }] as et}
 					<button
 						onclick={() => { cfEntityTab = et.key as typeof cfEntityTab; cfEditingId = null; cfShowAdd = false; }}
 						class="rounded-md px-3 py-1.5 text-sm font-medium transition {cfEntityTab === et.key ? 'bg-brand-600 text-white' : 'bg-surface-100 text-surface-600 hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:bg-surface-700'}"

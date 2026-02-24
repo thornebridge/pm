@@ -5,6 +5,7 @@ import {
 	crmContacts,
 	crmCompanies,
 	crmOpportunities,
+	crmLeads,
 	gmailThreads,
 	gmailMessages,
 	tasks,
@@ -49,6 +50,8 @@ export async function reindexAll(): Promise<Record<string, number>> {
 	counts.companies = await reindexCompanies(client);
 	// Opportunities
 	counts.opportunities = await reindexOpportunities(client);
+	// Leads
+	counts.leads = await reindexLeads(client);
 	// Email threads
 	counts.email_threads = await reindexEmailThreads(client);
 	// Tasks
@@ -132,6 +135,33 @@ async function reindexOpportunities(client: import('meilisearch').MeiliSearch): 
 			nextStep: r.nextStep,
 			expectedCloseDate: r.expectedCloseDate,
 			updatedAt: r.updatedAt
+		}));
+		await index.addDocuments(batch);
+	}
+	return rows.length;
+}
+
+async function reindexLeads(client: import('meilisearch').MeiliSearch): Promise<number> {
+	const index = client.index(INDEXES.leads.uid);
+	await index.deleteAllDocuments();
+	const rows = await db.select().from(crmLeads);
+	if (rows.length === 0) return 0;
+	for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+		const batch = rows.slice(i, i + BATCH_SIZE).map((r) => ({
+			id: r.id,
+			firstName: r.firstName,
+			lastName: r.lastName,
+			email: r.email,
+			phone: r.phone,
+			title: r.title,
+			companyName: r.companyName,
+			source: r.source,
+			statusId: r.statusId,
+			ownerId: r.ownerId,
+			notes: r.notes,
+			convertedAt: r.convertedAt,
+			updatedAt: r.updatedAt,
+			createdAt: r.createdAt
 		}));
 		await index.addDocuments(batch);
 	}

@@ -8,6 +8,13 @@
       "when": 1771961034318,
       "tag": "0000_calm_nightcrawler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1771972965579,
+      "tag": "0001_regular_gateway",
+      "breakpoints": true
     }
   ]
 }

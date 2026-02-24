@@ -5,6 +5,7 @@ const VALID_TRIGGERS: CrmTriggerEvent[] = [
 	'opportunity.owner_changed', 'opportunity.value_changed',
 	'opportunity.won', 'opportunity.lost',
 	'contact.created', 'company.created', 'activity.logged',
+	'lead.created', 'lead.status_changed', 'lead.converted', 'lead.owner_changed',
 	'deal.stale', 'deal.no_next_step', 'close_date.approaching'
 ];
 
@@ -14,12 +15,12 @@ const VALID_OPERATORS: CrmConditionOperator[] = [
 ];
 
 const VALID_FIELDS: CrmConditionField[] = [
-	'stageId', 'priority', 'ownerId', 'source', 'value', 'probability', 'companyId', 'nextStep'
+	'stageId', 'statusId', 'priority', 'ownerId', 'source', 'value', 'probability', 'companyId', 'nextStep'
 ];
 
 const VALID_ACTION_TYPES = ['set_field', 'log_activity', 'create_task', 'send_notification', 'fire_webhook'];
 
-const SETTABLE_FIELDS = ['stageId', 'priority', 'ownerId', 'value', 'probability', 'nextStep', 'nextStepDueDate', 'source'];
+const SETTABLE_FIELDS = ['stageId', 'statusId', 'priority', 'ownerId', 'value', 'probability', 'nextStep', 'nextStepDueDate', 'source'];
 
 export function validateCrmRule(data: {
 	name?: string;

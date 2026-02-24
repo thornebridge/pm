@@ -79,7 +79,8 @@ export async function initClient() {
 		const { TelnyxRTC } = await import('@telnyx/webrtc');
 
 		client = new TelnyxRTC({
-			login_token: tokenData.token
+			login_token: tokenData.token,
+			debug: true
 		});
 
 		client.on('telnyx.ready', () => {
@@ -152,9 +153,25 @@ function handleNotification(notification: any) {
 				break;
 
 			case 'hangup':
-			case 'destroy':
+			case 'destroy': {
+				// Surface the hangup reason so we can diagnose call failures
+				const cause = call.cause || '';
+				const sipCode = call.sipCode || '';
+				const sipReason = call.sipReason || '';
+				if (cause || sipCode) {
+					console.error(`[Dialer] Call ended: cause=${cause} causeCode=${call.causeCode || ''} sipCode=${sipCode} sipReason=${sipReason}`);
+				}
+				// Show error for unexpected hangups (call never reached 'active')
+				if (callState === 'connecting' || callState === 'ringing') {
+					error = sipReason
+						? `Call failed: ${sipReason} (${sipCode})`
+						: cause
+							? `Call failed: ${cause}`
+							: 'Call failed to connect';
+				}
 				_handleCallEnd();
 				break;
+			}
 
 			case 'purge':
 				_resetCallState();
@@ -365,7 +382,13 @@ function _resetCallState() {
 	currentContactId = null;
 	currentCompanyId = null;
 	localCallLogId = null;
-	error = null;
+	// Keep error visible briefly so user can read it
+	const pendingError = error;
+	if (pendingError) {
+		setTimeout(() => { if (error === pendingError) error = null; }, 4000);
+	} else {
+		error = null;
+	}
 	incomingCall = null;
 }
 
