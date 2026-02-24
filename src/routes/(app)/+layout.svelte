@@ -8,6 +8,7 @@
 	import Sidebar from '$lib/components/nav/Sidebar.svelte';
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
 	import QuickCreateTask from '$lib/components/task/QuickCreateTask.svelte';
+	import DialerWidget from '$lib/components/crm/DialerWidget.svelte';
 
 	import { browser } from '$app/environment';
 
@@ -158,11 +159,9 @@
 	currentProjectId={currentProjectId}
 />
 
-<!-- Telnyx dialer widget (dynamically loaded when enabled) -->
+<!-- Telnyx dialer widget -->
 {#if data.telnyxEnabled}
-	{#await import('$lib/components/crm/DialerWidget.svelte') then { default: DialerWidget }}
-		<DialerWidget />
-	{/await}
+	<DialerWidget />
 {/if}
 
 <!-- Keyboard shortcuts help modal -->
