@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
 import { folders, projects, users, userThemes, orgSettings } from '$lib/server/db/schema.js';
-import { desc, eq, and } from 'drizzle-orm';
+import { desc, eq, and, sql } from 'drizzle-orm';
 import { getBuiltinTheme, BUILTIN_THEMES } from '$lib/server/theme/builtins.js';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -18,7 +18,8 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 			slug: projects.slug,
 			color: projects.color,
 			folderId: projects.folderId,
-			archived: projects.archived
+			archived: projects.archived,
+			hasLogo: sql<boolean>`${projects.logoData} is not null`.as('has_logo')
 		})
 		.from(projects)
 		.orderBy(desc(projects.updatedAt));

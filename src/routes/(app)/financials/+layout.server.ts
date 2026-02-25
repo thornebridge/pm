@@ -1,6 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { db } from '$lib/server/db/index.js';
-import { finAccounts } from '$lib/server/db/schema.js';
+import { finAccounts, orgSettings } from '$lib/server/db/schema.js';
 import { eq, asc } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async () => {
@@ -28,10 +28,16 @@ export const load: LayoutServerLoad = async () => {
 	const revenueAccounts = accounts.filter((a) => a.accountType === 'revenue');
 	const expenseAccounts = accounts.filter((a) => a.accountType === 'expense');
 
+	const [org] = await db
+		.select({ aiEnabled: orgSettings.aiEnabled })
+		.from(orgSettings)
+		.where(eq(orgSettings.id, 'default'));
+
 	return {
 		accounts,
 		bankAccounts,
 		revenueAccounts,
-		expenseAccounts
+		expenseAccounts,
+		aiEnabled: org?.aiEnabled ?? false
 	};
 };

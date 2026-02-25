@@ -8,7 +8,7 @@
 	interface Props {
 		user: { name: string; role: string } | null;
 		folders: Array<{ id: string; name: string; slug: string; parentId: string | null; color: string | null; position: number }>;
-		projects: Array<{ id: string; name: string; slug: string; color: string; folderId: string | null }>;
+		projects: Array<{ id: string; name: string; slug: string; color: string; folderId: string | null; hasLogo?: boolean }>;
 		open: boolean;
 		onclose: () => void;
 		collapsed?: boolean;
@@ -262,8 +262,8 @@
 			</div>
 		{/each}
 
-		<!-- Workspace (always visible) -->
-		{#if hasWorkspace}
+		<!-- Workspace (ops mode only) -->
+		{#if hasWorkspace && activeMode === 'ops'}
 			{#if !collapsed}
 				<div class="pt-3">
 					<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Workspace</span>
@@ -278,9 +278,17 @@
 							<a
 								href="/projects/{project.slug}/home"
 								title={project.name}
-								class="h-2.5 w-2.5 rounded-full transition-transform hover:scale-150"
-								style="background-color: {project.color}"
-							></a>
+								class="transition-transform hover:scale-150"
+							>
+								{#if project.hasLogo}
+									<img src="/api/projects/{project.id}/logo" alt="" class="h-5 w-5 rounded object-contain" />
+								{:else}
+									<span
+										class="block h-2.5 w-2.5 rounded-full"
+										style="background-color: {project.color}"
+									></span>
+								{/if}
+							</a>
 						{/each}
 					</div>
 				{/if}

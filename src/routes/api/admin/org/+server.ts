@@ -28,7 +28,8 @@ export const GET: RequestHandler = async (event) => {
 		...settings,
 		telnyxApiKey: maskSecret(settings.telnyxApiKey),
 		googleClientSecret: maskSecret(settings.googleClientSecret),
-		resendApiKey: maskSecret(settings.resendApiKey)
+		resendApiKey: maskSecret(settings.resendApiKey),
+		aiApiKey: maskSecret(settings.aiApiKey)
 	});
 };
 
@@ -89,6 +90,21 @@ export const PUT: RequestHandler = async (event) => {
 		? (body.resendApiKey.trim() || null)
 		: current.resendApiKey;
 
+	// AI fields
+	const aiEnabled = typeof body.aiEnabled === 'boolean' ? body.aiEnabled : current.aiEnabled;
+	const aiProvider = typeof body.aiProvider === 'string'
+		? (body.aiProvider.trim() || null)
+		: current.aiProvider;
+	const aiModel = typeof body.aiModel === 'string'
+		? (body.aiModel.trim() || null)
+		: current.aiModel;
+	const aiApiKey = typeof body.aiApiKey === 'string' && !body.aiApiKey.startsWith('•')
+		? (body.aiApiKey.trim() || null)
+		: current.aiApiKey;
+	const aiEndpoint = typeof body.aiEndpoint === 'string'
+		? (body.aiEndpoint.trim() || null)
+		: current.aiEndpoint;
+
 	await db.update(orgSettings)
 		.set({
 			platformName,
@@ -103,6 +119,11 @@ export const PUT: RequestHandler = async (event) => {
 			emailProvider,
 			emailFromAddress,
 			resendApiKey,
+			aiEnabled,
+			aiProvider,
+			aiModel,
+			aiApiKey,
+			aiEndpoint,
 			updatedAt: Date.now()
 		})
 		.where(eq(orgSettings.id, 'default'));
@@ -120,6 +141,11 @@ export const PUT: RequestHandler = async (event) => {
 		googleClientSecret: maskSecret(googleClientSecret),
 		emailProvider,
 		emailFromAddress,
-		resendApiKey: maskSecret(resendApiKey)
+		resendApiKey: maskSecret(resendApiKey),
+		aiEnabled,
+		aiProvider,
+		aiModel,
+		aiApiKey: maskSecret(aiApiKey),
+		aiEndpoint
 	});
 };

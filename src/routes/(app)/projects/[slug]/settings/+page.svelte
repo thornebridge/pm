@@ -6,6 +6,23 @@
 
 	let { data } = $props();
 
+	// General info
+	let projectName = $state(data.project.name);
+	let projectDescription = $state(data.project.description ?? '');
+	let projectColor = $state(data.project.color);
+	let savingGeneral = $state(false);
+
+	$effect(() => {
+		projectName = data.project.name;
+		projectDescription = data.project.description ?? '';
+		projectColor = data.project.color;
+	});
+
+	// Logo state
+	let logoUploading = $state(false);
+	let hasProjectLogo = $state(data.project.hasLogo ?? false);
+	$effect(() => { hasProjectLogo = data.project.hasLogo ?? false; });
+
 	let newStatusName = $state('');
 	let newStatusColor = $state('#64748b');
 	let newLabelName = $state('');
@@ -24,6 +41,70 @@
 	// Default assignee
 	let defaultAssigneeId = $state(data.project.defaultAssigneeId ?? '');
 	$effect(() => { defaultAssigneeId = data.project.defaultAssigneeId ?? ''; });
+
+	async function saveGeneral() {
+		savingGeneral = true;
+		try {
+			await api(`/api/projects/${data.project.id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({
+					name: projectName.trim(),
+					description: projectDescription.trim() || null,
+					color: projectColor
+				})
+			});
+			await invalidateAll();
+			showToast('Project updated');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to save', 'error');
+		} finally {
+			savingGeneral = false;
+		}
+	}
+
+	async function uploadLogo(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		if (file.size > 512 * 1024) {
+			showToast('Logo must be under 512KB', 'error');
+			return;
+		}
+		logoUploading = true;
+		try {
+			const formData = new FormData();
+			formData.append('logo', file);
+			const csrfMatch = document.cookie.match(/(?:^|;\s*)pm_csrf=([^;]*)/);
+			const res = await fetch(`/api/projects/${data.project.id}/logo`, {
+				method: 'POST',
+				body: formData,
+				headers: csrfMatch ? { 'x-csrf-token': csrfMatch[1] } : {}
+			});
+			if (!res.ok) {
+				const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+				throw new Error(err.error);
+			}
+			hasProjectLogo = true;
+			await invalidateAll();
+			showToast('Logo uploaded');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to upload logo', 'error');
+		} finally {
+			logoUploading = false;
+			input.value = '';
+		}
+	}
+
+	async function removeLogo() {
+		try {
+			await api(`/api/projects/${data.project.id}/logo`, { method: 'DELETE' });
+			hasProjectLogo = false;
+			await invalidateAll();
+			showToast('Logo removed');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to remove logo', 'error');
+		}
+	}
 
 	async function addStatus() {
 		if (!newStatusName.trim()) return;
@@ -192,6 +273,90 @@
 </svelte:head>
 
 <div class="mx-auto max-w-xl p-6">
+	<!-- Logo -->
+	<section class="mb-8">
+		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Project Logo</h2>
+		<div class="flex items-center gap-4">
+			{#if hasProjectLogo}
+				<img
+					src="/api/projects/{data.project.id}/logo"
+					alt="Project logo"
+					class="h-10 w-10 rounded border border-surface-300 object-contain dark:border-surface-700"
+				/>
+			{:else}
+				<div class="flex h-10 w-10 items-center justify-center rounded border border-dashed border-surface-400 dark:border-surface-600">
+					<div class="h-4 w-4 rounded-full" style="background-color: {projectColor}"></div>
+				</div>
+			{/if}
+			<div class="flex items-center gap-2">
+				<label class="cursor-pointer rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-700 transition hover:border-surface-400 dark:border-surface-700 dark:text-surface-300 dark:hover:border-surface-600">
+					{logoUploading ? 'Uploading...' : 'Upload'}
+					<input
+						type="file"
+						accept="image/svg+xml,image/png,image/jpeg,image/webp"
+						class="hidden"
+						onchange={uploadLogo}
+						disabled={logoUploading}
+					/>
+				</label>
+				{#if hasProjectLogo}
+					<button
+						onclick={removeLogo}
+						class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-red-600 transition hover:border-red-400 dark:border-surface-700 dark:text-red-400 dark:hover:border-red-800"
+					>
+						Remove
+					</button>
+				{/if}
+			</div>
+		</div>
+		<p class="mt-1.5 text-xs text-surface-400">SVG, PNG, JPEG, or WebP. Max 512KB.</p>
+	</section>
+
+	<!-- General Info -->
+	<section class="mb-8 space-y-4">
+		<h2 class="text-sm font-semibold text-surface-900 dark:text-surface-100">General</h2>
+		<div>
+			<label for="project-name" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Name</label>
+			<input
+				id="project-name"
+				bind:value={projectName}
+				maxlength={100}
+				class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+			/>
+		</div>
+		<div>
+			<label for="project-desc" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Description</label>
+			<input
+				id="project-desc"
+				bind:value={projectDescription}
+				maxlength={200}
+				placeholder="Optional short description"
+				class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+			/>
+		</div>
+		<div>
+			<label for="project-color" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Color</label>
+			<div class="flex items-center gap-2">
+				<input
+					id="project-color"
+					type="color"
+					bind:value={projectColor}
+					class="h-8 w-8 cursor-pointer rounded border border-surface-300 dark:border-surface-700"
+				/>
+				<span class="text-xs text-surface-500">{projectColor}</span>
+			</div>
+		</div>
+		<div>
+			<button
+				onclick={saveGeneral}
+				disabled={savingGeneral || !projectName.trim()}
+				class="rounded-md bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-500 disabled:opacity-50"
+			>
+				{savingGeneral ? 'Saving...' : 'Save changes'}
+			</button>
+		</div>
+	</section>
+
 	<!-- README -->
 	<section class="mb-8">
 		<h2 class="mb-3 text-sm font-semibold text-surface-900 dark:text-surface-100">Project README</h2>

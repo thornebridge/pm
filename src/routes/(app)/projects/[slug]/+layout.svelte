@@ -66,7 +66,11 @@
 	<!-- Project header -->
 	<div class="flex items-center gap-4 border-b border-surface-300 px-6 py-3 dark:border-surface-800">
 		<div class="flex items-center gap-2">
-			<div class="h-3 w-3 rounded-full" style="background-color: {data.project.color}"></div>
+			{#if data.project.hasLogo}
+				<img src="/api/projects/{data.project.id}/logo" alt="" class="h-5 w-5 rounded object-contain" />
+			{:else}
+				<div class="h-3 w-3 rounded-full" style="background-color: {data.project.color}"></div>
+			{/if}
 			<h1 class="text-sm font-semibold text-surface-900 dark:text-surface-100">{data.project.name}</h1>
 		</div>
 		<nav class="flex gap-1">

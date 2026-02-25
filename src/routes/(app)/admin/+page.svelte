@@ -7,7 +7,7 @@
 
 	let { data } = $props();
 
-	let tab = $state<'org' | 'telephony' | 'calendar' | 'email' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
+	let tab = $state<'org' | 'telephony' | 'calendar' | 'email' | 'ai' | 'invites' | 'users' | 'webhooks' | 'backup' | 'audit'>('org');
 
 	// Org settings state
 	let orgPlatformName = $state('');
@@ -39,6 +39,23 @@
 	let savingEmail = $state(false);
 	let showResendKey = $state(false);
 
+	// AI state
+	let aiEnabled = $state(false);
+	let aiProvider = $state('');
+	let aiModel = $state('');
+	let aiApiKey = $state('');
+	let aiEndpoint = $state('');
+	let savingAI = $state(false);
+	let testingAI = $state(false);
+	let aiTestResult = $state<{ valid: boolean; error?: string } | null>(null);
+	let showAiKey = $state(false);
+
+	const AI_PROVIDER_DEFAULTS: Record<string, { model: string; endpoint: string }> = {
+		openai: { model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
+		anthropic: { model: 'claude-sonnet-4-20250514', endpoint: 'https://api.anthropic.com/v1/messages' },
+		gemini: { model: 'gemini-2.0-flash', endpoint: 'https://generativelanguage.googleapis.com/v1beta' }
+	};
+
 	$effect(() => {
 		api<{
 			platformName: string;
@@ -53,6 +70,11 @@
 			emailProvider: string | null;
 			emailFromAddress: string | null;
 			resendApiKey: string | null;
+			aiEnabled: boolean;
+			aiProvider: string | null;
+			aiModel: string | null;
+			aiApiKey: string | null;
+			aiEndpoint: string | null;
 		}>('/api/admin/org')
 			.then((org) => {
 				orgPlatformName = org.platformName;
@@ -76,6 +98,11 @@
 				emailProvider = org.emailProvider || '';
 				emailFromAddress = org.emailFromAddress || '';
 				resendApiKey = org.resendApiKey || '';
+				aiEnabled = org.aiEnabled;
+				aiProvider = org.aiProvider || '';
+				aiModel = org.aiModel || '';
+				aiApiKey = org.aiApiKey || '';
+				aiEndpoint = org.aiEndpoint || '';
 				orgLoaded = true;
 			})
 			.catch(() => { orgLoaded = true; });
@@ -172,6 +199,49 @@
 		} finally {
 			savingEmail = false;
 		}
+	}
+
+	async function saveAISettings() {
+		savingAI = true;
+		try {
+			const payload: Record<string, unknown> = { aiEnabled, aiProvider, aiModel, aiEndpoint };
+			if (aiApiKey && !aiApiKey.startsWith('•')) {
+				payload.aiApiKey = aiApiKey;
+			}
+			await api('/api/admin/org', { method: 'PUT', body: JSON.stringify(payload) });
+			await invalidateAll();
+			showToast('AI settings saved');
+		} catch (err) {
+			showToast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
+		} finally {
+			savingAI = false;
+		}
+	}
+
+	async function testAIConnection() {
+		testingAI = true;
+		aiTestResult = null;
+		try {
+			const keyToTest = aiApiKey.startsWith('•') ? '' : aiApiKey;
+			aiTestResult = await api<{ valid: boolean; error?: string }>('/api/admin/ai-test', {
+				method: 'POST',
+				body: JSON.stringify({ provider: aiProvider, apiKey: keyToTest, model: aiModel, endpoint: aiEndpoint })
+			});
+		} catch {
+			aiTestResult = { valid: false, error: 'Connection test failed' };
+		} finally {
+			testingAI = false;
+		}
+	}
+
+	function onAIProviderChange(newProvider: string) {
+		aiProvider = newProvider;
+		const defaults = AI_PROVIDER_DEFAULTS[newProvider];
+		if (defaults) {
+			aiModel = defaults.model;
+			aiEndpoint = defaults.endpoint;
+		}
+		aiTestResult = null;
 	}
 
 	// Invite state
@@ -360,7 +430,7 @@
 
 	<!-- Tabs -->
 	<div class="mb-6 flex gap-1 overflow-x-auto border-b border-surface-300 dark:border-surface-800">
-		{#each [['org', 'Organization'], ['telephony', 'Telephony'], ['calendar', 'Calendar'], ['email', 'Email'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
+		{#each [['org', 'Organization'], ['telephony', 'Telephony'], ['calendar', 'Calendar'], ['email', 'Email'], ['ai', 'AI'], ['invites', 'Invites'], ['users', `Users (${data.users.length})`], ['webhooks', 'Webhooks'], ['audit', 'Audit Log'], ['backup', 'Backup']] as [key, label]}
 			<button
 				onclick={() => (tab = key as typeof tab)}
 				class="whitespace-nowrap px-3 py-2 text-sm font-medium transition {tab === key ? 'border-b-2 border-brand-500 text-brand-600 dark:text-brand-400' : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-surface-100'}"
@@ -618,6 +688,107 @@
 						disabled={savingEmail}
 						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
 					>{savingEmail ? 'Saving...' : 'Save'}</button>
+				</div>
+			</div>
+		{:else}
+			<p class="text-sm text-surface-400">Loading...</p>
+		{/if}
+
+	{:else if tab === 'ai'}
+		{#if orgLoaded}
+			<div class="space-y-4">
+				<!-- Enable toggle -->
+				<div class="flex items-center gap-3">
+					<label class="relative inline-flex cursor-pointer items-center">
+						<input type="checkbox" bind:checked={aiEnabled} class="peer sr-only" />
+						<div class="peer h-5 w-9 rounded-full bg-surface-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-surface-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-500 peer-checked:after:translate-x-full peer-checked:after:border-white dark:bg-surface-600"></div>
+					</label>
+					<span class="text-sm font-medium text-surface-700 dark:text-surface-300">Enable AI Features</span>
+				</div>
+
+				{#if aiEnabled}
+					<!-- Provider -->
+					<div>
+						<label for="ai-provider" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Provider</label>
+						<select
+							id="ai-provider"
+							value={aiProvider}
+							onchange={(e) => onAIProviderChange(e.currentTarget.value)}
+							class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						>
+							<option value="">Select a provider...</option>
+							<option value="openai">OpenAI</option>
+							<option value="anthropic">Anthropic</option>
+							<option value="gemini">Google Gemini</option>
+						</select>
+					</div>
+
+					{#if aiProvider}
+						<!-- API Key -->
+						<div>
+							<label for="ai-api-key" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">API Key</label>
+							<div class="relative">
+								<input
+									id="ai-api-key"
+									type={showAiKey ? 'text' : 'password'}
+									bind:value={aiApiKey}
+									placeholder={aiProvider === 'openai' ? 'sk-...' : aiProvider === 'anthropic' ? 'sk-ant-...' : 'AI...'}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 pr-16 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+								/>
+								<button
+									type="button"
+									onclick={() => (showAiKey = !showAiKey)}
+									class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+								>{showAiKey ? 'Hide' : 'Show'}</button>
+							</div>
+						</div>
+
+						<!-- Model -->
+						<div>
+							<label for="ai-model" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Model</label>
+							<input
+								id="ai-model"
+								type="text"
+								bind:value={aiModel}
+								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							/>
+						</div>
+
+						<!-- Endpoint -->
+						<div>
+							<label for="ai-endpoint" class="mb-1 block text-sm text-surface-600 dark:text-surface-400">Endpoint</label>
+							<input
+								id="ai-endpoint"
+								type="text"
+								bind:value={aiEndpoint}
+								class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-2 text-sm text-surface-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							/>
+							<p class="mt-1 text-xs text-surface-400 dark:text-surface-600">Leave as default unless using a proxy or custom endpoint.</p>
+						</div>
+
+						<!-- Test + Save -->
+						<div class="flex items-center gap-3">
+							<button
+								onclick={testAIConnection}
+								disabled={testingAI || !aiApiKey || aiApiKey.startsWith('•')}
+								class="rounded-md border border-surface-300 px-3 py-1.5 text-sm font-medium text-surface-700 hover:bg-surface-100 disabled:opacity-50 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800"
+							>{testingAI ? 'Testing...' : 'Test Connection'}</button>
+
+							{#if aiTestResult}
+								<span class="text-sm {aiTestResult.valid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}">
+									{aiTestResult.valid ? 'Connected successfully' : aiTestResult.error || 'Connection failed'}
+								</span>
+							{/if}
+						</div>
+					{/if}
+				{/if}
+
+				<div>
+					<button
+						onclick={saveAISettings}
+						disabled={savingAI}
+						class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
+					>{savingAI ? 'Saving...' : 'Save'}</button>
 				</div>
 			</div>
 		{:else}

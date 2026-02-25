@@ -16,6 +16,7 @@
 		slug: string;
 		color: string;
 		folderId: string | null;
+		hasLogo?: boolean;
 	}
 
 	interface Props {
@@ -77,7 +78,11 @@
 		class="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800"
 		style="padding-left: {depth * 12 + 8}px"
 	>
-		<div class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: {project.color}"></div>
+		{#if project.hasLogo}
+			<img src="/api/projects/{project.id}/logo" alt="" class="h-4 w-4 shrink-0 rounded object-contain" />
+		{:else}
+			<div class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: {project.color}"></div>
+		{/if}
 		<span class="truncate">{project.name}</span>
 	</a>
 {/each}

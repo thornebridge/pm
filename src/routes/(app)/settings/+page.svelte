@@ -57,11 +57,11 @@
 		try {
 			const formData = new FormData();
 			formData.append('logo', file);
-			const csrfToken = document.cookie.match(/pm-csrf=([^;]+)/)?.[1] || '';
+			const csrfMatch = document.cookie.match(/(?:^|;\s*)pm_csrf=([^;]*)/);
 			await fetch('/api/admin/logo', {
 				method: 'POST',
 				body: formData,
-				headers: { 'X-CSRF-Token': csrfToken }
+				headers: csrfMatch ? { 'x-csrf-token': csrfMatch[1] } : {}
 			}).then(async (res) => {
 				if (!res.ok) throw new Error((await res.json()).error || 'Upload failed');
 			});

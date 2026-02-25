@@ -58,7 +58,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 			.select({
 				taskId: checklistItems.taskId,
 				total: sql<number>`count(*)`,
-				done: sql<number>`sum(case when ${checklistItems.completed} = 1 then 1 else 0 end)`
+				done: sql<number>`sum(case when ${checklistItems.completed} = true then 1 else 0 end)`
 			})
 			.from(checklistItems)
 			.where(inArray(checklistItems.taskId, taskIds))
@@ -93,7 +93,7 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 			.select({
 				parentId: tasks.parentId,
 				total: sql<number>`count(*)`,
-				done: sql<number>`sum(case when ${taskStatuses.isClosed} = 1 then 1 else 0 end)`
+				done: sql<number>`sum(case when ${taskStatuses.isClosed} = true then 1 else 0 end)`
 			})
 			.from(tasks)
 			.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
@@ -139,5 +139,14 @@ export const load: LayoutServerLoad = async ({ params, parent }) => {
 				.orderBy(asc(savedViews.createdAt))
 		: [];
 
-	return { project, statuses, labels, tasks: tasksWithExtras, members, views };
+	const { logoData, logoMimeType, ...projectData } = project;
+
+	return {
+		project: { ...projectData, hasLogo: !!logoData },
+		statuses,
+		labels,
+		tasks: tasksWithExtras,
+		members,
+		views
+	};
 };

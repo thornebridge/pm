@@ -122,7 +122,7 @@ export const GET: RequestHandler = async (event) => {
 	const [subtaskSummary] = await db
 		.select({
 			total: sql<number>`count(*)`,
-			done: sql<number>`sum(case when ${taskStatuses.isClosed} = 1 then 1 else 0 end)`
+			done: sql<number>`sum(case when ${taskStatuses.isClosed} = true then 1 else 0 end)`
 		})
 		.from(tasks)
 		.innerJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))

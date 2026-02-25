@@ -5,6 +5,8 @@ import { db } from '$lib/server/db/index.js';
 import { users } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { hashPassword, verifyPassword } from '$lib/server/auth/password.js';
+import { getRedis, isRedisConnected } from '$lib/server/redis/index.js';
+import { getSessionCookie } from '$lib/server/auth/session.js';
 
 export const PATCH: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -51,6 +53,13 @@ export const PATCH: RequestHandler = async (event) => {
 		.select({ id: users.id, name: users.name, email: users.email, role: users.role })
 		.from(users)
 		.where(eq(users.id, user.id));
+
+	// Invalidate Redis session cache so the next request picks up the new user data
+	const sessionId = getSessionCookie(event.cookies);
+	if (sessionId && isRedisConnected()) {
+		const redis = getRedis();
+		if (redis) await redis.del(`session:${sessionId}`).catch(() => {});
+	}
 
 	return json(updated);
 };

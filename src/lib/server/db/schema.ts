@@ -62,6 +62,8 @@ export const projects = pgTable('projects', {
 	folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
 	archived: boolean('archived').notNull().default(false),
 	readme: text('readme'),
+	logoData: text('logo_data'),
+	logoMimeType: text('logo_mime_type'),
 	defaultAssigneeId: text('default_assignee_id').references(() => users.id, { onDelete: 'set null' }),
 	createdBy: text('created_by')
 		.notNull()
@@ -977,6 +979,12 @@ export const orgSettings = pgTable('org_settings', {
 	// Branding
 	logoData: text('logo_data'), // base64-encoded image (SVG/PNG/JPG, max 512KB)
 	logoMimeType: text('logo_mime_type'), // e.g. 'image/svg+xml', 'image/png'
+	// AI provider
+	aiEnabled: boolean('ai_enabled').notNull().default(false),
+	aiProvider: text('ai_provider'), // 'openai' | 'anthropic' | 'gemini'
+	aiModel: text('ai_model'),
+	aiApiKey: text('ai_api_key'),
+	aiEndpoint: text('ai_endpoint'),
 	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });
 
@@ -1084,7 +1092,7 @@ export const finJournalEntries = pgTable(
 		referenceNumber: text('reference_number'),
 		status: text('status', { enum: ['draft', 'posted', 'voided'] }).notNull().default('draft'),
 		source: text('source', {
-			enum: ['manual', 'crm_sync', 'recurring', 'import', 'opening_balance', 'void_reversal']
+			enum: ['manual', 'crm_sync', 'recurring', 'import', 'opening_balance', 'void_reversal', 'ai_entry']
 		}).notNull().default('manual'),
 		crmOpportunityId: text('crm_opportunity_id').references(() => crmOpportunities.id, { onDelete: 'set null' }),
 		crmProposalId: text('crm_proposal_id').references(() => crmProposals.id, { onDelete: 'set null' }),
