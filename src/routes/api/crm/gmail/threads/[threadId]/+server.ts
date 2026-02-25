@@ -8,7 +8,8 @@ import {
 	gmailEntityLinks,
 	crmContacts,
 	crmCompanies,
-	crmOpportunities
+	crmOpportunities,
+	emailReminders
 } from '$lib/server/db/schema.js';
 import { eq, and, asc } from 'drizzle-orm';
 import { modifyMessage } from '$lib/server/gmail/gmail-api.js';
@@ -61,7 +62,15 @@ export const GET: RequestHandler = async (event) => {
 		}
 	}
 
-	return Response.json({ thread, messages: messagesWithAttachments, linkedEntities });
+	// Get active reminders
+	const reminders = await db.select()
+		.from(emailReminders)
+		.where(and(
+			eq(emailReminders.threadId, threadId),
+			eq(emailReminders.status, 'pending')
+		));
+
+	return Response.json({ thread, messages: messagesWithAttachments, linkedEntities, reminders });
 };
 
 export const PATCH: RequestHandler = async (event) => {

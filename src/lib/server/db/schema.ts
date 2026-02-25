@@ -342,7 +342,7 @@ export const notifications = pgTable(
 		userId: text('user_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment', 'due_day_before', 'due_soon', 'overdue'] }).notNull(),
+		type: text('type', { enum: ['mention', 'assigned', 'status_change', 'comment', 'due_day_before', 'due_soon', 'overdue', 'email_follow_up', 'email_snooze'] }).notNull(),
 		title: text('title').notNull(),
 		body: text('body'),
 		url: text('url'),
@@ -1653,5 +1653,161 @@ export const crmAutomationExecutions = pgTable(
 	(t) => [
 		index('idx_crm_auto_exec_rule').on(t.ruleId, t.createdAt),
 		index('idx_crm_auto_exec_entity').on(t.entityType, t.entityId)
+	]
+);
+
+// ─── Email Templates ─────────────────────────────────────────────────────────
+
+export const emailTemplates = pgTable(
+	'email_templates',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		name: text('name').notNull(),
+		subjectTemplate: text('subject_template').notNull(),
+		bodyTemplate: text('body_template').notNull(),
+		category: text('category'),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_email_templates_user').on(t.userId),
+		index('idx_email_templates_name').on(t.userId, t.name)
+	]
+);
+
+// ─── Email Tracking ──────────────────────────────────────────────────────────
+
+export const emailTrackingTokens = pgTable(
+	'email_tracking_tokens',
+	{
+		id: text('id').primaryKey(),
+		messageId: text('message_id').notNull(),
+		threadId: text('thread_id'),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		recipientEmail: text('recipient_email').notNull(),
+		subject: text('subject').notNull(),
+		trackedLinks: text('tracked_links'),
+		firstOpenedAt: bigint('first_opened_at', { mode: 'number' }),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_tracking_tokens_message').on(t.messageId),
+		index('idx_tracking_tokens_user').on(t.userId, t.createdAt),
+		index('idx_tracking_tokens_thread').on(t.threadId)
+	]
+);
+
+export const emailTrackingEvents = pgTable(
+	'email_tracking_events',
+	{
+		id: text('id').primaryKey(),
+		tokenId: text('token_id')
+			.notNull()
+			.references(() => emailTrackingTokens.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: ['open', 'click'] }).notNull(),
+		linkUrl: text('link_url'),
+		linkToken: text('link_token'),
+		ipAddress: text('ip_address'),
+		userAgent: text('user_agent'),
+		timestamp: bigint('timestamp', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_tracking_events_token').on(t.tokenId, t.type),
+		index('idx_tracking_events_time').on(t.tokenId, t.timestamp)
+	]
+);
+
+// ─── Email Reminders ─────────────────────────────────────────────────────────
+
+export const emailReminders = pgTable(
+	'email_reminders',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		threadId: text('thread_id')
+			.notNull()
+			.references(() => gmailThreads.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: ['follow_up', 'snooze'] }).notNull(),
+		remindAt: bigint('remind_at', { mode: 'number' }).notNull(),
+		messageCountAtCreation: integer('message_count_at_creation'),
+		status: text('status', {
+			enum: ['pending', 'fired', 'cancelled', 'auto_cancelled']
+		}).notNull().default('pending'),
+		firedAt: bigint('fired_at', { mode: 'number' }),
+		cancelledAt: bigint('cancelled_at', { mode: 'number' }),
+		cancelReason: text('cancel_reason'),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_email_reminders_pending').on(t.status, t.remindAt),
+		index('idx_email_reminders_thread').on(t.threadId, t.status),
+		index('idx_email_reminders_user').on(t.userId, t.status)
+	]
+);
+
+// ─── Email Campaigns ─────────────────────────────────────────────────────────
+
+export const emailCampaigns = pgTable(
+	'email_campaigns',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		templateId: text('template_id')
+			.notNull()
+			.references(() => emailTemplates.id, { onDelete: 'restrict' }),
+		name: text('name').notNull(),
+		status: text('status', {
+			enum: ['draft', 'queued', 'sending', 'paused', 'completed', 'failed']
+		}).notNull().default('draft'),
+		totalRecipients: integer('total_recipients').notNull().default(0),
+		sentCount: integer('sent_count').notNull().default(0),
+		failedCount: integer('failed_count').notNull().default(0),
+		throttleMs: integer('throttle_ms').notNull().default(2000),
+		startedAt: bigint('started_at', { mode: 'number' }),
+		completedAt: bigint('completed_at', { mode: 'number' }),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+		updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_email_campaigns_user').on(t.userId),
+		index('idx_email_campaigns_status').on(t.status)
+	]
+);
+
+export const emailCampaignRecipients = pgTable(
+	'email_campaign_recipients',
+	{
+		id: text('id').primaryKey(),
+		campaignId: text('campaign_id')
+			.notNull()
+			.references(() => emailCampaigns.id, { onDelete: 'cascade' }),
+		contactId: text('contact_id')
+			.notNull()
+			.references(() => crmContacts.id, { onDelete: 'cascade' }),
+		opportunityId: text('opportunity_id')
+			.references(() => crmOpportunities.id, { onDelete: 'set null' }),
+		status: text('status', {
+			enum: ['pending', 'sending', 'sent', 'failed', 'skipped']
+		}).notNull().default('pending'),
+		sentAt: bigint('sent_at', { mode: 'number' }),
+		gmailMessageId: text('gmail_message_id'),
+		gmailThreadId: text('gmail_thread_id'),
+		errorMessage: text('error_message'),
+		retryCount: integer('retry_count').notNull().default(0),
+		createdAt: bigint('created_at', { mode: 'number' }).notNull()
+	},
+	(t) => [
+		index('idx_campaign_recipients_campaign').on(t.campaignId, t.status),
+		index('idx_campaign_recipients_contact').on(t.contactId),
+		uniqueIndex('idx_campaign_recipients_unique').on(t.campaignId, t.contactId)
 	]
 );

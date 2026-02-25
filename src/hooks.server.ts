@@ -11,6 +11,8 @@ import { startSnapshotPoller } from '$lib/server/jobs/snapshots.js';
 import { startReminderPoller } from '$lib/server/jobs/reminders.js';
 import { startDigestPoller } from '$lib/server/jobs/digests.js';
 import { startRecurringTaskPoller } from '$lib/server/jobs/recurring.js';
+import { startEmailReminderPoller } from '$lib/server/jobs/email-reminders.js';
+import { startBulkEmailPoller } from '$lib/server/jobs/bulk-email.js';
 import { db } from '$lib/server/db/index.js';
 import { users, userThemes } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
@@ -35,6 +37,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		startReminderPoller();
 		startDigestPoller();
 		startRecurringTaskPoller();
+		startEmailReminderPoller();
+		startBulkEmailPoller();
 		seeded = true;
 	}
 

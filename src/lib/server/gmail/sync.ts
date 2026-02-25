@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db/index.js';
-import { gmailIntegrations, gmailThreads, gmailMessages, gmailAttachments } from '$lib/server/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { gmailIntegrations, gmailThreads, gmailMessages, gmailAttachments, emailReminders } from '$lib/server/db/schema.js';
+import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import {
 	getMessage,
@@ -223,9 +223,10 @@ async function _incrementalSync(userId: string): Promise<void> {
 			}
 		}
 
-		// Auto-link newly added threads
+		// Auto-link newly added threads and auto-cancel follow-up reminders on replies
 		for (const threadId of addedThreadIds) {
 			await autoLinkThread(threadId, userId);
+			await checkAndCancelFollowUpReminders(threadId, userId);
 		}
 
 		const now = Date.now();
@@ -316,6 +317,38 @@ async function upsertMessage(userId: string, msg: GmailMessage): Promise<void> {
 
 	// Upsert thread
 	await updateThreadFromMessages(msg.threadId, userId);
+}
+
+async function checkAndCancelFollowUpReminders(threadId: string, userId: string): Promise<void> {
+	try {
+		const pendingReminders = await db.select()
+			.from(emailReminders)
+			.where(and(
+				eq(emailReminders.threadId, threadId),
+				eq(emailReminders.userId, userId),
+				eq(emailReminders.type, 'follow_up'),
+				eq(emailReminders.status, 'pending')
+			));
+
+		if (pendingReminders.length === 0) return;
+
+		// Get current thread to check message count
+		const [thread] = await db.select({ messageCount: gmailThreads.messageCount })
+			.from(gmailThreads)
+			.where(eq(gmailThreads.id, threadId));
+
+		if (!thread) return;
+
+		for (const reminder of pendingReminders) {
+			if (reminder.messageCountAtCreation !== null && thread.messageCount > reminder.messageCountAtCreation) {
+				await db.update(emailReminders)
+					.set({ status: 'auto_cancelled', cancelledAt: Date.now(), cancelReason: 'Recipient replied' })
+					.where(eq(emailReminders.id, reminder.id));
+			}
+		}
+	} catch (err) {
+		console.error(`[gmail/sync] Failed to check follow-up reminders for thread ${threadId}:`, err);
+	}
 }
 
 async function updateThreadFromMessages(threadId: string, userId: string): Promise<void> {

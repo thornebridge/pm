@@ -10,7 +10,7 @@
 
 	let { data } = $props();
 
-	let category = $state<'inbox' | 'sent' | 'archived' | 'all'>('inbox');
+	let category = $state<'inbox' | 'sent' | 'archived' | 'snoozed' | 'all'>('inbox');
 	let search = $state('');
 	let threads = $state<any[]>([]);
 	let total = $state(0);
@@ -210,6 +210,7 @@
 				{#each [
 					{ key: 'inbox', label: 'Inbox', icon: 'M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884zM18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z' },
 					{ key: 'sent', label: 'Sent', icon: 'M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z' },
+					{ key: 'snoozed', label: 'Snoozed', icon: 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z' },
 					{ key: 'archived', label: 'Archived', icon: 'M4 3a2 2 0 100 4h12a2 2 0 100-4H4zm0 6h12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V9zm5 2a1 1 0 000 2h2a1 1 0 100-2H9z' },
 					{ key: 'all', label: 'All Mail', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' }
 				] as cat}
@@ -224,6 +225,21 @@
 					</button>
 				{/each}
 			</nav>
+
+			<div class="space-y-0.5 border-t border-surface-300 p-2 dark:border-surface-800">
+				<a href="/crm/email/templates" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-800">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd" />
+					</svg>
+					Templates
+				</a>
+				<a href="/crm/email/campaigns" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-800">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+						<path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+					</svg>
+					Campaigns
+				</a>
+			</div>
 
 			<div class="border-t border-surface-300 p-3 dark:border-surface-800">
 				<div class="flex items-center justify-between">

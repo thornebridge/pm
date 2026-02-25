@@ -3,6 +3,7 @@
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
 	import ComposeEmail from './ComposeEmail.svelte';
+	import RemindMenu from './RemindMenu.svelte';
 
 	interface Props {
 		thread: {
@@ -49,6 +50,24 @@
 	let showReply = $state(false);
 	let replyTo = $state<{ messageId: string; threadId: string; subject: string; toEmail: string } | undefined>(undefined);
 	let creatingTask = $state(false);
+	let showRemindMenu = $state(false);
+	let reminders = $state<Array<{
+		id: string;
+		type: string;
+		remindAt: number;
+		status: string;
+	}>>([]);
+
+	let trackingData = $state<{
+		messages: Array<{
+			messageId: string;
+			recipientEmail: string;
+			opens: { count: number; firstAt: number | null; lastAt: number | null };
+			clicks: Array<{ url: string; count: number; firstAt: number }>;
+			totalClicks: number;
+		}>;
+		summary: { totalOpens: number; totalClicks: number; opened: boolean; clicked: boolean; firstOpenAt: number | null };
+	} | null>(null);
 
 	function formatDate(ms: number): string {
 		return new Date(ms).toLocaleString('en-US', {
@@ -192,6 +211,63 @@
 		return result.join('\n');
 	}
 
+	function formatRelative(ms: number): string {
+		const diff = Date.now() - ms;
+		const mins = Math.floor(diff / 60000);
+		if (mins < 1) return 'just now';
+		if (mins < 60) return `${mins}m ago`;
+		const hours = Math.floor(mins / 60);
+		if (hours < 24) return `${hours}h ago`;
+		const days = Math.floor(hours / 24);
+		return `${days}d ago`;
+	}
+
+	function getMessageTracking(messageId: string) {
+		return trackingData?.messages.find((m) => m.messageId === messageId) || null;
+	}
+
+	function loadReminders() {
+		api<{ reminders: typeof reminders }>(`/api/crm/gmail/threads/${thread.id}/remind`)
+			.then((res) => { reminders = res.reminders; })
+			.catch(() => { reminders = []; });
+	}
+
+	async function cancelReminder(reminderId: string) {
+		try {
+			await api(`/api/crm/gmail/threads/${thread.id}/remind`, {
+				method: 'DELETE',
+				body: JSON.stringify({ reminderId })
+			});
+			reminders = reminders.filter((r) => r.id !== reminderId);
+			showToast('Reminder cancelled');
+		} catch {
+			showToast('Failed to cancel reminder', 'error');
+		}
+	}
+
+	function formatReminderDate(ms: number): string {
+		return new Date(ms).toLocaleDateString('en-US', {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+			hour: 'numeric',
+			minute: '2-digit'
+		});
+	}
+
+	// Fetch reminders
+	$effect(() => {
+		thread.id; // track dependency
+		loadReminders();
+	});
+
+	// Fetch tracking data
+	$effect(() => {
+		api<typeof trackingData>(`/api/crm/gmail/threads/${thread.id}/tracking`)
+			.then((res) => { trackingData = res; })
+			.catch(() => { trackingData = null; });
+	});
+
 	let sanitizedBodies = $state<Map<string, string>>(new Map());
 
 	onMount(async () => {
@@ -247,6 +323,19 @@
 					<path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V8z" clip-rule="evenodd" />
 				</svg>
 			</button>
+			<div class="relative">
+				<button onclick={() => (showRemindMenu = !showRemindMenu)} title="Remind / Snooze" class="rounded p-1.5 text-surface-400 hover:text-surface-700 dark:hover:text-surface-200">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+					</svg>
+				</button>
+				<RemindMenu
+					threadId={thread.id}
+					open={showRemindMenu}
+					onclose={() => (showRemindMenu = false)}
+					oncreated={loadReminders}
+				/>
+			</div>
 		</div>
 	</div>
 
@@ -265,6 +354,22 @@
 					{#if entity.linkType === 'manual'}
 						<button onclick={() => removeLink(entity.linkId)} class="hover:opacity-70">&times;</button>
 					{/if}
+				</span>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- Active reminders -->
+	{#if reminders.length > 0}
+		<div class="flex flex-wrap gap-1 border-b border-surface-200 px-4 py-2 dark:border-surface-800">
+			{#each reminders as reminder}
+				<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium
+					{reminder.type === 'follow_up'
+						? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+						: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}">
+					{reminder.type === 'follow_up' ? 'Follow up' : 'Snoozed'}
+					until {formatReminderDate(reminder.remindAt)}
+					<button onclick={() => cancelReminder(reminder.id)} class="hover:opacity-70">&times;</button>
 				</span>
 			{/each}
 		</div>
@@ -300,6 +405,26 @@
 						</button>
 					</div>
 				</div>
+
+				<!-- Tracking status -->
+				{#if getMessageTracking(msg.id)?.opens?.count}
+					<div class="flex items-center gap-1 border-b border-surface-100 px-4 py-1 dark:border-surface-800">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-emerald-500" viewBox="0 0 20 20" fill="currentColor">
+							<path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+							<path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+						</svg>
+						<span class="text-[10px] text-emerald-600 dark:text-emerald-400">
+							Opened {getMessageTracking(msg.id)!.opens.count}x &middot; last {formatRelative(getMessageTracking(msg.id)!.opens.lastAt!)}
+							{#if getMessageTracking(msg.id)!.totalClicks > 0}
+								&middot; {getMessageTracking(msg.id)!.totalClicks} click{getMessageTracking(msg.id)!.totalClicks !== 1 ? 's' : ''}
+							{/if}
+						</span>
+					</div>
+				{:else if getMessageTracking(msg.id)}
+					<div class="border-b border-surface-100 px-4 py-1 dark:border-surface-800">
+						<span class="text-[10px] text-surface-400">Not yet opened</span>
+					</div>
+				{/if}
 
 				<!-- Message body -->
 				<div class="px-4 py-3">

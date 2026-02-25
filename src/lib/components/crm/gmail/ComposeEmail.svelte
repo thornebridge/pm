@@ -2,6 +2,7 @@
 	import { fly, fade } from 'svelte/transition';
 	import { api } from '$lib/utils/api.js';
 	import { showToast } from '$lib/stores/toasts.js';
+	import TemplatePicker from './TemplatePicker.svelte';
 
 	interface Props {
 		open: boolean;
@@ -22,6 +23,9 @@
 	let showCc = $state(false);
 	let showSuggestions = $state(false);
 	let toSuggestions = $state<typeof contacts>([]);
+	let showTemplatePicker = $state(false);
+	let selectedContactId = $state<string | null>(null);
+	let trackOpens = $state(true);
 
 	$effect(() => {
 		if (open) {
@@ -29,17 +33,22 @@
 				to = replyTo.toEmail;
 				subject = replyTo.subject;
 				body = '';
+				trackOpens = false;
 			} else if (prefilledTo) {
 				to = prefilledTo;
 				subject = '';
 				body = '';
+				trackOpens = true;
 			} else {
 				to = '';
 				subject = '';
 				body = '';
+				trackOpens = true;
 			}
 			cc = '';
 			showCc = false;
+			selectedContactId = null;
+			showTemplatePicker = false;
 		}
 	});
 
@@ -60,7 +69,29 @@
 
 	function selectSuggestion(contact: typeof contacts[0]) {
 		to = contact.email;
+		selectedContactId = contact.id;
 		showSuggestions = false;
+	}
+
+	async function handleTemplateSelect(template: { id: string; name: string; subjectTemplate: string; bodyTemplate: string }) {
+		if (selectedContactId) {
+			try {
+				const preview = await api<{ subject: string; bodyHtml: string }>(
+					`/api/crm/gmail/templates/${template.id}/preview`,
+					{ method: 'POST', body: JSON.stringify({ contactId: selectedContactId }) }
+				);
+				subject = preview.subject;
+				// Convert HTML back to plain text for the textarea
+				body = preview.bodyHtml.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+			} catch {
+				// Fallback to raw template
+				subject = template.subjectTemplate;
+				body = template.bodyTemplate;
+			}
+		} else {
+			subject = template.subjectTemplate;
+			body = template.bodyTemplate;
+		}
 	}
 
 	async function send() {
@@ -79,6 +110,7 @@
 			if (cc.trim()) {
 				payload.cc = cc.split(',').map((e) => e.trim()).filter(Boolean);
 			}
+			payload.trackOpens = trackOpens;
 			if (replyTo) {
 				payload.replyToMessageId = replyTo.messageId;
 				payload.threadId = replyTo.threadId;
@@ -123,11 +155,26 @@
 			transition:fly={{ y: 20, duration: 200 }}
 		>
 			<!-- Header -->
-			<div class="flex items-center justify-between border-b border-surface-300 px-4 py-3 dark:border-surface-800">
+			<div class="relative flex items-center justify-between border-b border-surface-300 px-4 py-3 dark:border-surface-800">
 				<h3 class="text-sm font-semibold text-surface-900 dark:text-surface-100">
 					{replyTo ? 'Reply' : 'New Email'}
 				</h3>
-				<button onclick={onclose} class="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300">&times;</button>
+				<div class="flex items-center gap-2">
+					{#if !replyTo}
+						<button
+							onclick={() => (showTemplatePicker = !showTemplatePicker)}
+							class="rounded-md border border-surface-300 px-2 py-1 text-[10px] font-medium text-surface-600 hover:bg-surface-100 dark:border-surface-600 dark:text-surface-400 dark:hover:bg-surface-700"
+						>
+							Templates
+						</button>
+					{/if}
+					<button onclick={onclose} class="text-surface-400 hover:text-surface-600 dark:hover:text-surface-300">&times;</button>
+				</div>
+				<TemplatePicker
+					open={showTemplatePicker}
+					onselect={handleTemplateSelect}
+					onclose={() => (showTemplatePicker = false)}
+				/>
 			</div>
 
 			<!-- Form -->
@@ -199,7 +246,13 @@
 
 			<!-- Footer -->
 			<div class="flex items-center justify-between border-t border-surface-300 px-4 py-3 dark:border-surface-800">
-				<span class="text-[10px] text-surface-500">Ctrl+Enter to send</span>
+				<div class="flex items-center gap-3">
+					<span class="text-[10px] text-surface-500">Ctrl+Enter to send</span>
+					<label class="flex items-center gap-1 text-[10px] text-surface-500">
+						<input type="checkbox" bind:checked={trackOpens} class="h-3 w-3 rounded border-surface-400" />
+						Track opens
+					</label>
+				</div>
 				<div class="flex gap-2">
 					<button onclick={onclose} class="rounded-md border border-surface-300 px-3 py-1.5 text-sm text-surface-600 hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800">
 						Cancel
