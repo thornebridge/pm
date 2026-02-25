@@ -233,8 +233,8 @@
 {#if task}
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="fixed inset-0 z-50 flex justify-end">
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="absolute inset-0 bg-black/30 dark:bg-black/50" onclick={onclose} transition:fade={{ duration: 150 }}></div>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="absolute inset-0 bg-black/30 dark:bg-black/50" onclick={onclose} role="presentation" transition:fade={{ duration: 150 }}></div>
 		<div
 			class="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto border-l border-surface-300 bg-surface-50 shadow-2xl dark:border-surface-700 dark:bg-surface-900"
 			role="dialog"
@@ -287,6 +287,7 @@
 					<!-- Title -->
 					<div class="mb-4">
 						{#if editingTitle}
+							<!-- svelte-ignore a11y_autofocus -->
 							<input
 								bind:value={titleInput}
 								onblur={saveTitle}
@@ -304,67 +305,72 @@
 					<!-- Metadata row -->
 					<div class="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
 						<div>
-							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Status</label>
-							<select
-								value={task.statusId}
-								onchange={(e) => updateField('statusId', e.currentTarget.value)}
-								class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
-							>
-								{#each statuses as status}
-									<option value={status.id}>{status.name}</option>
-								{/each}
-							</select>
+							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Status
+								<select
+									value={task.statusId}
+									onchange={(e) => updateField('statusId', e.currentTarget.value)}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+								>
+									{#each statuses as status}
+										<option value={status.id}>{status.name}</option>
+									{/each}
+								</select>
+							</label>
 						</div>
 						<div>
-							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Priority</label>
-							<select
-								value={task.priority}
-								onchange={(e) => updateField('priority', e.currentTarget.value)}
-								class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
-							>
-								<option value="urgent">Urgent</option>
-								<option value="high">High</option>
-								<option value="medium">Medium</option>
-								<option value="low">Low</option>
-							</select>
+							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Priority
+								<select
+									value={task.priority}
+									onchange={(e) => updateField('priority', e.currentTarget.value)}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+								>
+									<option value="urgent">Urgent</option>
+									<option value="high">High</option>
+									<option value="medium">Medium</option>
+									<option value="low">Low</option>
+								</select>
+							</label>
 						</div>
 						<div>
-							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Assignee</label>
-							<select
-								value={task.assigneeId ?? ''}
-								onchange={(e) => updateField('assigneeId', e.currentTarget.value || null)}
-								class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
-							>
-								<option value="">Unassigned</option>
-								{#each members as member}
-									<option value={member.id}>{member.name}</option>
-								{/each}
-							</select>
+							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Assignee
+								<select
+									value={task.assigneeId ?? ''}
+									onchange={(e) => updateField('assigneeId', e.currentTarget.value || null)}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+								>
+									<option value="">Unassigned</option>
+									{#each members as member}
+										<option value={member.id}>{member.name}</option>
+									{/each}
+								</select>
+							</label>
 						</div>
 						<div>
-							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Due date</label>
-							<input
-								type="date"
-								value={formatDateInput(task.dueDate)}
-								onchange={(e) => updateField('dueDate', e.currentTarget.value ? new Date(e.currentTarget.value).getTime() : null)}
-								class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
-							/>
+							<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Due date
+								<input
+									type="date"
+									value={formatDateInput(task.dueDate)}
+									onchange={(e) => updateField('dueDate', e.currentTarget.value ? new Date(e.currentTarget.value).getTime() : null)}
+									class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+								/>
+							</label>
 						</div>
 					</div>
 
 					<!-- Type selector -->
 					<div class="mb-4">
-						<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Type</label>
-						<select
-							value={task.type || 'task'}
-							onchange={(e) => updateField('type', e.currentTarget.value)}
-							class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
-						>
-							<option value="task">Task</option>
-							<option value="bug">Bug</option>
-							<option value="feature">Feature</option>
-							<option value="improvement">Improvement</option>
-						</select>
+						<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Type
+							<select
+								value={task.type || 'task'}
+								onchange={(e) => updateField('type', e.currentTarget.value)}
+								class="w-full rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
+							>
+								<option value="task">Task</option>
+								<option value="bug">Bug</option>
+								<option value="feature">Feature</option>
+								<option value="improvement">Improvement</option>
+							</select>
+						</label>
 					</div>
 
 					<!-- Recurrence indicator -->

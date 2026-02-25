@@ -270,6 +270,7 @@
 		</td>
 		<td class="px-3 py-2">
 			{#if editingCell?.taskId === task.id && editingCell?.field === 'title'}
+				<!-- svelte-ignore a11y_autofocus -->
 				<input
 					bind:value={editValue}
 					onkeydown={(e) => handleTitleKeydown(e, task)}

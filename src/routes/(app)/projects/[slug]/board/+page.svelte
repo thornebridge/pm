@@ -183,6 +183,7 @@
 		}}
 		class="space-y-3"
 	>
+		<!-- svelte-ignore a11y_autofocus -->
 		<input
 			bind:value={title}
 			placeholder="Task title"

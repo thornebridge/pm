@@ -129,6 +129,7 @@
 			onsubmit={(e) => { e.preventDefault(); saveView(); }}
 			class="inline-flex items-center gap-1"
 		>
+			<!-- svelte-ignore a11y_autofocus -->
 			<input
 				bind:value={viewName}
 				placeholder="View name"

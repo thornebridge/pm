@@ -100,10 +100,10 @@
 			<!-- Field header (always visible) -->
 			<div class="flex items-center gap-2 px-3 py-2">
 				<div class="flex flex-col gap-0.5">
-					<button type="button" onclick={() => moveUp(idx)} disabled={idx === 0} class="text-surface-300 hover:text-surface-500 disabled:opacity-30">
+					<button type="button" aria-label="Move field up" onclick={() => moveUp(idx)} disabled={idx === 0} class="text-surface-300 hover:text-surface-500 disabled:opacity-30">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>
 					</button>
-					<button type="button" onclick={() => moveDown(idx)} disabled={idx >= fields.length - 1} class="text-surface-300 hover:text-surface-500 disabled:opacity-30">
+					<button type="button" aria-label="Move field down" onclick={() => moveDown(idx)} disabled={idx >= fields.length - 1} class="text-surface-300 hover:text-surface-500 disabled:opacity-30">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 					</button>
 				</div>
@@ -119,10 +119,10 @@
 				{#if field.required}
 					<span class="text-[10px] text-red-500">Required</span>
 				{/if}
-				<button type="button" onclick={() => { expandedIdx = expandedIdx === idx ? null : idx; }} class="rounded p-1 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
+				<button type="button" aria-label="Toggle field settings" onclick={() => { expandedIdx = expandedIdx === idx ? null : idx; }} class="rounded p-1 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 transition {expandedIdx === idx ? 'rotate-180' : ''}" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 				</button>
-				<button type="button" onclick={() => removeField(idx)} class="rounded p-1 text-surface-400 hover:text-red-500">
+				<button type="button" aria-label="Remove field" onclick={() => removeField(idx)} class="rounded p-1 text-surface-400 hover:text-red-500">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 				</button>
 			</div>
@@ -133,7 +133,7 @@
 					<div class="space-y-2.5">
 						<div class="grid grid-cols-2 gap-2">
 							<div>
-								<label class="mb-0.5 block text-[10px] text-surface-500">Type</label>
+								<label class="mb-0.5 block text-[10px] text-surface-500">Type
 								<select
 									value={field.type}
 									onchange={(e) => updateField(idx, 'type', (e.target as HTMLSelectElement).value)}
@@ -143,9 +143,10 @@
 										<option value={ft.value}>{ft.label}</option>
 									{/each}
 								</select>
+							</label>
 							</div>
 							<div>
-								<label class="mb-0.5 block text-[10px] text-surface-500">Required</label>
+								<span class="mb-0.5 block text-[10px] text-surface-500">Required</span>
 								<label class="flex items-center gap-1.5 pt-1">
 									<input
 										type="checkbox"
@@ -158,19 +159,20 @@
 							</div>
 						</div>
 						<div>
-							<label class="mb-0.5 block text-[10px] text-surface-500">Placeholder</label>
+							<label class="mb-0.5 block text-[10px] text-surface-500">Placeholder
 							<input
 								value={field.placeholder}
 								oninput={(e) => updateField(idx, 'placeholder', (e.target as HTMLInputElement).value)}
 								placeholder="Placeholder text"
 								class={inputClass}
 							/>
+							</label>
 						</div>
 
 						<!-- Options for select/radio -->
 						{#if field.type === 'select' || field.type === 'radio'}
 							<div>
-								<label class="mb-0.5 block text-[10px] text-surface-500">Options</label>
+								<span class="mb-0.5 block text-[10px] text-surface-500">Options</span>
 								<div class="space-y-1">
 									{#each field.options as opt, optIdx}
 										<div class="flex items-center gap-1">
@@ -180,7 +182,7 @@
 												placeholder="Option {optIdx + 1}"
 												class="flex-1 {inputClass}"
 											/>
-											<button type="button" onclick={() => removeOption(idx, optIdx)} class="rounded p-0.5 text-surface-400 hover:text-red-500">
+											<button type="button" aria-label="Remove option" onclick={() => removeOption(idx, optIdx)} class="rounded p-0.5 text-surface-400 hover:text-red-500">
 												<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 											</button>
 										</div>
@@ -192,7 +194,7 @@
 
 						<!-- Conditional visibility -->
 						<div>
-							<label class="mb-0.5 block text-[10px] text-surface-500">Show only when...</label>
+							<label class="mb-0.5 block text-[10px] text-surface-500">Show only when...
 							<div class="flex items-center gap-1.5">
 								<select
 									value={field.conditionalFieldId}
@@ -216,6 +218,7 @@
 									/>
 								{/if}
 							</div>
+						</label>
 						</div>
 					</div>
 				</div>

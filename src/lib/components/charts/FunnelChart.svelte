@@ -15,7 +15,7 @@
 	let { stages }: Props = $props();
 
 	const WIDTH = 600;
-	const HEIGHT = 40 * Math.max(stages.length, 1);
+	const HEIGHT = $derived(40 * Math.max(stages.length, 1));
 	const PADDING = { top: 8, right: 160, bottom: 8, left: 8 };
 
 	const chartW = WIDTH - PADDING.left - PADDING.right;

@@ -14,9 +14,14 @@
 
 	// ─── Session & Queue State ──────────────────────────────────────────────────
 
+	// svelte-ignore state_referenced_locally
 	let activeSession = $state(data.activeSession);
 	let queueItems = $state(data.queueItems as any[]);
 	let sessions = $state(data.sessions as any[]);
+
+	$effect(() => { activeSession = data.activeSession; });
+	$effect(() => { queueItems = data.queueItems as any[]; });
+	$effect(() => { sessions = data.sessions as any[]; });
 	let showNewSessionInput = $state(false);
 	let newSessionName = $state('');
 	let creating = $state(false);

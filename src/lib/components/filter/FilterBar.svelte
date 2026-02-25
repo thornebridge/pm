@@ -57,6 +57,7 @@
 	const filtersActive = $derived(hasActiveFilters());
 
 	// Debounced search
+	// svelte-ignore state_referenced_locally
 	let searchInput = $state(filters.search);
 	let searchTimer: ReturnType<typeof setTimeout> | null = null;
 

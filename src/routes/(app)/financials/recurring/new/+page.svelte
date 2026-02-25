@@ -178,7 +178,7 @@
 			/>
 		</div>
 		<div>
-			<label class="mb-1 block text-xs text-surface-500">Auto-Post</label>
+			<span class="mb-1 block text-xs text-surface-500">Auto-Post</span>
 			<label class="inline-flex items-center gap-2 text-sm text-surface-100">
 				<input
 					type="checkbox"

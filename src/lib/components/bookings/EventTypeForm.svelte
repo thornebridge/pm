@@ -349,7 +349,7 @@
 					<div class="space-y-3 p-5">
 						<!-- Logo -->
 						<div>
-							<label class={labelClass}>Logo</label>
+							<span class={labelClass}>Logo</span>
 							<div class="flex items-center gap-3">
 								{#if logoPreview}
 									<img src={logoPreview} alt="Logo preview" class="h-10 w-10 rounded object-contain" />
@@ -427,7 +427,7 @@
 
 						<!-- Scheduling Type -->
 						<div class="rounded-lg border border-surface-200 p-3 dark:border-surface-700">
-							<label class={labelClass}>Scheduling Type</label>
+							<span class={labelClass}>Scheduling Type</span>
 							<div class="mt-1 flex gap-3">
 								<label class="flex items-center gap-1.5 text-xs text-surface-700 dark:text-surface-300">
 									<input type="radio" name="scheduling-type" value="individual" bind:group={schedulingType} class="h-3.5 w-3.5 border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600" />
@@ -440,7 +440,7 @@
 							</div>
 							{#if schedulingType === 'round_robin'}
 								<div class="mt-2.5 space-y-2 border-t border-surface-200 pt-2.5 dark:border-surface-700">
-									<label class="mb-1 block text-[10px] font-medium text-surface-500">Assignment Mode</label>
+									<span class="mb-1 block text-[10px] font-medium text-surface-500">Assignment Mode</span>
 									<div class="flex gap-3">
 										<label class="flex items-center gap-1.5 text-xs text-surface-700 dark:text-surface-300">
 											<input type="radio" name="rr-mode" value="rotation" bind:group={roundRobinMode} class="h-3.5 w-3.5 border-surface-300 text-brand-600 focus:ring-brand-500 dark:border-surface-600" />
@@ -550,7 +550,7 @@
 														class="rounded border border-surface-300 bg-surface-50 px-1.5 py-0.5 text-[11px] dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 													/>
 												{/if}
-												<button type="button" onclick={() => removeOverride(i)} class="ml-auto rounded p-0.5 text-surface-400 hover:text-red-500">
+												<button type="button" aria-label="Remove override" onclick={() => removeOverride(i)} class="ml-auto rounded p-0.5 text-surface-400 hover:text-red-500">
 													<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
 												</button>
 											</div>

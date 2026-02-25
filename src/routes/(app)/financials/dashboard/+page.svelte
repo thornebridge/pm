@@ -242,35 +242,40 @@
 
 					<!-- Type -->
 					<div>
-						<label class={labelClasses}>Type</label>
+						<label class={labelClasses}>Type
 						<select bind:value={previewType} class={selectClasses}>
 							<option value="expense">Expense</option>
 							<option value="deposit">Deposit</option>
 							<option value="transfer">Transfer</option>
 						</select>
+					</label>
 					</div>
 
 					<!-- Amount + Date -->
 					<div class="grid grid-cols-2 gap-3">
 						<div>
-							<label class={labelClasses}>Amount ($)</label>
-							<input type="number" step="0.01" min="0" bind:value={previewAmount} class={inputClasses} />
+							<label class={labelClasses}>Amount ($)
+								<input type="number" step="0.01" min="0" bind:value={previewAmount} class={inputClasses} />
+							</label>
 						</div>
 						<div>
-							<label class={labelClasses}>Date</label>
-							<input type="date" bind:value={previewDate} class={inputClasses} />
+							<label class={labelClasses}>Date
+								<input type="date" bind:value={previewDate} class={inputClasses} />
+							</label>
 						</div>
 					</div>
 
 					<!-- Description + Memo -->
 					<div>
-						<label class={labelClasses}>Description</label>
-						<input type="text" bind:value={previewDescription} class={inputClasses} />
+						<label class={labelClasses}>Description
+							<input type="text" bind:value={previewDescription} class={inputClasses} />
+						</label>
 					</div>
 					{#if previewMemo || previewType}
 						<div>
-							<label class={labelClasses}>Memo</label>
-							<input type="text" bind:value={previewMemo} placeholder="Optional notes" class={inputClasses} />
+							<label class={labelClasses}>Memo
+								<input type="text" bind:value={previewMemo} placeholder="Optional notes" class={inputClasses} />
+							</label>
 						</div>
 					{/if}
 
@@ -278,64 +283,70 @@
 					{#if previewType === 'expense'}
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class={labelClasses}>Bank Account</label>
-								<select bind:value={previewBankAccountId} class={selectClasses}>
-									<option value="">Select...</option>
-									{#each data.bankAccounts as a}
-										<option value={a.id}>{a.accountNumber} - {a.name}</option>
-									{/each}
-								</select>
+								<label class={labelClasses}>Bank Account
+									<select bind:value={previewBankAccountId} class={selectClasses}>
+										<option value="">Select...</option>
+										{#each data.bankAccounts as a}
+											<option value={a.id}>{a.accountNumber} - {a.name}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 							<div>
-								<label class={labelClasses}>Expense Account</label>
-								<select bind:value={previewExpenseAccountId} class={selectClasses}>
-									<option value="">Select...</option>
-									{#each data.expenseAccounts as a}
-										<option value={a.id}>{a.accountNumber} - {a.name}</option>
-									{/each}
-								</select>
+								<label class={labelClasses}>Expense Account
+									<select bind:value={previewExpenseAccountId} class={selectClasses}>
+										<option value="">Select...</option>
+										{#each data.expenseAccounts as a}
+											<option value={a.id}>{a.accountNumber} - {a.name}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 						</div>
 					{:else if previewType === 'deposit'}
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class={labelClasses}>Bank Account</label>
-								<select bind:value={previewBankAccountId} class={selectClasses}>
-									<option value="">Select...</option>
-									{#each data.bankAccounts as a}
-										<option value={a.id}>{a.accountNumber} - {a.name}</option>
-									{/each}
-								</select>
+								<label class={labelClasses}>Bank Account
+									<select bind:value={previewBankAccountId} class={selectClasses}>
+										<option value="">Select...</option>
+										{#each data.bankAccounts as a}
+											<option value={a.id}>{a.accountNumber} - {a.name}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 							<div>
-								<label class={labelClasses}>Revenue Account</label>
-								<select bind:value={previewRevenueAccountId} class={selectClasses}>
-									<option value="">Select...</option>
-									{#each data.revenueAccounts as a}
-										<option value={a.id}>{a.accountNumber} - {a.name}</option>
-									{/each}
-								</select>
+								<label class={labelClasses}>Revenue Account
+									<select bind:value={previewRevenueAccountId} class={selectClasses}>
+										<option value="">Select...</option>
+										{#each data.revenueAccounts as a}
+											<option value={a.id}>{a.accountNumber} - {a.name}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 						</div>
 					{:else if previewType === 'transfer'}
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class={labelClasses}>From Account</label>
-								<select bind:value={previewFromAccountId} class={selectClasses}>
-									<option value="">Select...</option>
-									{#each data.bankAccounts as a}
-										<option value={a.id}>{a.accountNumber} - {a.name}</option>
-									{/each}
-								</select>
+								<label class={labelClasses}>From Account
+									<select bind:value={previewFromAccountId} class={selectClasses}>
+										<option value="">Select...</option>
+										{#each data.bankAccounts as a}
+											<option value={a.id}>{a.accountNumber} - {a.name}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 							<div>
-								<label class={labelClasses}>To Account</label>
-								<select bind:value={previewToAccountId} class={selectClasses}>
-									<option value="">Select...</option>
-									{#each data.bankAccounts as a}
-										<option value={a.id}>{a.accountNumber} - {a.name}</option>
-									{/each}
-								</select>
+								<label class={labelClasses}>To Account
+									<select bind:value={previewToAccountId} class={selectClasses}>
+										<option value="">Select...</option>
+										{#each data.bankAccounts as a}
+											<option value={a.id}>{a.accountNumber} - {a.name}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 						</div>
 					{/if}
@@ -343,8 +354,9 @@
 					<!-- Reference -->
 					{#if previewReferenceNumber}
 						<div>
-							<label class={labelClasses}>Reference #</label>
-							<input type="text" bind:value={previewReferenceNumber} class={inputClasses} />
+							<label class={labelClasses}>Reference #
+								<input type="text" bind:value={previewReferenceNumber} class={inputClasses} />
+							</label>
 						</div>
 					{/if}
 
@@ -362,23 +374,26 @@
 					{#if previewIsRecurring}
 						<div class="grid grid-cols-3 gap-3">
 							<div>
-								<label class={labelClasses}>Frequency</label>
-								<select bind:value={previewFrequency} class={selectClasses}>
-									<option value="daily">Daily</option>
-									<option value="weekly">Weekly</option>
-									<option value="biweekly">Biweekly</option>
-									<option value="monthly">Monthly</option>
-									<option value="quarterly">Quarterly</option>
-									<option value="yearly">Yearly</option>
-								</select>
+								<label class={labelClasses}>Frequency
+									<select bind:value={previewFrequency} class={selectClasses}>
+										<option value="daily">Daily</option>
+										<option value="weekly">Weekly</option>
+										<option value="biweekly">Biweekly</option>
+										<option value="monthly">Monthly</option>
+										<option value="quarterly">Quarterly</option>
+										<option value="yearly">Yearly</option>
+									</select>
+								</label>
 							</div>
 							<div>
-								<label class={labelClasses}>End Date</label>
-								<input type="date" bind:value={previewRecurringEndDate} placeholder="Leave empty for indefinite" class={inputClasses} />
+								<label class={labelClasses}>End Date
+									<input type="date" bind:value={previewRecurringEndDate} placeholder="Leave empty for indefinite" class={inputClasses} />
+								</label>
 							</div>
 							<div>
-								<label class={labelClasses}>Rule Name</label>
-								<input type="text" bind:value={previewRecurringName} class={inputClasses} />
+								<label class={labelClasses}>Rule Name
+									<input type="text" bind:value={previewRecurringName} class={inputClasses} />
+								</label>
 							</div>
 						</div>
 					{/if}

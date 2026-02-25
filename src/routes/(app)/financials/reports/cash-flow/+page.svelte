@@ -9,6 +9,7 @@
 		return (neg ? '-' : '') + '$' + Math.floor(a / 100).toLocaleString() + '.' + String(a % 100).padStart(2, '0');
 	}
 
+	// svelte-ignore state_referenced_locally
 	let fromDate = $state(new Date(parseInt(data.filters.from)).toISOString().split('T')[0]);
 	let toDate = $state(new Date(parseInt(data.filters.to)).toISOString().split('T')[0]);
 

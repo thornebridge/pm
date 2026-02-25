@@ -92,25 +92,29 @@
 	</button>
 
 	{#if open}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-surface-300 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900"
+			role="presentation"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<div class="mb-2 space-y-1.5">
-				<label class="block text-[10px] font-medium text-surface-500">From</label>
+				<label class="block text-[10px] font-medium text-surface-500">From
 				<input
 					type="date"
 					value={toDateStr(from)}
 					onchange={handleFromChange}
 					class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 				/>
-				<label class="block text-[10px] font-medium text-surface-500">To</label>
+				</label>
+				<label class="block text-[10px] font-medium text-surface-500">To
 				<input
 					type="date"
 					value={toDateStr(to)}
 					onchange={handleToChange}
 					class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 				/>
+				</label>
 			</div>
 
 			<div class="border-t border-surface-200 pt-1.5 dark:border-surface-800">

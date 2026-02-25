@@ -449,12 +449,14 @@
 			<!-- Name & Description -->
 			<div class="mb-4 space-y-3">
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name</label>
-					<input bind:value={bName} placeholder="e.g. Stale Deal Alert" class="w-full rounded border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name
+						<input bind:value={bName} placeholder="e.g. Stale Deal Alert" class="w-full rounded border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</label>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Description (optional)</label>
-					<input bind:value={bDescription} placeholder="What does this automation do?" class="w-full rounded border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Description (optional)
+						<input bind:value={bDescription} placeholder="What does this automation do?" class="w-full rounded border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</label>
 				</div>
 			</div>
 
@@ -469,60 +471,64 @@
 
 				{#if bTriggerEvent === 'opportunity.stage_changed'}
 					<div class="mt-2">
-						<label class="mb-1 block text-xs text-surface-500">Filter to stage (optional)</label>
-						<select
-							value={bTriggerConfig.stageId ?? ''}
-							onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, stageId: (e.target as HTMLSelectElement).value || undefined }; }}
-							class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-						>
-							<option value="">Any stage</option>
-							{#each data.stages as stage}
-								<option value={stage.id}>{stage.name}</option>
-							{/each}
-						</select>
+						<label class="mb-1 block text-xs text-surface-500">Filter to stage (optional)
+							<select
+								value={bTriggerConfig.stageId ?? ''}
+								onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, stageId: (e.target as HTMLSelectElement).value || undefined }; }}
+								class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							>
+								<option value="">Any stage</option>
+								{#each data.stages as stage}
+									<option value={stage.id}>{stage.name}</option>
+								{/each}
+							</select>
+						</label>
 					</div>
 				{/if}
 
 				{#if bTriggerEvent === 'activity.logged'}
 					<div class="mt-2">
-						<label class="mb-1 block text-xs text-surface-500">Activity type (optional)</label>
-						<select
-							value={bTriggerConfig.activityType ?? ''}
-							onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, activityType: (e.target as HTMLSelectElement).value || undefined }; }}
-							class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-						>
-							<option value="">Any type</option>
-							<option value="call">Call</option>
-							<option value="email">Email</option>
-							<option value="meeting">Meeting</option>
-							<option value="note">Note</option>
-						</select>
+						<label class="mb-1 block text-xs text-surface-500">Activity type (optional)
+							<select
+								value={bTriggerConfig.activityType ?? ''}
+								onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, activityType: (e.target as HTMLSelectElement).value || undefined }; }}
+								class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							>
+								<option value="">Any type</option>
+								<option value="call">Call</option>
+								<option value="email">Email</option>
+								<option value="meeting">Meeting</option>
+								<option value="note">Note</option>
+							</select>
+						</label>
 					</div>
 				{/if}
 
 				{#if bTriggerEvent === 'deal.stale'}
 					<div class="mt-2">
-						<label class="mb-1 block text-xs text-surface-500">Days without activity</label>
-						<input
-							type="number"
-							min="1"
-							value={bTriggerConfig.staleDays ?? 7}
-							onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, staleDays: parseInt((e.target as HTMLInputElement).value) || 7 }; }}
-							class="w-24 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-						/>
+						<label class="mb-1 block text-xs text-surface-500">Days without activity
+							<input
+								type="number"
+								min="1"
+								value={bTriggerConfig.staleDays ?? 7}
+								onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, staleDays: parseInt((e.target as HTMLInputElement).value) || 7 }; }}
+								class="w-24 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							/>
+						</label>
 					</div>
 				{/if}
 
 				{#if bTriggerEvent === 'close_date.approaching'}
 					<div class="mt-2">
-						<label class="mb-1 block text-xs text-surface-500">Days before close date</label>
-						<input
-							type="number"
-							min="1"
-							value={bTriggerConfig.daysBefore ?? 7}
-							onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, daysBefore: parseInt((e.target as HTMLInputElement).value) || 7 }; }}
-							class="w-24 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-						/>
+						<label class="mb-1 block text-xs text-surface-500">Days before close date
+							<input
+								type="number"
+								min="1"
+								value={bTriggerConfig.daysBefore ?? 7}
+								onchange={(e) => { bTriggerConfig = { ...bTriggerConfig, daysBefore: parseInt((e.target as HTMLInputElement).value) || 7 }; }}
+								class="w-24 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+							/>
+						</label>
 					</div>
 				{/if}
 			</div>
@@ -677,27 +683,29 @@
 										/>
 										<div class="flex gap-2">
 											<div>
-												<label class="block text-[10px] text-surface-500">Due in (days)</label>
-												<input
-													type="number"
-													min="0"
-													value={action.daysFromNow ?? 1}
-													oninput={(e) => updateAction(i, 'daysFromNow', parseInt((e.target as HTMLInputElement).value) || 0)}
-													class="w-20 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-												/>
+												<label class="block text-[10px] text-surface-500">Due in (days)
+													<input
+														type="number"
+														min="0"
+														value={action.daysFromNow ?? 1}
+														oninput={(e) => updateAction(i, 'daysFromNow', parseInt((e.target as HTMLInputElement).value) || 0)}
+														class="w-20 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+													/>
+												</label>
 											</div>
 											<div>
-												<label class="block text-[10px] text-surface-500">Priority</label>
-												<select
-													value={action.priority}
-													onchange={(e) => updateAction(i, 'priority', (e.target as HTMLSelectElement).value)}
-													class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-												>
-													<option value="low">Low</option>
-													<option value="medium">Medium</option>
-													<option value="high">High</option>
-													<option value="urgent">Urgent</option>
-												</select>
+												<label class="block text-[10px] text-surface-500">Priority
+													<select
+														value={action.priority}
+														onchange={(e) => updateAction(i, 'priority', (e.target as HTMLSelectElement).value)}
+														class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+													>
+														<option value="low">Low</option>
+														<option value="medium">Medium</option>
+														<option value="high">High</option>
+														<option value="urgent">Urgent</option>
+													</select>
+												</label>
 											</div>
 										</div>
 									</div>

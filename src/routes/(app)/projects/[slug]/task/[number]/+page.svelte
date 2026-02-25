@@ -415,6 +415,7 @@
 			<!-- Title -->
 			<div class="mb-4">
 				{#if editingTitle}
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						bind:value={titleInput}
 						onblur={saveTitle}

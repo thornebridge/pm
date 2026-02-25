@@ -10,6 +10,7 @@
 
 	let { data } = $props();
 
+	// svelte-ignore state_referenced_locally
 	let automations = $state(data.automations);
 	let builderOpen = $state(false);
 	let templatePickerOpen = $state(false);

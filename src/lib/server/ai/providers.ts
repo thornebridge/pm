@@ -39,12 +39,116 @@ export interface ParsedTransaction {
 	confidence: number;
 }
 
+// ─── Structured Output Schema ───────────────────────────────────────────────
+
+const TRANSACTION_SCHEMA = {
+	type: 'object' as const,
+	properties: {
+		transactionType: { type: 'string' as const, enum: ['expense', 'deposit', 'transfer'] },
+		amount: { type: 'number' as const },
+		description: { type: 'string' as const },
+		memo: { type: ['string', 'null'] as const },
+		date: { type: 'string' as const, description: 'ISO date YYYY-MM-DD' },
+		suggestedExpenseAccountId: { type: ['string', 'null'] as const },
+		suggestedRevenueAccountId: { type: ['string', 'null'] as const },
+		suggestedBankAccountId: { type: ['string', 'null'] as const },
+		suggestedFromAccountId: { type: ['string', 'null'] as const },
+		suggestedToAccountId: { type: ['string', 'null'] as const },
+		referenceNumber: { type: ['string', 'null'] as const },
+		isRecurring: { type: 'boolean' as const },
+		frequency: {
+			type: ['string', 'null'] as const,
+			enum: ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly', null]
+		},
+		recurringEndDate: { type: ['string', 'null'] as const },
+		recurringName: { type: ['string', 'null'] as const },
+		confidence: { type: 'number' as const }
+	},
+	required: [
+		'transactionType',
+		'amount',
+		'description',
+		'memo',
+		'date',
+		'suggestedExpenseAccountId',
+		'suggestedRevenueAccountId',
+		'suggestedBankAccountId',
+		'suggestedFromAccountId',
+		'suggestedToAccountId',
+		'referenceNumber',
+		'isRecurring',
+		'frequency',
+		'recurringEndDate',
+		'recurringName',
+		'confidence'
+	],
+	additionalProperties: false
+} as const;
+
+function getOpenAISchema() {
+	return {
+		name: 'parsed_transaction',
+		strict: true,
+		schema: TRANSACTION_SCHEMA
+	};
+}
+
+function getAnthropicTool() {
+	return {
+		name: 'parse_transaction',
+		description: 'Parse a natural language financial transaction into structured data',
+		input_schema: TRANSACTION_SCHEMA
+	};
+}
+
+function getGeminiSchema(): Record<string, unknown> {
+	const typeMap: Record<string, string> = {
+		string: 'STRING',
+		number: 'NUMBER',
+		boolean: 'BOOLEAN',
+		object: 'OBJECT',
+		array: 'ARRAY'
+	};
+
+	function convertProperty(prop: Record<string, unknown>): Record<string, unknown> {
+		const t = prop.type;
+		if (Array.isArray(t)) {
+			const nonNull = t.filter((x: string) => x !== 'null')[0] as string;
+			const result: Record<string, unknown> = { type: typeMap[nonNull] || nonNull, nullable: true };
+			if (prop.enum) result.enum = (prop.enum as unknown[]).filter((v) => v !== null);
+			if (prop.description) result.description = prop.description;
+			return result;
+		}
+		const result: Record<string, unknown> = { type: typeMap[t as string] || t };
+		if (prop.enum) result.enum = prop.enum;
+		if (prop.description) result.description = prop.description;
+		return result;
+	}
+
+	const properties: Record<string, unknown> = {};
+	for (const [key, val] of Object.entries(TRANSACTION_SCHEMA.properties)) {
+		properties[key] = convertProperty(val as Record<string, unknown>);
+	}
+
+	return {
+		type: 'OBJECT',
+		properties,
+		required: [...TRANSACTION_SCHEMA.required]
+	};
+}
+
 // ─── Provider Defaults ──────────────────────────────────────────────────────
 
 const PROVIDER_DEFAULTS: Record<string, { model: string; endpoint: string }> = {
 	openai: { model: 'gpt-4o-mini', endpoint: 'https://api.openai.com/v1/chat/completions' },
-	anthropic: { model: 'claude-sonnet-4-20250514', endpoint: 'https://api.anthropic.com/v1/messages' },
-	gemini: { model: 'gemini-2.0-flash', endpoint: 'https://generativelanguage.googleapis.com/v1beta' }
+	anthropic: {
+		model: 'claude-haiku-4-5-20251001',
+		endpoint: 'https://api.anthropic.com/v1/messages'
+	},
+	gemini: {
+		model: 'gemini-2.0-flash',
+		endpoint: 'https://generativelanguage.googleapis.com/v1beta'
+	}
 };
 
 // ─── Config Loader ──────────────────────────────────────────────────────────
@@ -76,9 +180,9 @@ export async function getAIConfig(): Promise<AIConfig | null> {
 	};
 }
 
-// ─── System Prompt Builder ──────────────────────────────────────────────────
+// ─── Domain Context Builder ─────────────────────────────────────────────────
 
-export function buildSystemPrompt(accounts: AccountContext[]): string {
+export function buildDomainContext(accounts: AccountContext[]): string {
 	const today = new Date().toISOString().split('T')[0];
 
 	const bankAccounts = accounts.filter(
@@ -98,10 +202,15 @@ export function buildSystemPrompt(accounts: AccountContext[]): string {
 	}
 
 	function formatOtherAccounts(list: AccountContext[]): string {
-		return list.map((a) => `- ID: "${a.id}" | #${a.accountNumber} | "${a.name}" | Type: ${a.accountType}`).join('\n');
+		return list
+			.map(
+				(a) =>
+					`- ID: "${a.id}" | #${a.accountNumber} | "${a.name}" | Type: ${a.accountType}`
+			)
+			.join('\n');
 	}
 
-	return `You are a financial transaction parser for a double-entry bookkeeping system. Parse the user's natural language input into a structured JSON transaction.
+	return `You are a financial transaction parser for a double-entry bookkeeping system. Parse the user's natural language input into a structured transaction.
 
 Today's date is: ${today}
 
@@ -120,47 +229,30 @@ OTHER ACCOUNTS (asset, liability, equity):
 ${otherAccounts.length > 0 ? formatOtherAccounts(otherAccounts) : '(none)'}
 
 RULES:
-1. Respond with ONLY a valid JSON object, no other text or markdown.
-2. Determine transactionType: "expense" (money going out), "deposit" (money coming in), or "transfer" (moving between accounts).
-3. amount: The dollar amount as a number (e.g. 299.00, not cents).
-4. description: A clean, professional description for the journal entry (e.g. "Figma Design Software Subscription").
-5. memo: Additional context from the input that adds detail beyond the description. null if nothing extra.
-6. date: ISO date string (YYYY-MM-DD). Default to today (${today}) unless the user specifies a date.
-7. suggestedBankAccountId: The most appropriate bank/cash account ID. If only one exists, use it.
-8. For expenses: set suggestedExpenseAccountId to the best-matching expense account ID.
-9. For deposits: set suggestedRevenueAccountId to the best-matching revenue account ID.
-10. For transfers: set suggestedFromAccountId and suggestedToAccountId.
-11. referenceNumber: Extract invoice numbers, check numbers, or reference IDs if mentioned. Otherwise null.
-12. isRecurring: true if the input mentions recurring frequency (monthly, weekly, yearly, subscription, etc.).
-13. frequency: One of "daily", "weekly", "biweekly", "monthly", "quarterly", "yearly". Only set if isRecurring is true.
-14. recurringEndDate: ISO date if an end date is mentioned, null if indefinite or "until cancelled".
-15. recurringName: A descriptive name for the recurring rule (e.g. "Figma Monthly Subscription"). Only set if isRecurring is true.
-16. confidence: 0.0 to 1.0 representing parsing confidence. Lower if ambiguous.
-
-JSON SCHEMA:
-{
-  "transactionType": "expense" | "deposit" | "transfer",
-  "amount": number,
-  "description": string,
-  "memo": string | null,
-  "date": "YYYY-MM-DD",
-  "suggestedExpenseAccountId": string | null,
-  "suggestedRevenueAccountId": string | null,
-  "suggestedBankAccountId": string | null,
-  "suggestedFromAccountId": string | null,
-  "suggestedToAccountId": string | null,
-  "referenceNumber": string | null,
-  "isRecurring": boolean,
-  "frequency": string | null,
-  "recurringEndDate": string | null,
-  "recurringName": string | null,
-  "confidence": number
-}`;
+1. Determine transactionType: "expense" (money going out), "deposit" (money coming in), or "transfer" (moving between accounts).
+2. amount: The dollar amount as a number (e.g. 299.00, not cents).
+3. description: A clean, professional description for the journal entry (e.g. "Figma Design Software Subscription").
+4. memo: Additional context from the input that adds detail beyond the description. null if nothing extra.
+5. date: ISO date string (YYYY-MM-DD). Default to today (${today}) unless the user specifies a date.
+6. suggestedBankAccountId: The most appropriate bank/cash account ID. If only one exists, use it.
+7. For expenses: set suggestedExpenseAccountId to the best-matching expense account ID.
+8. For deposits: set suggestedRevenueAccountId to the best-matching revenue account ID.
+9. For transfers: set suggestedFromAccountId and suggestedToAccountId.
+10. referenceNumber: Extract invoice numbers, check numbers, or reference IDs if mentioned. Otherwise null.
+11. isRecurring: true if the input mentions recurring frequency (monthly, weekly, yearly, subscription, etc.).
+12. frequency: One of "daily", "weekly", "biweekly", "monthly", "quarterly", "yearly". Only set if isRecurring is true.
+13. recurringEndDate: ISO date if an end date is mentioned, null if indefinite or "until cancelled".
+14. recurringName: A descriptive name for the recurring rule (e.g. "Figma Monthly Subscription"). Only set if isRecurring is true.
+15. confidence: 0.0 to 1.0 representing parsing confidence. Lower if ambiguous.`;
 }
 
 // ─── Provider Callers ───────────────────────────────────────────────────────
 
-async function callOpenAI(config: AIConfig, systemPrompt: string, userInput: string): Promise<string> {
+async function callOpenAI(
+	config: AIConfig,
+	domainContext: string,
+	userInput: string
+): Promise<ParsedTransaction> {
 	const res = await fetch(config.endpoint, {
 		method: 'POST',
 		headers: {
@@ -170,11 +262,14 @@ async function callOpenAI(config: AIConfig, systemPrompt: string, userInput: str
 		body: JSON.stringify({
 			model: config.model,
 			messages: [
-				{ role: 'system', content: systemPrompt },
+				{ role: 'system', content: domainContext },
 				{ role: 'user', content: userInput }
 			],
 			temperature: 0.1,
-			response_format: { type: 'json_object' }
+			response_format: {
+				type: 'json_schema',
+				json_schema: getOpenAISchema()
+			}
 		})
 	});
 
@@ -184,10 +279,19 @@ async function callOpenAI(config: AIConfig, systemPrompt: string, userInput: str
 	}
 
 	const data = await res.json();
-	return data.choices[0].message.content;
+
+	if (data.choices[0].message.refusal) {
+		throw new Error(`OpenAI refused: ${data.choices[0].message.refusal}`);
+	}
+
+	return JSON.parse(data.choices[0].message.content) as ParsedTransaction;
 }
 
-async function callAnthropic(config: AIConfig, systemPrompt: string, userInput: string): Promise<string> {
+async function callAnthropic(
+	config: AIConfig,
+	domainContext: string,
+	userInput: string
+): Promise<ParsedTransaction> {
 	const res = await fetch(config.endpoint, {
 		method: 'POST',
 		headers: {
@@ -198,7 +302,9 @@ async function callAnthropic(config: AIConfig, systemPrompt: string, userInput: 
 		body: JSON.stringify({
 			model: config.model,
 			max_tokens: 1024,
-			system: systemPrompt,
+			system: domainContext,
+			tools: [getAnthropicTool()],
+			tool_choice: { type: 'tool', name: 'parse_transaction' },
 			messages: [{ role: 'user', content: userInput }]
 		})
 	});
@@ -209,20 +315,33 @@ async function callAnthropic(config: AIConfig, systemPrompt: string, userInput: 
 	}
 
 	const data = await res.json();
-	return data.content[0].text;
+	const toolBlock = data.content.find(
+		(block: { type: string }) => block.type === 'tool_use'
+	);
+
+	if (!toolBlock) {
+		throw new Error('Anthropic did not return a tool_use block');
+	}
+
+	return toolBlock.input as ParsedTransaction;
 }
 
-async function callGemini(config: AIConfig, systemPrompt: string, userInput: string): Promise<string> {
+async function callGemini(
+	config: AIConfig,
+	domainContext: string,
+	userInput: string
+): Promise<ParsedTransaction> {
 	const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
 	const res = await fetch(url, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
 		body: JSON.stringify({
-			system_instruction: { parts: [{ text: systemPrompt }] },
+			system_instruction: { parts: [{ text: domainContext }] },
 			contents: [{ parts: [{ text: userInput }] }],
 			generationConfig: {
 				temperature: 0.1,
-				responseMimeType: 'application/json'
+				responseMimeType: 'application/json',
+				responseSchema: getGeminiSchema()
 			}
 		})
 	});
@@ -233,19 +352,16 @@ async function callGemini(config: AIConfig, systemPrompt: string, userInput: str
 	}
 
 	const data = await res.json();
-	return data.candidates[0].content.parts[0].text;
+	return JSON.parse(data.candidates[0].content.parts[0].text) as ParsedTransaction;
 }
 
-// ─── JSON Extraction ────────────────────────────────────────────────────────
+// ─── Validation ─────────────────────────────────────────────────────────────
 
-function extractJSON(raw: string): ParsedTransaction {
-	const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-	const parsed = JSON.parse(cleaned);
+function validateTransaction(parsed: ParsedTransaction): ParsedTransaction {
 	const today = new Date().toISOString().split('T')[0];
-
 	return {
 		transactionType: parsed.transactionType || 'expense',
-		amount: typeof parsed.amount === 'number' ? parsed.amount : parseFloat(parsed.amount) || 0,
+		amount: typeof parsed.amount === 'number' ? parsed.amount : 0,
 		description: parsed.description || 'AI-parsed transaction',
 		memo: parsed.memo || null,
 		date: parsed.date || today,
@@ -265,30 +381,33 @@ function extractJSON(raw: string): ParsedTransaction {
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
-export async function parseTransaction(input: string, accounts: AccountContext[]): Promise<ParsedTransaction> {
+export async function parseTransaction(
+	input: string,
+	accounts: AccountContext[]
+): Promise<ParsedTransaction> {
 	const config = await getAIConfig();
 	if (!config) {
 		throw new Error('AI is not configured. Ask an admin to set up an AI provider in Settings.');
 	}
 
-	const systemPrompt = buildSystemPrompt(accounts);
-	let raw: string;
+	const domainContext = buildDomainContext(accounts);
+	let parsed: ParsedTransaction;
 
 	switch (config.provider) {
 		case 'openai':
-			raw = await callOpenAI(config, systemPrompt, input);
+			parsed = await callOpenAI(config, domainContext, input);
 			break;
 		case 'anthropic':
-			raw = await callAnthropic(config, systemPrompt, input);
+			parsed = await callAnthropic(config, domainContext, input);
 			break;
 		case 'gemini':
-			raw = await callGemini(config, systemPrompt, input);
+			parsed = await callGemini(config, domainContext, input);
 			break;
 		default:
 			throw new Error(`Unsupported AI provider: ${config.provider}`);
 	}
 
-	return extractJSON(raw);
+	return validateTransaction(parsed);
 }
 
 // ─── Test Connection ────────────────────────────────────────────────────────
@@ -308,23 +427,57 @@ export async function testAIConnection(params: {
 	};
 
 	try {
-		let raw: string;
-		const testPrompt = 'Respond with exactly: {"status":"ok"}';
-
 		switch (config.provider) {
-			case 'openai':
-				raw = await callOpenAI(config, 'You are a test assistant.', testPrompt);
+			case 'openai': {
+				const res = await fetch(config.endpoint, {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${config.apiKey}`,
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						model: config.model,
+						messages: [{ role: 'user', content: 'Reply with "ok"' }],
+						max_tokens: 5
+					})
+				});
+				if (!res.ok) throw new Error(`OpenAI (${res.status}): ${await res.text()}`);
 				break;
-			case 'anthropic':
-				raw = await callAnthropic(config, 'You are a test assistant.', testPrompt);
+			}
+			case 'anthropic': {
+				const res = await fetch(config.endpoint, {
+					method: 'POST',
+					headers: {
+						'x-api-key': config.apiKey,
+						'anthropic-version': '2023-06-01',
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						model: config.model,
+						max_tokens: 5,
+						messages: [{ role: 'user', content: 'Reply with "ok"' }]
+					})
+				});
+				if (!res.ok)
+					throw new Error(`Anthropic (${res.status}): ${await res.text()}`);
 				break;
-			case 'gemini':
-				raw = await callGemini(config, 'You are a test assistant.', testPrompt);
+			}
+			case 'gemini': {
+				const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+				const res = await fetch(url, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						contents: [{ parts: [{ text: 'Reply with "ok"' }] }],
+						generationConfig: { maxOutputTokens: 5 }
+					})
+				});
+				if (!res.ok) throw new Error(`Gemini (${res.status}): ${await res.text()}`);
 				break;
+			}
 			default:
 				return { valid: false, error: `Unsupported provider: ${config.provider}` };
 		}
-
 		return { valid: true };
 	} catch (err) {
 		return { valid: false, error: err instanceof Error ? err.message : 'Connection failed' };

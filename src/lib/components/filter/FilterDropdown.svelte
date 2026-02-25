@@ -70,12 +70,15 @@
 	</button>
 
 	{#if open}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
 			class="absolute left-0 top-full z-50 mt-1 w-56 rounded-md border border-surface-300 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900"
+			role="presentation"
 			onclick={(e) => e.stopPropagation()}
 		>
 			{#if searchable}
 				<div class="border-b border-surface-200 p-1.5 dark:border-surface-800">
+					<!-- svelte-ignore a11y_autofocus -->
 					<input
 						bind:value={search}
 						placeholder="Search..."

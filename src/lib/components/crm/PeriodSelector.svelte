@@ -26,8 +26,12 @@
 		return new Date(ms).toISOString().slice(0, 10);
 	}
 
+	// svelte-ignore state_referenced_locally
 	let fromStr = $state(toDateStr(customFrom));
 	let toStr = $state(toDateStr(customTo));
+
+	$effect(() => { fromStr = toDateStr(customFrom); });
+	$effect(() => { toStr = toDateStr(customTo); });
 
 	function navigate(preset: PeriodPreset) {
 		const url = new URL($page.url);

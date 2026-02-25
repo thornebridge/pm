@@ -116,7 +116,8 @@
 		class="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
 		onkeydown={handleKeydown}
 	>
-		<div class="absolute inset-0 bg-black/40 dark:bg-black/60" transition:fade={{ duration: 150 }} onclick={onclose}></div>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<div class="absolute inset-0 bg-black/40 dark:bg-black/60" role="presentation" transition:fade={{ duration: 150 }} onclick={onclose}></div>
 		<div
 			class="relative w-full max-w-lg rounded-t-lg bg-surface-50 shadow-xl dark:bg-surface-900 sm:rounded-lg"
 			transition:fly={{ y: 20, duration: 200 }}
@@ -134,7 +135,7 @@
 				<!-- To -->
 				<div class="relative">
 					<div class="flex items-center gap-2">
-						<label class="w-8 text-xs text-surface-500">To</label>
+						<label class="w-8 text-xs text-surface-500">To
 						<input
 							bind:value={to}
 							oninput={onToInput}
@@ -143,6 +144,7 @@
 							placeholder="email@example.com"
 							class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 						/>
+					</label>
 						{#if !showCc}
 							<button onclick={() => (showCc = true)} class="text-xs text-surface-500 hover:text-surface-700">Cc</button>
 						{/if}
@@ -165,23 +167,25 @@
 				<!-- CC -->
 				{#if showCc}
 					<div class="flex items-center gap-2">
-						<label class="w-8 text-xs text-surface-500">Cc</label>
+						<label class="w-8 text-xs text-surface-500">Cc
 						<input
 							bind:value={cc}
 							placeholder="cc@example.com"
 							class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
 						/>
+					</label>
 					</div>
 				{/if}
 
 				<!-- Subject -->
 				<div class="flex items-center gap-2">
-					<label class="w-8 text-xs text-surface-500">Subj</label>
-					<input
-						bind:value={subject}
-						placeholder="Subject"
-						class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-					/>
+					<label class="w-8 text-xs text-surface-500">Subj
+						<input
+							bind:value={subject}
+							placeholder="Subject"
+							class="flex-1 rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+						/>
+					</label>
 				</div>
 
 				<!-- Body -->

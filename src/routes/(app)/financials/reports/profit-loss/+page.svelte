@@ -13,6 +13,7 @@
 		return new Date(parseInt(ts)).toISOString().split('T')[0];
 	}
 
+	// svelte-ignore state_referenced_locally
 	let fromDate = $state(tsToDateStr(data.filters.from));
 	let toDate = $state(tsToDateStr(data.filters.to));
 

@@ -527,16 +527,19 @@
 		{#if showAdd}
 			<div class="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name</label>
-					<input bind:value={newName} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name
+						<input bind:value={newName} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</label>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Color</label>
-					<input type="color" bind:value={newColor} class="h-8 w-10" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Color
+						<input type="color" bind:value={newColor} class="h-8 w-10" />
+					</label>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Probability</label>
-					<input type="number" min="0" max="100" bind:value={newProbability} class="w-16 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Probability
+						<input type="number" min="0" max="100" bind:value={newProbability} class="w-16 rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</label>
 				</div>
 				<label class="flex items-center gap-1 text-sm text-surface-700 dark:text-surface-300">
 					<input type="checkbox" bind:checked={newIsClosed} /> Closed
@@ -618,12 +621,14 @@
 		{#if lsShowAdd}
 			<div class="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name</label>
-					<input bind:value={lsNewName} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Name
+						<input bind:value={lsNewName} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</label>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Color</label>
-					<input type="color" bind:value={lsNewColor} class="h-8 w-10" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Color
+						<input type="color" bind:value={lsNewColor} class="h-8 w-10" />
+					</label>
 				</div>
 				<label class="flex items-center gap-1 text-sm text-surface-700 dark:text-surface-300">
 					<input type="checkbox" bind:checked={lsNewIsConverted} /> Converted
@@ -755,21 +760,24 @@
 		{#if cfShowAdd}
 			<div class="mt-4 flex flex-wrap items-end gap-3 rounded-lg border border-surface-300 bg-surface-50 p-4 dark:border-surface-800 dark:bg-surface-900">
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Label</label>
-					<input bind:value={cfNewLabel} placeholder="e.g. License Type" class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Label
+						<input bind:value={cfNewLabel} placeholder="e.g. License Type" class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+					</label>
 				</div>
 				<div>
-					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Type</label>
-					<select bind:value={cfNewType} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100">
-						{#each fieldTypes as ft}
-							<option value={ft.value}>{ft.label}</option>
-						{/each}
-					</select>
+					<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Type
+						<select bind:value={cfNewType} class="rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100">
+							{#each fieldTypes as ft}
+								<option value={ft.value}>{ft.label}</option>
+							{/each}
+						</select>
+					</label>
 				</div>
 				{#if cfNewType === 'select' || cfNewType === 'multi_select'}
 					<div class="min-w-48">
-						<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Options (comma-separated)</label>
-						<input bind:value={cfNewOptions} placeholder="Option 1, Option 2, Option 3" class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+						<label class="mb-1 block text-xs font-medium text-surface-600 dark:text-surface-400">Options (comma-separated)
+							<input bind:value={cfNewOptions} placeholder="Option 1, Option 2, Option 3" class="w-full rounded border border-surface-300 bg-surface-50 px-2 py-1 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100" />
+						</label>
 					</div>
 				{/if}
 				<label class="flex items-center gap-1 text-sm text-surface-700 dark:text-surface-300">

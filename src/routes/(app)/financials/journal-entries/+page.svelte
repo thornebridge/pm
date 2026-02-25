@@ -3,6 +3,7 @@
 
 	let { data } = $props();
 
+	// svelte-ignore state_referenced_locally
 	let statusFilter = $state(data.filters.status);
 	let search = $state(data.filters.q);
 	let fromDate = $state(data.filters.from ? new Date(parseInt(data.filters.from)).toISOString().split('T')[0] : '');

@@ -37,6 +37,7 @@
 		})
 	);
 
+	// svelte-ignore state_referenced_locally
 	let views = $state(data.views ?? []);
 
 	// Keep views in sync when data changes (e.g., navigation)

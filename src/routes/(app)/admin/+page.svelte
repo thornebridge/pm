@@ -266,6 +266,7 @@
 	const WEBHOOK_EVENT_OPTIONS = ['task.created', 'task.updated', 'task.deleted', 'comment.created', '*'];
 
 	// Audit log filters
+	// svelte-ignore state_referenced_locally
 	let auditUser = $state(data.auditFilters?.user ?? '');
 	let auditProject = $state(data.auditFilters?.project ?? '');
 	let auditAction = $state(data.auditFilters?.action ?? '');
@@ -934,40 +935,43 @@
 		<!-- Filters -->
 		<div class="mb-4 flex flex-wrap items-end gap-2">
 			<div>
-				<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">User</label>
-				<select
-					bind:value={auditUser}
-					class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
-				>
-					<option value="">All users</option>
-					{#each data.users as u}
-						<option value={u.id}>{u.name}</option>
-					{/each}
-				</select>
+				<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">User
+					<select
+						bind:value={auditUser}
+						class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
+					>
+						<option value="">All users</option>
+						{#each data.users as u}
+							<option value={u.id}>{u.name}</option>
+						{/each}
+					</select>
+				</label>
 			</div>
 			<div>
-				<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Project</label>
-				<select
-					bind:value={auditProject}
-					class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
-				>
-					<option value="">All projects</option>
-					{#each data.allProjects as p}
-						<option value={p.id}>{p.name}</option>
-					{/each}
-				</select>
+				<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Project
+					<select
+						bind:value={auditProject}
+						class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
+					>
+						<option value="">All projects</option>
+						{#each data.allProjects as p}
+							<option value={p.id}>{p.name}</option>
+						{/each}
+					</select>
+				</label>
 			</div>
 			<div>
-				<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Action</label>
-				<select
-					bind:value={auditAction}
-					class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
-				>
-					<option value="">All actions</option>
-					{#each ACTION_OPTIONS as a}
-						<option value={a}>{a}</option>
-					{/each}
-				</select>
+				<label class="mb-1 block text-[10px] font-medium uppercase tracking-wider text-surface-400">Action
+					<select
+						bind:value={auditAction}
+						class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
+					>
+						<option value="">All actions</option>
+						{#each ACTION_OPTIONS as a}
+							<option value={a}>{a}</option>
+						{/each}
+					</select>
+				</label>
 			</div>
 			<button
 				onclick={applyAuditFilters}

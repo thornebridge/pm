@@ -160,6 +160,7 @@
 						<div class="flex items-center gap-2 rounded-md p-2 hover:bg-surface-100 dark:hover:bg-surface-800">
 							<button
 								onclick={() => completeTask(task.id)}
+								aria-label="Mark task complete"
 								class="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-surface-400 transition hover:border-green-500 hover:bg-green-50 dark:border-surface-600 dark:hover:border-green-500 dark:hover:bg-green-900/20"
 							>
 							</button>

@@ -152,12 +152,8 @@
 
 	// Next step inline editing
 	let editingNextStep = $state(false);
-	let nextStepText = $state(data.opportunity.nextStep || '');
-	let nextStepDueDateStr = $state(
-		data.opportunity.nextStepDueDate
-			? new Date(data.opportunity.nextStepDueDate).toISOString().split('T')[0]
-			: ''
-	);
+	let nextStepText = $state('');
+	let nextStepDueDateStr = $state('');
 
 	$effect(() => {
 		nextStepText = data.opportunity.nextStep || '';
@@ -458,45 +454,48 @@
 						<!-- Inline field editing -->
 						<div class="mt-3 grid grid-cols-3 gap-2">
 							<div>
-								<label class="mb-0.5 block text-[10px] text-surface-400 uppercase tracking-wide">Role</label>
-								<select
-									value={contact.role || ''}
-									onchange={(e) => updateContactRole(contact.contactId, 'role', (e.target as HTMLSelectElement).value || null)}
-									class="w-full rounded border border-surface-200 bg-white px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-								>
-									<option value="">--</option>
-									{#each roleOptions as r}
-										<option value={r}>{r}</option>
-									{/each}
-								</select>
+								<label class="mb-0.5 block text-[10px] text-surface-400 uppercase tracking-wide">Role
+									<select
+										value={contact.role || ''}
+										onchange={(e) => updateContactRole(contact.contactId, 'role', (e.target as HTMLSelectElement).value || null)}
+										class="w-full rounded border border-surface-200 bg-white px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+									>
+										<option value="">--</option>
+										{#each roleOptions as r}
+											<option value={r}>{r}</option>
+										{/each}
+									</select>
+								</label>
 							</div>
 							<div>
-								<label class="mb-0.5 block text-[10px] text-surface-400 uppercase tracking-wide">Influence</label>
-								<select
-									value={contact.influence || ''}
-									onchange={(e) => updateContactRole(contact.contactId, 'influence', (e.target as HTMLSelectElement).value || null)}
-									class="w-full rounded border border-surface-200 bg-white px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-								>
-									<option value="">--</option>
-									<option value="high">High</option>
-									<option value="medium">Medium</option>
-									<option value="low">Low</option>
-								</select>
+								<label class="mb-0.5 block text-[10px] text-surface-400 uppercase tracking-wide">Influence
+									<select
+										value={contact.influence || ''}
+										onchange={(e) => updateContactRole(contact.contactId, 'influence', (e.target as HTMLSelectElement).value || null)}
+										class="w-full rounded border border-surface-200 bg-white px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+									>
+										<option value="">--</option>
+										<option value="high">High</option>
+										<option value="medium">Medium</option>
+										<option value="low">Low</option>
+									</select>
+								</label>
 							</div>
 							<div>
-								<label class="mb-0.5 block text-[10px] text-surface-400 uppercase tracking-wide">Sentiment</label>
-								<select
-									value={contact.sentiment || ''}
-									onchange={(e) => updateContactRole(contact.contactId, 'sentiment', (e.target as HTMLSelectElement).value || null)}
-									class="w-full rounded border border-surface-200 bg-white px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
-								>
-									<option value="">--</option>
-									<option value="champion">Champion</option>
-									<option value="supportive">Supportive</option>
-									<option value="neutral">Neutral</option>
-									<option value="skeptical">Skeptical</option>
-									<option value="blocker">Blocker</option>
-								</select>
+								<label class="mb-0.5 block text-[10px] text-surface-400 uppercase tracking-wide">Sentiment
+									<select
+										value={contact.sentiment || ''}
+										onchange={(e) => updateContactRole(contact.contactId, 'sentiment', (e.target as HTMLSelectElement).value || null)}
+										class="w-full rounded border border-surface-200 bg-white px-2 py-1 text-xs text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
+									>
+										<option value="">--</option>
+										<option value="champion">Champion</option>
+										<option value="supportive">Supportive</option>
+										<option value="neutral">Neutral</option>
+										<option value="skeptical">Skeptical</option>
+										<option value="blocker">Blocker</option>
+									</select>
+								</label>
 							</div>
 						</div>
 						{#if contact.notes}

@@ -269,8 +269,9 @@
 			<section>
 				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-surface-500">Brand Colors</h2>
 				<div class="mb-2 flex items-center gap-2">
-					<label class="text-xs text-surface-600 dark:text-surface-400">Base</label>
+					<label class="text-xs text-surface-600 dark:text-surface-400">Base
 					<input type="color" bind:value={brandBase} class="h-7 w-10 cursor-pointer rounded border border-surface-300 dark:border-surface-700" />
+					</label>
 					<input
 						bind:value={brandBase}
 						placeholder="#3d7a5c"
@@ -285,13 +286,14 @@
 					{#each SHADE_KEYS as shade}
 						{@const key = `brand-${shade}`}
 						<div>
-							<label class="mb-0.5 block text-center text-[9px] text-surface-500">{shade}</label>
+							<label class="mb-0.5 block text-center text-[9px] text-surface-500">{shade}
 							<input
 								type="color"
 								value={ts.colors[key] || '#000000'}
 								oninput={(e) => { ts.colors[key] = (e.target as HTMLInputElement).value; }}
 								class="h-7 w-full cursor-pointer rounded border border-surface-300 dark:border-surface-700"
 							/>
+							</label>
 						</div>
 					{/each}
 				</div>
@@ -301,8 +303,9 @@
 			<section>
 				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-surface-500">Surface Colors</h2>
 				<div class="mb-2 flex items-center gap-2">
-					<label class="text-xs text-surface-600 dark:text-surface-400">Base</label>
+					<label class="text-xs text-surface-600 dark:text-surface-400">Base
 					<input type="color" bind:value={surfaceBase} class="h-7 w-10 cursor-pointer rounded border border-surface-300 dark:border-surface-700" />
+					</label>
 					<input
 						bind:value={surfaceBase}
 						placeholder="#a8a198"
@@ -317,13 +320,14 @@
 					{#each SHADE_KEYS as shade}
 						{@const key = `surface-${shade}`}
 						<div>
-							<label class="mb-0.5 block text-center text-[9px] text-surface-500">{shade}</label>
+							<label class="mb-0.5 block text-center text-[9px] text-surface-500">{shade}
 							<input
 								type="color"
 								value={ts.colors[key] || '#000000'}
 								oninput={(e) => { ts.colors[key] = (e.target as HTMLInputElement).value; }}
 								class="h-7 w-full cursor-pointer rounded border border-surface-300 dark:border-surface-700"
 							/>
+							</label>
 						</div>
 					{/each}
 				</div>
@@ -341,13 +345,14 @@
 						{ key: 'info', label: 'Info' }
 					] as sem}
 						<div>
-							<label class="mb-0.5 block text-center text-[9px] text-surface-500">{sem.label}</label>
+							<label class="mb-0.5 block text-center text-[9px] text-surface-500">{sem.label}
 							<input
 								type="color"
 								value={ts[sem.key as keyof ThemeBuilderState] as string}
 								oninput={(e) => { (ts as any)[sem.key] = (e.target as HTMLInputElement).value; }}
 								class="h-7 w-full cursor-pointer rounded border border-surface-300 dark:border-surface-700"
 							/>
+							</label>
 						</div>
 					{/each}
 				</div>
@@ -358,7 +363,7 @@
 				<h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-surface-500">Typography</h2>
 				<div class="space-y-2">
 					<div>
-						<label class="mb-0.5 block text-xs text-surface-600 dark:text-surface-400">Body Font</label>
+						<label class="mb-0.5 block text-xs text-surface-600 dark:text-surface-400">Body Font
 						<select
 							bind:value={ts.font}
 							class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm text-surface-900 outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
@@ -367,9 +372,10 @@
 								<option value={preset}>{preset.split(',')[0].replace(/'/g, '')}</option>
 							{/each}
 						</select>
+						</label>
 					</div>
 					<div>
-						<label class="mb-0.5 block text-xs text-surface-600 dark:text-surface-400">Heading Font</label>
+						<label class="mb-0.5 block text-xs text-surface-600 dark:text-surface-400">Heading Font
 						<select
 							bind:value={ts.headingFont}
 							class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm text-surface-900 outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
@@ -378,9 +384,10 @@
 								<option value={preset}>{preset.split(',')[0].replace(/'/g, '')}</option>
 							{/each}
 						</select>
+						</label>
 					</div>
 					<div>
-						<label class="mb-0.5 block text-xs text-surface-600 dark:text-surface-400">Mono Font</label>
+						<label class="mb-0.5 block text-xs text-surface-600 dark:text-surface-400">Mono Font
 						<select
 							bind:value={ts.monoFont}
 							class="w-full rounded-md border border-surface-300 bg-surface-50 px-3 py-1.5 text-sm text-surface-900 outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100"
@@ -389,6 +396,7 @@
 								<option value={preset}>{preset.split(',')[0].replace(/'/g, '')}</option>
 							{/each}
 						</select>
+						</label>
 					</div>
 				</div>
 			</section>

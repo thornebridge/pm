@@ -17,6 +17,7 @@
 		});
 	}
 
+	// svelte-ignore state_referenced_locally
 	let selectedAccount = $state(data.filters.accountId);
 	let fromDate = $state(new Date(parseInt(data.filters.from)).toISOString().split('T')[0]);
 	let toDate = $state(new Date(parseInt(data.filters.to)).toISOString().split('T')[0]);
