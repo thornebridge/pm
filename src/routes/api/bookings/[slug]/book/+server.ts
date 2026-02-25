@@ -1,12 +1,13 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db/index.js';
-import { bookingEventTypes, bookings, users } from '$lib/server/db/schema.js';
+import { bookingEventTypes, bookings, users, bookingCustomFields, bookingCustomFieldValues } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { getAvailableSlots } from '$lib/server/bookings/availability.js';
 import { createCalendarEvent, getValidToken } from '$lib/server/bookings/google-calendar.js';
 import { sendBookingConfirmation } from '$lib/server/bookings/notifications.js';
+import { selectRoundRobinMember } from '$lib/server/bookings/round-robin.js';
 
 export const POST: RequestHandler = async (event) => {
 	const slug = event.params.slug;
@@ -36,21 +37,36 @@ export const POST: RequestHandler = async (event) => {
 		return json({ error: 'This time slot is no longer available' }, { status: 409 });
 	}
 
+	// Determine assigned user
+	let assignedUserId = eventType.userId;
+	if (eventType.schedulingType === 'round_robin') {
+		const memberId = await selectRoundRobinMember(eventType.id, startTime, endTime, dateStr, body.timezone);
+		if (!memberId) {
+			return json({ error: 'No team members available for this slot' }, { status: 409 });
+		}
+		assignedUserId = memberId;
+	}
+
 	const now = Date.now();
 	const bookingId = nanoid(12);
 
 	// Create Google Calendar event if connected
 	let googleEventId: string | null = null;
-	const hasGcal = await getValidToken(eventType.userId);
+	let meetLink: string | null = null;
+	const generateMeet = eventType.location?.toLowerCase() === 'google meet';
+	const hasGcal = await getValidToken(assignedUserId);
 	if (hasGcal) {
-		googleEventId = await createCalendarEvent(eventType.userId, {
+		const result = await createCalendarEvent(assignedUserId, {
 			summary: `${eventType.title} with ${body.name.trim()}`,
 			description: body.notes?.trim() || undefined,
 			location: eventType.location || undefined,
 			start: startTime,
 			end: endTime,
-			attendeeEmail: body.email.trim()
+			attendeeEmail: body.email.trim(),
+			generateMeet
 		});
+		googleEventId = result.eventId;
+		meetLink = result.meetLink;
 	}
 
 	const booking = {
@@ -64,15 +80,38 @@ export const POST: RequestHandler = async (event) => {
 		status: 'confirmed' as const,
 		notes: body.notes?.trim() || null,
 		googleEventId,
+		meetLink,
+		assignedUserId,
 		createdAt: now
 	};
 
 	await db.insert(bookings).values(booking);
 
+	// Store custom field values
+	if (body.customFields && typeof body.customFields === 'object') {
+		const fields = await db
+			.select()
+			.from(bookingCustomFields)
+			.where(eq(bookingCustomFields.eventTypeId, eventType.id));
+
+		const fieldValues = fields
+			.filter((f) => body.customFields[f.id] !== undefined && body.customFields[f.id] !== '')
+			.map((f) => ({
+				id: nanoid(12),
+				bookingId,
+				fieldId: f.id,
+				value: String(body.customFields[f.id])
+			}));
+
+		if (fieldValues.length > 0) {
+			await db.insert(bookingCustomFieldValues).values(fieldValues);
+		}
+	}
+
 	// Send confirmation emails
-	const [owner] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, eventType.userId));
+	const [owner] = await db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, assignedUserId));
 	if (owner) {
-		sendBookingConfirmation(booking, eventType, owner).catch((err) =>
+		sendBookingConfirmation(booking, eventType, owner, meetLink).catch((err) =>
 			console.error('[bookings] Failed to send confirmation:', err)
 		);
 	}
@@ -82,6 +121,7 @@ export const POST: RequestHandler = async (event) => {
 		eventType: eventType.title,
 		startTime: booking.startTime,
 		endTime: booking.endTime,
-		timezone: booking.timezone
+		timezone: booking.timezone,
+		meetLink
 	}, { status: 201 });
 };

@@ -2,8 +2,13 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { requireAuth } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
-import { bookingEventTypes } from '$lib/server/db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import {
+	bookingEventTypes,
+	bookingAvailabilitySchedules,
+	bookingAvailabilityOverrides
+} from '$lib/server/db/schema.js';
+import { eq, and, isNull } from 'drizzle-orm';
+import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
 	const user = requireAuth(event);
@@ -14,7 +19,31 @@ export const GET: RequestHandler = async (event) => {
 		.where(and(eq(bookingEventTypes.id, event.params.id), eq(bookingEventTypes.userId, user.id)));
 
 	if (!row) return json({ error: 'Not found' }, { status: 404 });
-	return json(row);
+
+	// Fetch default schedules and overrides
+	const schedules = await db
+		.select()
+		.from(bookingAvailabilitySchedules)
+		.where(
+			and(
+				eq(bookingAvailabilitySchedules.eventTypeId, event.params.id),
+				isNull(bookingAvailabilitySchedules.userId)
+			)
+		)
+		.orderBy(bookingAvailabilitySchedules.dayOfWeek);
+
+	const overrides = await db
+		.select()
+		.from(bookingAvailabilityOverrides)
+		.where(
+			and(
+				eq(bookingAvailabilityOverrides.eventTypeId, event.params.id),
+				isNull(bookingAvailabilityOverrides.userId)
+			)
+		)
+		.orderBy(bookingAvailabilityOverrides.date);
+
+	return json({ ...row, schedules, overrides });
 };
 
 function slugify(text: string): string {
@@ -60,8 +89,58 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.minNoticeHours !== undefined) updates.minNoticeHours = body.minNoticeHours;
 	if (body.maxDaysOut !== undefined) updates.maxDaysOut = body.maxDaysOut;
 	if (body.isActive !== undefined) updates.isActive = body.isActive;
+	if (body.schedulingType !== undefined) updates.schedulingType = body.schedulingType;
+	if (body.roundRobinMode !== undefined) updates.roundRobinMode = body.roundRobinMode;
 
 	await db.update(bookingEventTypes).set(updates).where(eq(bookingEventTypes.id, event.params.id));
+
+	// Update schedules if provided (delete-and-replace default schedules)
+	if (body.schedules) {
+		await db.delete(bookingAvailabilitySchedules).where(
+			and(
+				eq(bookingAvailabilitySchedules.eventTypeId, event.params.id),
+				isNull(bookingAvailabilitySchedules.userId)
+			)
+		);
+		const scheduleRows = body.schedules.map(
+			(s: { dayOfWeek: number; startTime: string; endTime: string; enabled: boolean }) => ({
+				id: nanoid(12),
+				eventTypeId: event.params.id,
+				userId: null,
+				dayOfWeek: s.dayOfWeek,
+				startTime: s.startTime,
+				endTime: s.endTime,
+				enabled: s.enabled
+			})
+		);
+		if (scheduleRows.length > 0) {
+			await db.insert(bookingAvailabilitySchedules).values(scheduleRows);
+		}
+	}
+
+	// Update overrides if provided (delete-and-replace default overrides)
+	if (body.overrides) {
+		await db.delete(bookingAvailabilityOverrides).where(
+			and(
+				eq(bookingAvailabilityOverrides.eventTypeId, event.params.id),
+				isNull(bookingAvailabilityOverrides.userId)
+			)
+		);
+		const overrideRows = body.overrides.map(
+			(o: { date: string; startTime?: string; endTime?: string; isBlocked: boolean }) => ({
+				id: nanoid(12),
+				eventTypeId: event.params.id,
+				userId: null,
+				date: o.date,
+				startTime: o.isBlocked ? null : o.startTime || null,
+				endTime: o.isBlocked ? null : o.endTime || null,
+				isBlocked: o.isBlocked
+			})
+		);
+		if (overrideRows.length > 0) {
+			await db.insert(bookingAvailabilityOverrides).values(overrideRows);
+		}
+	}
 
 	const [updated] = await db.select().from(bookingEventTypes).where(eq(bookingEventTypes.id, event.params.id));
 	return json(updated);

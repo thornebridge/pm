@@ -65,13 +65,14 @@ export interface OwnerInfo {
 export async function sendBookingConfirmation(
 	booking: BookingInfo,
 	eventType: EventTypeInfo,
-	owner: OwnerInfo
+	owner: OwnerInfo,
+	meetLink?: string | null
 ): Promise<void> {
 	const icsEvent: IcsEvent = {
 		uid: `booking-${booking.id}@pm`,
 		title: eventType.title,
 		description: booking.notes || undefined,
-		location: eventType.location || undefined,
+		location: meetLink || eventType.location || undefined,
 		startTime: booking.startTime,
 		endTime: booking.endTime,
 		organizerName: owner.name,
@@ -84,6 +85,13 @@ export async function sendBookingConfirmation(
 	const attachment = { filename: 'invite.ics', content: Buffer.from(icsContent) };
 	const timeStr = formatTime(booking.startTime, booking.timezone);
 
+	const locationDetails: string[] = [];
+	if (meetLink) {
+		locationDetails.push(`Join: <a href="${escapeHtml(meetLink)}" style="color:#2d4f3e;">${escapeHtml(meetLink)}</a>`);
+	} else if (eventType.location) {
+		locationDetails.push(`Location: ${escapeHtml(eventType.location)}`);
+	}
+
 	// Email to invitee
 	await sendEmail(
 		booking.inviteeEmail,
@@ -94,7 +102,7 @@ export async function sendBookingConfirmation(
 				`<strong>${escapeHtml(eventType.title)}</strong>`,
 				`${escapeHtml(timeStr)} (${eventType.durationMinutes} min)`,
 				`With: ${escapeHtml(owner.name)}`,
-				...(eventType.location ? [`Location: ${escapeHtml(eventType.location)}`] : [])
+				...locationDetails
 			],
 			note: booking.notes || undefined
 		}),
@@ -111,7 +119,7 @@ export async function sendBookingConfirmation(
 				`<strong>${escapeHtml(eventType.title)}</strong>`,
 				`${escapeHtml(timeStr)} (${eventType.durationMinutes} min)`,
 				`With: ${escapeHtml(booking.inviteeName)} (${escapeHtml(booking.inviteeEmail)})`,
-				...(eventType.location ? [`Location: ${escapeHtml(eventType.location)}`] : [])
+				...locationDetails
 			],
 			note: booking.notes || undefined
 		}),

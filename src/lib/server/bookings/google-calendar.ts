@@ -101,10 +101,11 @@ export async function createCalendarEvent(
 		start: number;
 		end: number;
 		attendeeEmail: string;
+		generateMeet?: boolean;
 	}
-): Promise<string | null> {
+): Promise<{ eventId: string | null; meetLink: string | null }> {
 	const token = await getValidToken(userId);
-	if (!token) return null;
+	if (!token) return { eventId: null, meetLink: null };
 
 	const [integration] = await db
 		.select({ calendarId: calendarIntegrations.calendarId })
@@ -113,29 +114,47 @@ export async function createCalendarEvent(
 
 	const calendarId = integration?.calendarId || 'primary';
 
-	const res = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`, {
+	const body: Record<string, unknown> = {
+		summary: event.summary,
+		description: event.description,
+		location: event.location,
+		start: { dateTime: new Date(event.start).toISOString() },
+		end: { dateTime: new Date(event.end).toISOString() },
+		attendees: [{ email: event.attendeeEmail }]
+	};
+
+	if (event.generateMeet) {
+		body.conferenceData = {
+			createRequest: {
+				requestId: `meet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+				conferenceSolutionKey: { type: 'hangoutsMeet' }
+			}
+		};
+	}
+
+	const queryParam = event.generateMeet ? '?conferenceDataVersion=1' : '';
+	const url = `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events${queryParam}`;
+
+	const res = await fetch(url, {
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${token}`,
 			'Content-Type': 'application/json'
 		},
-		body: JSON.stringify({
-			summary: event.summary,
-			description: event.description,
-			location: event.location,
-			start: { dateTime: new Date(event.start).toISOString() },
-			end: { dateTime: new Date(event.end).toISOString() },
-			attendees: [{ email: event.attendeeEmail }]
-		})
+		body: JSON.stringify(body)
 	});
 
 	if (!res.ok) {
 		console.error('[google-calendar] Create event failed:', res.status, await res.text());
-		return null;
+		return { eventId: null, meetLink: null };
 	}
 
 	const data = await res.json();
-	return data.id;
+	const meetLink = data.hangoutLink
+		|| data.conferenceData?.entryPoints?.find((ep: { entryPointType: string; uri: string }) => ep.entryPointType === 'video')?.uri
+		|| null;
+
+	return { eventId: data.id, meetLink };
 }
 
 export async function deleteCalendarEvent(userId: string, eventId: string): Promise<void> {
