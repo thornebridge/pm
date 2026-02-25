@@ -137,11 +137,59 @@
 		}
 	}
 
-	// Sanitize HTML email content
-	function sanitizeHtml(html: string): string {
-		if (typeof window === 'undefined') return '';
-		// Dynamic import to avoid SSR issues
-		return html;
+	// Convert plain text email to presentable HTML
+	function plainTextToHtml(text: string): string {
+		// Escape HTML entities
+		let escaped = text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+
+		// Convert URLs to clickable links with truncated display text
+		escaped = escaped.replace(
+			/(?:&lt;)?(https?:\/\/[^\s&<>")\]]+)(?:&gt;)?/g,
+			(_match, url: string) => {
+				let display = url;
+				try {
+					const u = new URL(url);
+					display = u.hostname + (u.pathname.length > 30 ? u.pathname.slice(0, 30) + '...' : u.pathname);
+				} catch { /* keep full url as display */ }
+				return `<a href="${url}" target="_blank" rel="noopener noreferrer">${display}</a>`;
+			}
+		);
+
+		// Convert email addresses to mailto links
+		escaped = escaped.replace(
+			/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g,
+			'<a href="mailto:$1">$1</a>'
+		);
+
+		// Handle quoted lines (lines starting with >)
+		const lines = escaped.split('\n');
+		const result: string[] = [];
+		let inQuote = false;
+
+		for (const line of lines) {
+			const isQuotedLine = /^(&gt;\s*)+/.test(line);
+			if (isQuotedLine && !inQuote) {
+				result.push('<blockquote class="email-quote">');
+				inQuote = true;
+			} else if (!isQuotedLine && inQuote) {
+				result.push('</blockquote>');
+				inQuote = false;
+			}
+
+			if (isQuotedLine) {
+				result.push(line.replace(/^(&gt;\s*)+/, '') + '<br>');
+			} else if (line.trim() === '') {
+				result.push('<br>');
+			} else {
+				result.push(line + '<br>');
+			}
+		}
+		if (inQuote) result.push('</blockquote>');
+
+		return result.join('\n');
 	}
 
 	let sanitizedBodies = $state<Map<string, string>>(new Map());
@@ -154,10 +202,19 @@
 				map.set(msg.id, DOMPurify.sanitize(msg.bodyHtml, {
 					ALLOWED_TAGS: ['a', 'b', 'i', 'u', 'em', 'strong', 'p', 'br', 'div', 'span', 'ul', 'ol', 'li',
 						'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code', 'table', 'thead',
-						'tbody', 'tr', 'td', 'th', 'img', 'hr'],
-					ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'class', 'target', 'width', 'height'],
+						'tbody', 'tr', 'td', 'th', 'img', 'hr', 'caption', 'col', 'colgroup', 'center',
+						'abbr', 'address', 'cite', 'dd', 'dl', 'dt', 'figure', 'figcaption', 'small', 'sub', 'sup'],
+					ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'class', 'target', 'width', 'height',
+						'colspan', 'rowspan', 'align', 'valign', 'bgcolor', 'border', 'cellpadding', 'cellspacing',
+						'dir', 'title', 'role', 'scope'],
 					ADD_ATTR: ['target'],
 					FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input']
+				}));
+			} else if (msg.bodyText) {
+				// Convert plain text to rich HTML
+				map.set(msg.id, DOMPurify.sanitize(plainTextToHtml(msg.bodyText), {
+					ALLOWED_TAGS: ['a', 'br', 'blockquote', 'div', 'span'],
+					ALLOWED_ATTR: ['href', 'target', 'rel', 'class']
 				}));
 			}
 		}
@@ -247,13 +304,11 @@
 				<!-- Message body -->
 				<div class="px-4 py-3">
 					{#if sanitizedBodies.get(msg.id)}
-						<div class="email-body prose prose-sm max-w-none break-words dark:prose-invert">
+						<div class="email-body prose prose-sm max-w-none break-words dark:prose-invert {!msg.bodyHtml ? 'email-body-plaintext' : ''}">
 							{@html sanitizedBodies.get(msg.id)}
 						</div>
-					{:else if msg.bodyText}
-						<pre class="whitespace-pre-wrap text-sm text-surface-700 dark:text-surface-300">{msg.bodyText}</pre>
 					{:else}
-						<p class="text-sm text-surface-500">{msg.snippet || '(empty)'}</p>
+						<p class="text-sm text-surface-500 italic">{msg.snippet || '(No content)'}</p>
 					{/if}
 				</div>
 
@@ -303,17 +358,144 @@
 />
 
 <style>
+	/* Base email body */
+	:global(.email-body) {
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		line-height: 1.6;
+		color: var(--color-surface-800);
+		word-break: break-word;
+		overflow-wrap: break-word;
+	}
+
+	:global(.dark .email-body) {
+		color: var(--color-surface-200);
+	}
+
+	/* Images */
 	:global(.email-body img) {
 		max-width: 100%;
 		height: auto;
+		border-radius: 4px;
 	}
+
+	/* Links */
 	:global(.email-body a) {
 		color: var(--color-brand-500);
+		text-decoration: none;
+		word-break: break-all;
 	}
+
+	:global(.email-body a:hover) {
+		text-decoration: underline;
+	}
+
+	/* Blockquotes / quoted text */
 	:global(.email-body blockquote) {
 		border-left: 3px solid var(--color-surface-300);
 		padding-left: 12px;
+		margin: 8px 0;
 		margin-left: 0;
 		color: var(--color-surface-500);
+	}
+
+	:global(.dark .email-body blockquote) {
+		border-left-color: var(--color-surface-600);
+		color: var(--color-surface-400);
+	}
+
+	:global(.email-body .email-quote) {
+		border-left: 3px solid var(--color-surface-300);
+		padding-left: 12px;
+		margin: 8px 0;
+		color: var(--color-surface-500);
+	}
+
+	:global(.dark .email-body .email-quote) {
+		border-left-color: var(--color-surface-600);
+		color: var(--color-surface-400);
+	}
+
+	/* Tables */
+	:global(.email-body table) {
+		border-collapse: collapse;
+		max-width: 100%;
+		overflow-x: auto;
+		display: block;
+	}
+
+	:global(.email-body td),
+	:global(.email-body th) {
+		padding: 6px 10px;
+		vertical-align: top;
+	}
+
+	:global(.email-body th) {
+		font-weight: 600;
+	}
+
+	/* Headings */
+	:global(.email-body h1) { font-size: 1.4em; margin: 16px 0 8px; font-weight: 600; }
+	:global(.email-body h2) { font-size: 1.2em; margin: 14px 0 6px; font-weight: 600; }
+	:global(.email-body h3) { font-size: 1.1em; margin: 12px 0 4px; font-weight: 600; }
+
+	/* Paragraphs */
+	:global(.email-body p) {
+		margin: 0 0 8px;
+	}
+
+	/* Lists */
+	:global(.email-body ul),
+	:global(.email-body ol) {
+		padding-left: 24px;
+		margin: 4px 0 8px;
+	}
+
+	:global(.email-body li) {
+		margin-bottom: 2px;
+	}
+
+	/* Code */
+	:global(.email-body pre) {
+		background: var(--color-surface-100);
+		border-radius: 6px;
+		padding: 12px;
+		overflow-x: auto;
+		font-size: 0.85em;
+	}
+
+	:global(.dark .email-body pre) {
+		background: var(--color-surface-800);
+	}
+
+	:global(.email-body code) {
+		background: var(--color-surface-100);
+		border-radius: 3px;
+		padding: 1px 4px;
+		font-size: 0.9em;
+	}
+
+	:global(.dark .email-body code) {
+		background: var(--color-surface-800);
+	}
+
+	/* HR */
+	:global(.email-body hr) {
+		border: none;
+		border-top: 1px solid var(--color-surface-200);
+		margin: 16px 0;
+	}
+
+	:global(.dark .email-body hr) {
+		border-top-color: var(--color-surface-700);
+	}
+
+	/* Plain text specific styles */
+	:global(.email-body-plaintext) {
+		font-size: 0.875rem;
+		line-height: 1.7;
+	}
+
+	:global(.email-body-plaintext a) {
+		word-break: break-all;
 	}
 </style>
