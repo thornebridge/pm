@@ -177,8 +177,9 @@ function handleNotification(notification: any) {
 			_audioElement.srcObject = call.remoteStream;
 		}
 
-		// Auto-answer Leg B: if we're expecting a server call and ANY inbound call arrives, answer it
-		if (expectingServerCall && call.direction === 'inbound' && !activeCall && state !== 'hangup' && state !== 'destroy' && state !== 'purge') {
+		// Auto-answer Leg B: if we're expecting a server call, answer it
+		// Note: call.direction is undefined when the call first arrives in TelnyxRTC
+		if (expectingServerCall && !activeCall && state !== 'hangup' && state !== 'destroy' && state !== 'purge' && state !== 'active') {
 			console.log('[Dialer] Auto-answering server Leg B (state:', state, ')');
 			call.answer({ audio: true, video: false });
 			activeCall = call;
