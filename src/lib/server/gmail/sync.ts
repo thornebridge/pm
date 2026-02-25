@@ -259,6 +259,17 @@ async function upsertMessage(userId: string, msg: GmailMessage): Promise<void> {
 	const internalDate = parseInt(msg.internalDate, 10);
 	const isRead = !labelIds.includes('UNREAD');
 
+	// Ensure thread row exists before inserting message (FK constraint)
+	await db.insert(gmailThreads)
+		.values({
+			id: msg.threadId,
+			userId,
+			subject,
+			lastMessageAt: internalDate,
+			syncedAt: now
+		})
+		.onConflictDoNothing();
+
 	// Atomic upsert — avoids race condition between concurrent syncs
 	await db.insert(gmailMessages)
 		.values({
