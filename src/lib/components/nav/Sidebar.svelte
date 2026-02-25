@@ -176,7 +176,7 @@
 	}
 </script>
 
-<aside class="dark fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-surface-800 bg-surface-900 transition-all md:static md:translate-x-0 {open ? 'translate-x-0 w-60' : '-translate-x-full w-60'} {collapsed ? 'md:w-14' : 'md:w-60'}">
+<aside class="pm-sidebar dark fixed inset-y-0 left-0 z-50 flex shrink-0 flex-col border-r border-surface-800 bg-surface-900 transition-all md:static md:translate-x-0 {open ? 'translate-x-0 w-60' : '-translate-x-full w-60'} {collapsed ? 'md:w-14' : 'md:w-60'}">
 	<div class="flex h-12 items-center justify-between px-4">
 		{#if !collapsed}
 			<div class="flex items-center gap-2">
@@ -250,7 +250,7 @@
 					<a
 						href={link.href}
 						onclick={onclose}
-						class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition {isActive(link.href) ? 'bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'} {collapsed ? 'justify-center' : ''}"
+						class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition {isActive(link.href) ? 'pm-sidebar-active bg-surface-800 text-surface-100' : 'text-surface-300 hover:bg-surface-800 hover:text-surface-100'} {collapsed ? 'justify-center' : ''}"
 						title={collapsed ? link.label : undefined}
 					>
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">

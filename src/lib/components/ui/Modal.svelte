@@ -29,7 +29,8 @@
 	>
 		<div class="absolute inset-0 bg-black/40 dark:bg-black/60" transition:fade={{ duration: 150 }}></div>
 		<div
-			class="relative w-full max-w-lg rounded-lg border border-surface-300 bg-surface-50 shadow-xl dark:border-surface-700 dark:bg-surface-900"
+			class="relative w-full max-w-lg border border-surface-300 bg-surface-50 shadow-xl dark:border-surface-700 dark:bg-surface-900"
+			style="border-radius: var(--pm-r-lg);"
 			role="dialog"
 			aria-modal="true"
 			transition:scale={{ start: 0.95, duration: 150 }}

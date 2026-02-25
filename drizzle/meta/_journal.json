@@ -36,6 +36,13 @@
       "when": 1772179200000,
       "tag": "0004_project_logos",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1771981387219,
+      "tag": "0005_new_magus",
+      "breakpoints": true
     }
   ]
 }

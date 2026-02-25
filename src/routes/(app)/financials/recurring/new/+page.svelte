@@ -89,7 +89,7 @@
 				return;
 			}
 
-			const res = await api('/api/financials/recurring', {
+			const res: any = await api('/api/financials/recurring', {
 				method: 'POST',
 				body: JSON.stringify({
 					name: name.trim(),

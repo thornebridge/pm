@@ -143,3 +143,46 @@ html[data-gradient='vivid'] .pm-gradient::before {
 	pointer-events: none;
 	border-radius: inherit;
 }
+
+/* ─── Semantic color defaults (fallbacks when no theme overrides) ─── */
+:root {
+	--color-accent: #8b5cf6;
+	--color-success: #22c55e;
+	--color-warning: #f59e0b;
+	--color-error: #ef4444;
+	--color-info: #3b82f6;
+	--font-heading: var(--font-sans);
+	--font-mono: ui-monospace, SFMono-Regular, monospace;
+	--pm-r-sm: 4px; --pm-r-md: 6px; --pm-r-lg: 8px; --pm-r-xl: 12px; --pm-r-full: 9999px;
+	--pm-d-gap: 0.5rem; --pm-d-pad-x: 0.75rem; --pm-d-pad-y: 0.5rem; --pm-d-pad: 0.75rem;
+	--pm-bw: 1px;
+	--pm-anim-duration: 150ms; --pm-anim-transition: 150ms ease;
+}
+
+/* ─── Radius Scale ─── */
+html[data-radius='none'] { --pm-r-sm: 0; --pm-r-md: 0; --pm-r-lg: 0; --pm-r-xl: 0; --pm-r-full: 0; }
+html[data-radius='small'] { --pm-r-sm: 2px; --pm-r-md: 4px; --pm-r-lg: 6px; --pm-r-xl: 8px; --pm-r-full: 9999px; }
+html[data-radius='medium'] { --pm-r-sm: 4px; --pm-r-md: 6px; --pm-r-lg: 8px; --pm-r-xl: 12px; --pm-r-full: 9999px; }
+html[data-radius='large'] { --pm-r-sm: 6px; --pm-r-md: 10px; --pm-r-lg: 14px; --pm-r-xl: 20px; --pm-r-full: 9999px; }
+html[data-radius='pill'] { --pm-r-sm: 9999px; --pm-r-md: 9999px; --pm-r-lg: 9999px; --pm-r-xl: 9999px; --pm-r-full: 9999px; }
+
+/* ─── Density ─── */
+html[data-density='compact'] { --pm-d-gap: 0.25rem; --pm-d-pad-x: 0.375rem; --pm-d-pad-y: 0.25rem; --pm-d-pad: 0.5rem; }
+html[data-density='comfortable'] { --pm-d-gap: 0.5rem; --pm-d-pad-x: 0.75rem; --pm-d-pad-y: 0.5rem; --pm-d-pad: 0.75rem; }
+html[data-density='spacious'] { --pm-d-gap: 0.75rem; --pm-d-pad-x: 1rem; --pm-d-pad-y: 0.75rem; --pm-d-pad: 1rem; }
+
+/* ─── Border Width ─── */
+html[data-border-width='none'] { --pm-bw: 0px; }
+html[data-border-width='thin'] { --pm-bw: 0.5px; }
+html[data-border-width='default'] { --pm-bw: 1px; }
+html[data-border-width='thick'] { --pm-bw: 2px; }
+
+/* ─── Sidebar Style ─── */
+html[data-sidebar-style='transparent'] .pm-sidebar { background: transparent; border-right-color: transparent; }
+html[data-sidebar-style='accent'] .pm-sidebar { background-color: var(--color-brand-900); border-right-color: var(--color-brand-800); }
+html[data-sidebar-style='accent'] .pm-sidebar .pm-sidebar-active { background-color: var(--color-brand-700); }
+
+/* ─── Animation ─── */
+html[data-animation='none'] { --pm-anim-duration: 0ms; --pm-anim-transition: none; }
+html[data-animation='subtle'] { --pm-anim-duration: 150ms; --pm-anim-transition: 150ms ease; }
+html[data-animation='smooth'] { --pm-anim-duration: 300ms; --pm-anim-transition: 300ms cubic-bezier(0.4, 0, 0.2, 1); }

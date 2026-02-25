@@ -142,7 +142,7 @@
 					<h1 class="text-sm font-semibold text-surface-900 dark:text-surface-100">Email</h1>
 					<div class="flex gap-1">
 						<button
-							onclick={triggerSync}
+							onclick={() => triggerSync()}
 							disabled={syncing}
 							title="Sync"
 							class="rounded p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700 dark:hover:bg-surface-800 dark:hover:text-surface-200 disabled:opacity-50"

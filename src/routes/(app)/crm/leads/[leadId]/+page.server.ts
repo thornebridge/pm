@@ -5,6 +5,7 @@ import {
 	crmLeads,
 	crmLeadStatuses,
 	crmActivities,
+	crmTasks,
 	crmCompanies,
 	crmContacts,
 	crmOpportunities,
@@ -12,7 +13,9 @@ import {
 } from '$lib/server/db/schema.js';
 import { eq, desc } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ params }) => {
+export const load: PageServerLoad = async ({ params, parent }) => {
+	const parentData = await parent();
+
 	const [lead] = await db.select().from(crmLeads).where(eq(crmLeads.id, params.leadId));
 	if (!lead) throw error(404, 'Lead not found');
 
@@ -35,7 +38,22 @@ export const load: PageServerLoad = async ({ params }) => {
 		.innerJoin(users, eq(crmActivities.userId, users.id))
 		.where(eq(crmActivities.leadId, params.leadId))
 		.orderBy(desc(crmActivities.createdAt))
-		.limit(20);
+		.limit(50);
+
+	const tasks = await db
+		.select({
+			id: crmTasks.id,
+			title: crmTasks.title,
+			description: crmTasks.description,
+			dueDate: crmTasks.dueDate,
+			completedAt: crmTasks.completedAt,
+			priority: crmTasks.priority,
+			assigneeName: users.name
+		})
+		.from(crmTasks)
+		.leftJoin(users, eq(crmTasks.assigneeId, users.id))
+		.where(eq(crmTasks.leadId, params.leadId))
+		.orderBy(desc(crmTasks.createdAt));
 
 	// If converted, load linked entities
 	let convertedCompany = null;
@@ -54,5 +72,15 @@ export const load: PageServerLoad = async ({ params }) => {
 		}
 	}
 
-	return { lead, status, owner, activities, convertedCompany, convertedContact, convertedOpportunity };
+	return {
+		lead,
+		status,
+		owner,
+		activities,
+		tasks,
+		convertedCompany,
+		convertedContact,
+		convertedOpportunity,
+		telnyxEnabled: parentData.telnyxEnabled
+	};
 };

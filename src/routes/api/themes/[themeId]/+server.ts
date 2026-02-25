@@ -5,6 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { userThemes, users } from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { getBuiltinTheme } from '$lib/server/theme/builtins.js';
+import { validateTheme, themeToVariables } from '$lib/server/theme/parser.js';
 
 /** GET — export a theme's .pmtheme source */
 export const GET: RequestHandler = async (event) => {
@@ -27,6 +28,51 @@ export const GET: RequestHandler = async (event) => {
 	}
 
 	return json({ source: theme.source });
+};
+
+/** PUT — update a custom theme */
+export const PUT: RequestHandler = async (event) => {
+	const user = requireAuth(event);
+	const { themeId } = event.params;
+	const body = await event.request.json();
+
+	// Can't update builtins
+	if (getBuiltinTheme(themeId)) {
+		return json({ error: 'Cannot update built-in theme' }, { status: 400 });
+	}
+
+	if (!body.source || typeof body.source !== 'string') {
+		return json({ error: 'Missing .pmtheme source' }, { status: 400 });
+	}
+
+	const result = validateTheme(body.source);
+	if (!result.valid || !result.theme) {
+		return json({ error: 'Invalid theme', details: result.errors }, { status: 400 });
+	}
+
+	// Verify ownership
+	const [existing] = await db
+		.select()
+		.from(userThemes)
+		.where(and(eq(userThemes.id, themeId), eq(userThemes.userId, user.id)));
+
+	if (!existing) {
+		return json({ error: 'Theme not found' }, { status: 404 });
+	}
+
+	const variables = themeToVariables(result.theme);
+
+	await db.update(userThemes)
+		.set({
+			name: result.theme.name,
+			description: result.theme.description || '',
+			source: body.source,
+			variables: JSON.stringify(variables),
+			updatedAt: Date.now()
+		})
+		.where(eq(userThemes.id, themeId));
+
+	return json({ id: themeId, name: result.theme.name, variables, builtin: false });
 };
 
 /** DELETE — remove a custom theme */

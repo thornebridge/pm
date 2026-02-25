@@ -12,9 +12,10 @@
 		prefilledCompanyId?: string;
 		prefilledContactId?: string;
 		prefilledOpportunityId?: string;
+		prefilledLeadId?: string;
 	}
 
-	let { open, onclose, companies, members, prefilledCompanyId, prefilledContactId, prefilledOpportunityId }: Props = $props();
+	let { open, onclose, companies, members, prefilledCompanyId, prefilledContactId, prefilledOpportunityId, prefilledLeadId }: Props = $props();
 
 	let type = $state<'call' | 'email' | 'meeting' | 'note'>('note');
 	let subject = $state('');
@@ -49,6 +50,7 @@
 				companyId: companyId || null,
 				contactId: prefilledContactId || null,
 				opportunityId: prefilledOpportunityId || null,
+				leadId: prefilledLeadId || null,
 				durationMinutes: durationMinutes ? parseInt(durationMinutes) : null
 			};
 

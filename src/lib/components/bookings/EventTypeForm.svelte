@@ -149,8 +149,7 @@
 	async function loadEventTypeSchedules(id: string) {
 		loadingSchedules = true;
 		try {
-			const res = await api(`/api/bookings/event-types/${id}`);
-			const data = await res.json();
+			const data: any = await api(`/api/bookings/event-types/${id}`);
 			if (data.schedules?.length > 0) {
 				schedules = DAY_NAMES.map((_, i) => {
 					const s = data.schedules.find((s: Schedule) => s.dayOfWeek === i);
@@ -178,8 +177,7 @@
 	async function loadCustomFields(id: string) {
 		loadingFields = true;
 		try {
-			const res = await api(`/api/bookings/event-types/${id}/fields`);
-			const data = await res.json();
+			const data: any = await api(`/api/bookings/event-types/${id}/fields`);
 			customFields = (data.fields || []).map((f: CustomField & { id?: string }) => ({
 				id: f.id,
 				label: f.label || '',
@@ -264,11 +262,10 @@
 					body: JSON.stringify(payload)
 				});
 			} else {
-				const res = await api('/api/bookings/event-types', {
+				const data: any = await api('/api/bookings/event-types', {
 					method: 'POST',
 					body: JSON.stringify(payload)
 				});
-				const data = await res.json();
 				eventId = data.id;
 			}
 

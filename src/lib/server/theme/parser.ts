@@ -11,17 +11,34 @@ export type ThemeTexture = 'none' | 'grid' | 'dots';
 export type ThemeCardStyle = 'rounded' | 'square';
 export type ThemeDepthStyle = 'shadow' | 'flat' | 'glass';
 export type ThemeGradient = 'none' | 'subtle' | 'vivid';
+export type ThemeRadius = 'none' | 'small' | 'medium' | 'large' | 'pill';
+export type ThemeDensity = 'compact' | 'comfortable' | 'spacious';
+export type ThemeSidebarStyle = 'default' | 'transparent' | 'accent';
+export type ThemeBorderWidth = 'none' | 'thin' | 'default' | 'thick';
+export type ThemeAnimation = 'none' | 'subtle' | 'smooth';
 
 export interface ParsedTheme {
 	name: string;
 	description: string;
 	colors: Record<string, string>;
 	font?: string;
+	headingFont?: string;
+	monoFont?: string;
 	mode?: 'dark' | 'light';
 	texture?: ThemeTexture;
 	cardStyle?: ThemeCardStyle;
 	depthStyle?: ThemeDepthStyle;
 	gradient?: ThemeGradient;
+	accent?: string;
+	success?: string;
+	warning?: string;
+	error?: string;
+	info?: string;
+	radius?: ThemeRadius;
+	density?: ThemeDensity;
+	sidebarStyle?: ThemeSidebarStyle;
+	borderWidth?: ThemeBorderWidth;
+	animation?: ThemeAnimation;
 }
 
 export interface ThemeValidationResult {
@@ -60,16 +77,33 @@ export function parsePmTheme(source: string): ParsedTheme {
 	// Extract key-value pairs from ```pmtheme fenced blocks
 	const colors: Record<string, string> = {};
 	let font: string | undefined;
+	let headingFont: string | undefined;
+	let monoFont: string | undefined;
 	let mode: 'dark' | 'light' | undefined;
 	let texture: ThemeTexture | undefined;
 	let cardStyle: ThemeCardStyle | undefined;
 	let depthStyle: ThemeDepthStyle | undefined;
 	let gradient: ThemeGradient | undefined;
+	let accent: string | undefined;
+	let success: string | undefined;
+	let warning: string | undefined;
+	let error: string | undefined;
+	let info: string | undefined;
+	let radius: ThemeRadius | undefined;
+	let density: ThemeDensity | undefined;
+	let sidebarStyle: ThemeSidebarStyle | undefined;
+	let borderWidth: ThemeBorderWidth | undefined;
+	let animation: ThemeAnimation | undefined;
 
 	const TEXTURES: ThemeTexture[] = ['none', 'grid', 'dots'];
 	const CARD_STYLES: ThemeCardStyle[] = ['rounded', 'square'];
 	const DEPTH_STYLES: ThemeDepthStyle[] = ['shadow', 'flat', 'glass'];
 	const GRADIENTS: ThemeGradient[] = ['none', 'subtle', 'vivid'];
+	const RADII: ThemeRadius[] = ['none', 'small', 'medium', 'large', 'pill'];
+	const DENSITIES: ThemeDensity[] = ['compact', 'comfortable', 'spacious'];
+	const SIDEBAR_STYLES: ThemeSidebarStyle[] = ['default', 'transparent', 'accent'];
+	const BORDER_WIDTHS: ThemeBorderWidth[] = ['none', 'thin', 'default', 'thick'];
+	const ANIMATIONS: ThemeAnimation[] = ['none', 'subtle', 'smooth'];
 
 	const blockRegex = /```pmtheme\s*\n([\s\S]*?)```/g;
 	let match: RegExpExecArray | null;
@@ -88,6 +122,10 @@ export function parsePmTheme(source: string): ParsedTheme {
 
 			if (key === 'font') {
 				font = value;
+			} else if (key === 'heading-font') {
+				headingFont = value;
+			} else if (key === 'mono-font') {
+				monoFont = value;
 			} else if (key === 'mode' && (value === 'dark' || value === 'light')) {
 				mode = value;
 			} else if (key === 'texture' && TEXTURES.includes(value as ThemeTexture)) {
@@ -98,13 +136,38 @@ export function parsePmTheme(source: string): ParsedTheme {
 				depthStyle = value as ThemeDepthStyle;
 			} else if (key === 'gradient' && GRADIENTS.includes(value as ThemeGradient)) {
 				gradient = value as ThemeGradient;
+			} else if (key === 'accent' && HEX_PATTERN.test(value)) {
+				accent = value;
+			} else if (key === 'success' && HEX_PATTERN.test(value)) {
+				success = value;
+			} else if (key === 'warning' && HEX_PATTERN.test(value)) {
+				warning = value;
+			} else if (key === 'error' && HEX_PATTERN.test(value)) {
+				error = value;
+			} else if (key === 'info' && HEX_PATTERN.test(value)) {
+				info = value;
+			} else if (key === 'radius' && RADII.includes(value as ThemeRadius)) {
+				radius = value as ThemeRadius;
+			} else if (key === 'density' && DENSITIES.includes(value as ThemeDensity)) {
+				density = value as ThemeDensity;
+			} else if (key === 'sidebar-style' && SIDEBAR_STYLES.includes(value as ThemeSidebarStyle)) {
+				sidebarStyle = value as ThemeSidebarStyle;
+			} else if (key === 'border-width' && BORDER_WIDTHS.includes(value as ThemeBorderWidth)) {
+				borderWidth = value as ThemeBorderWidth;
+			} else if (key === 'animation' && ANIMATIONS.includes(value as ThemeAnimation)) {
+				animation = value as ThemeAnimation;
 			} else if (key.startsWith('brand-') || key.startsWith('surface-')) {
 				colors[key] = value;
 			}
 		}
 	}
 
-	return { name, description, colors, font, mode, texture, cardStyle, depthStyle, gradient };
+	return {
+		name, description, colors, font, headingFont, monoFont, mode,
+		texture, cardStyle, depthStyle, gradient,
+		accent, success, warning, error, info,
+		radius, density, sidebarStyle, borderWidth, animation
+	};
 }
 
 /**
@@ -142,6 +205,20 @@ export function validateTheme(source: string): ThemeValidationResult {
 	if (theme.font && theme.font.length > 200) {
 		errors.push('Font value too long (max 200 chars)');
 	}
+	if (theme.headingFont && theme.headingFont.length > 200) {
+		errors.push('Heading font value too long (max 200 chars)');
+	}
+	if (theme.monoFont && theme.monoFont.length > 200) {
+		errors.push('Mono font value too long (max 200 chars)');
+	}
+
+	// Validate semantic color hex values
+	const semanticKeys = ['accent', 'success', 'warning', 'error', 'info'] as const;
+	for (const key of semanticKeys) {
+		if (theme[key] && !HEX_PATTERN.test(theme[key]!)) {
+			errors.push(`Invalid hex color for ${key}: ${theme[key]}`);
+		}
+	}
 
 	return {
 		valid: errors.length === 0,
@@ -160,14 +237,26 @@ export function themeToVariables(theme: ParsedTheme): Record<string, string> {
 		vars[`--color-${key}`] = value;
 	}
 
-	if (theme.font) {
-		vars['--font-sans'] = theme.font;
-	}
+	if (theme.font) vars['--font-sans'] = theme.font;
+	if (theme.headingFont) vars['--font-heading'] = theme.headingFont;
+	if (theme.monoFont) vars['--font-mono'] = theme.monoFont;
 
 	if (theme.texture) vars['--pm-texture'] = theme.texture;
 	if (theme.cardStyle) vars['--pm-card-style'] = theme.cardStyle;
 	if (theme.depthStyle) vars['--pm-depth-style'] = theme.depthStyle;
 	if (theme.gradient) vars['--pm-gradient'] = theme.gradient;
+
+	if (theme.accent) vars['--color-accent'] = theme.accent;
+	if (theme.success) vars['--color-success'] = theme.success;
+	if (theme.warning) vars['--color-warning'] = theme.warning;
+	if (theme.error) vars['--color-error'] = theme.error;
+	if (theme.info) vars['--color-info'] = theme.info;
+
+	if (theme.radius) vars['--pm-radius'] = theme.radius;
+	if (theme.density) vars['--pm-density'] = theme.density;
+	if (theme.sidebarStyle) vars['--pm-sidebar-style'] = theme.sidebarStyle;
+	if (theme.borderWidth) vars['--pm-border-width'] = theme.borderWidth;
+	if (theme.animation) vars['--pm-animation'] = theme.animation;
 
 	return vars;
 }

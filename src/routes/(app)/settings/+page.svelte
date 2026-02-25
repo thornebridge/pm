@@ -318,6 +318,16 @@
 									</svg>
 								</button>
 								{#if !theme.builtin}
+									<a
+										href="/settings/theme-builder?edit={theme.id}"
+										onclick={(e) => e.stopPropagation()}
+										class="rounded p-0.5 text-surface-400 hover:bg-surface-200 hover:text-surface-600 dark:hover:bg-surface-700 dark:hover:text-surface-300"
+										title="Edit theme"
+									>
+										<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+										</svg>
+									</a>
 									<button
 										onclick={(e) => { e.stopPropagation(); deleteTheme(theme.id); }}
 										class="rounded p-0.5 text-surface-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
@@ -332,6 +342,19 @@
 						</div>
 					</div>
 				{/each}
+			</div>
+
+			<!-- Build Custom Theme -->
+			<div class="mt-4">
+				<a
+					href="/settings/theme-builder"
+					class="inline-flex items-center gap-1.5 rounded-md border border-brand-600 px-3 py-1.5 text-sm font-medium text-brand-500 hover:bg-brand-600/10"
+				>
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+					</svg>
+					Build Custom Theme
+				</a>
 			</div>
 
 			<!-- Import toggle + format help -->

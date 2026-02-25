@@ -767,6 +767,7 @@ export const crmTasks = pgTable(
 		opportunityId: text('opportunity_id').references(() => crmOpportunities.id, {
 			onDelete: 'set null'
 		}),
+		leadId: text('lead_id').references(() => crmLeads.id, { onDelete: 'set null' }),
 		assigneeId: text('assignee_id').references(() => users.id, { onDelete: 'set null' }),
 		createdBy: text('created_by')
 			.notNull()
@@ -776,7 +777,8 @@ export const crmTasks = pgTable(
 	},
 	(t) => [
 		index('idx_crm_tasks_assignee').on(t.assigneeId, t.completedAt),
-		index('idx_crm_tasks_due').on(t.dueDate)
+		index('idx_crm_tasks_due').on(t.dueDate),
+		index('idx_crm_tasks_lead').on(t.leadId)
 	]
 );
 

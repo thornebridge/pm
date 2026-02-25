@@ -92,6 +92,7 @@ export const POST: RequestHandler = async (event) => {
 		companyId: body.companyId || null,
 		contactId: body.contactId || null,
 		opportunityId: body.opportunityId || null,
+		leadId: body.leadId || null,
 		scheduledAt: body.scheduledAt ?? null,
 		completedAt: body.completedAt ?? null,
 		durationMinutes: body.durationMinutes ?? null,

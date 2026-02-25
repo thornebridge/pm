@@ -6,7 +6,8 @@
 <div class="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
 	{#each $toasts as toast (toast.id)}
 		<div
-			class="pointer-events-auto rounded-md border px-4 py-2 text-sm shadow-lg {toast.type === 'error' ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300' : 'border-surface-300 bg-surface-50 text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-100'}"
+			class="pointer-events-auto text-sm shadow-lg"
+			style="border-radius: var(--pm-r-md); border-width: var(--pm-bw); border-style: solid; {toast.type === 'error' ? 'border-color: var(--color-error); background-color: color-mix(in srgb, var(--color-error) 10%, var(--color-surface-50)); color: var(--color-error);' : 'border-color: var(--color-surface-300); background-color: var(--color-surface-50); color: var(--color-surface-900);'} padding: var(--pm-d-pad-x) var(--pm-d-pad-x);"
 			in:fly={{ y: 20, duration: 200 }}
 			out:fade={{ duration: 100 }}
 		>

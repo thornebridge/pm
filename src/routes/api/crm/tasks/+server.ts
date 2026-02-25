@@ -22,6 +22,7 @@ export const GET: RequestHandler = async (event) => {
 	const companyId = url.searchParams.get('company');
 	const contactId = url.searchParams.get('contact');
 	const opportunityId = url.searchParams.get('opportunity');
+	const leadId = url.searchParams.get('lead');
 	const dueBefore = url.searchParams.get('dueBefore');
 	const dueAfter = url.searchParams.get('dueAfter');
 	const sort = url.searchParams.get('sort') || 'due';
@@ -37,6 +38,7 @@ export const GET: RequestHandler = async (event) => {
 	if (companyId) conditions.push(eq(crmTasks.companyId, companyId));
 	if (contactId) conditions.push(eq(crmTasks.contactId, contactId));
 	if (opportunityId) conditions.push(eq(crmTasks.opportunityId, opportunityId));
+	if (leadId) conditions.push(eq(crmTasks.leadId, leadId));
 	if (dueBefore) conditions.push(lte(crmTasks.dueDate, parseInt(dueBefore)));
 	if (dueAfter) conditions.push(gte(crmTasks.dueDate, parseInt(dueAfter)));
 
@@ -100,6 +102,7 @@ export const POST: RequestHandler = async (event) => {
 		companyId: body.companyId || null,
 		contactId: body.contactId || null,
 		opportunityId: body.opportunityId || null,
+		leadId: body.leadId || null,
 		assigneeId: body.assigneeId || user.id,
 		createdBy: user.id,
 		createdAt: now,

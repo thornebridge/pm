@@ -109,15 +109,13 @@
 				payload.priority = priority;
 			}
 
-			const result = await api(`/api/crm/leads/${lead.id}/convert`, {
+			const data: any = await api(`/api/crm/leads/${lead.id}/convert`, {
 				method: 'POST',
 				body: JSON.stringify(payload)
 			});
 
 			showToast('Lead converted successfully');
 			onclose();
-
-			const data = await result.json();
 			if (data.opportunity?.id) {
 				goto(`/crm/opportunities/${data.opportunity.id}`);
 			} else if (data.company?.id) {

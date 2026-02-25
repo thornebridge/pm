@@ -24,6 +24,7 @@ export const PATCH: RequestHandler = async (event) => {
 		'companyId',
 		'contactId',
 		'opportunityId',
+		'leadId',
 		'assigneeId'
 	];
 	for (const f of fields) {

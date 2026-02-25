@@ -82,6 +82,11 @@
 		html.dataset.cardStyle = vars?.['--pm-card-style'] || 'rounded';
 		html.dataset.depthStyle = vars?.['--pm-depth-style'] || 'shadow';
 		html.dataset.gradient = vars?.['--pm-gradient'] || 'none';
+		html.dataset.radius = vars?.['--pm-radius'] || 'medium';
+		html.dataset.density = vars?.['--pm-density'] || 'comfortable';
+		html.dataset.sidebarStyle = vars?.['--pm-sidebar-style'] || 'default';
+		html.dataset.borderWidth = vars?.['--pm-border-width'] || 'default';
+		html.dataset.animation = vars?.['--pm-animation'] || 'subtle';
 	});
 
 	onMount(() => {
