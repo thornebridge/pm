@@ -23,6 +23,7 @@ import { autoLinkThread } from './auto-link.js';
 import { indexDocument, removeDocument } from '$lib/server/search/meilisearch.js';
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+const syncingUsers = new Set<string>();
 
 export function startGmailSyncPoller(intervalMs = 120_000): void {
 	if (pollInterval) return;
@@ -52,15 +53,18 @@ async function pollAllUsers(): Promise<void> {
 	const integrations = await db.select().from(gmailIntegrations);
 
 	for (const integration of integrations) {
+		// Skip if another sync is already running for this user (e.g. manual sync)
+		if (syncingUsers.has(integration.userId)) continue;
+
 		try {
 			await db.update(gmailIntegrations)
 				.set({ syncStatus: 'syncing', updatedAt: Date.now() })
 				.where(eq(gmailIntegrations.userId, integration.userId));
 
 			if (integration.historyId) {
-				await incrementalSync(integration.userId);
+				await _incrementalSync(integration.userId);
 			} else {
-				await initialSync(integration.userId);
+				await _initialSync(integration.userId);
 			}
 
 			await db.update(gmailIntegrations)
@@ -89,6 +93,21 @@ function classifySyncError(err: unknown): string {
 }
 
 export async function initialSync(userId: string): Promise<void> {
+	// Acquire per-user lock to prevent concurrent syncs
+	if (syncingUsers.has(userId)) {
+		console.log(`[gmail/sync] Skipping initial sync for user ${userId} — already syncing`);
+		return;
+	}
+	syncingUsers.add(userId);
+
+	try {
+		await _initialSync(userId);
+	} finally {
+		syncingUsers.delete(userId);
+	}
+}
+
+async function _initialSync(userId: string): Promise<void> {
 	console.log(`[gmail/sync] Starting initial sync for user ${userId}`);
 
 	// Validate connection before attempting sync
@@ -140,6 +159,20 @@ export async function initialSync(userId: string): Promise<void> {
 }
 
 export async function incrementalSync(userId: string): Promise<void> {
+	if (syncingUsers.has(userId)) {
+		console.log(`[gmail/sync] Skipping incremental sync for user ${userId} — already syncing`);
+		return;
+	}
+	syncingUsers.add(userId);
+
+	try {
+		await _incrementalSync(userId);
+	} finally {
+		syncingUsers.delete(userId);
+	}
+}
+
+async function _incrementalSync(userId: string): Promise<void> {
 	const [integration] = await db.select()
 		.from(gmailIntegrations)
 		.where(eq(gmailIntegrations.userId, userId));
@@ -206,7 +239,7 @@ export async function incrementalSync(userId: string): Promise<void> {
 			await db.update(gmailIntegrations)
 				.set({ historyId: null, updatedAt: Date.now() })
 				.where(eq(gmailIntegrations.userId, userId));
-			await initialSync(userId);
+			await _initialSync(userId);
 		} else {
 			throw err;
 		}
@@ -226,51 +259,48 @@ async function upsertMessage(userId: string, msg: GmailMessage): Promise<void> {
 	const internalDate = parseInt(msg.internalDate, 10);
 	const isRead = !labelIds.includes('UNREAD');
 
-	// Upsert message
-	const [existing] = await db.select({ id: gmailMessages.id }).from(gmailMessages).where(eq(gmailMessages.id, msg.id));
-	if (existing) {
-		await db.update(gmailMessages)
-			.set({
+	// Atomic upsert — avoids race condition between concurrent syncs
+	await db.insert(gmailMessages)
+		.values({
+			id: msg.id,
+			threadId: msg.threadId,
+			userId,
+			fromEmail: from.email,
+			fromName: from.name,
+			toEmails: JSON.stringify(parseEmailList(toRaw)),
+			ccEmails: ccRaw ? JSON.stringify(parseEmailList(ccRaw)) : null,
+			bccEmails: bccRaw ? JSON.stringify(parseEmailList(bccRaw)) : null,
+			subject,
+			bodyHtml: html || null,
+			bodyText: text || null,
+			snippet: msg.snippet,
+			internalDate,
+			labelIds: JSON.stringify(labelIds),
+			isRead,
+			hasAttachments: attachments.length > 0,
+			syncedAt: now
+		})
+		.onConflictDoUpdate({
+			target: gmailMessages.id,
+			set: {
 				labelIds: JSON.stringify(labelIds),
 				isRead,
 				syncedAt: now
-			})
-			.where(eq(gmailMessages.id, msg.id));
-	} else {
-		await db.insert(gmailMessages)
-			.values({
-				id: msg.id,
-				threadId: msg.threadId,
-				userId,
-				fromEmail: from.email,
-				fromName: from.name,
-				toEmails: JSON.stringify(parseEmailList(toRaw)),
-				ccEmails: ccRaw ? JSON.stringify(parseEmailList(ccRaw)) : null,
-				bccEmails: bccRaw ? JSON.stringify(parseEmailList(bccRaw)) : null,
-				subject,
-				bodyHtml: html || null,
-				bodyText: text || null,
-				snippet: msg.snippet,
-				internalDate,
-				labelIds: JSON.stringify(labelIds),
-				isRead,
-				hasAttachments: attachments.length > 0,
-				syncedAt: now
-			});
+			}
+		});
 
-		// Upsert attachments
-		for (const att of attachments) {
-			await db.insert(gmailAttachments)
-				.values({
-					id: nanoid(12),
-					messageId: msg.id,
-					gmailAttachmentId: att.attachmentId,
-					filename: att.filename,
-					mimeType: att.mimeType,
-					size: att.size
-				})
-				.onConflictDoNothing();
-		}
+	// Upsert attachments
+	for (const att of attachments) {
+		await db.insert(gmailAttachments)
+			.values({
+				id: nanoid(12),
+				messageId: msg.id,
+				gmailAttachmentId: att.attachmentId,
+				filename: att.filename,
+				mimeType: att.mimeType,
+				size: att.size
+			})
+			.onConflictDoNothing();
 	}
 
 	// Upsert thread
@@ -299,10 +329,24 @@ async function updateThreadFromMessages(threadId: string, userId: string): Promi
 	const isStarred = allLabelIds.includes('STARRED');
 	const category = determineCategory(uniqueLabels);
 
-	const [existingThread] = await db.select({ id: gmailThreads.id }).from(gmailThreads).where(eq(gmailThreads.id, threadId));
-	if (existingThread) {
-		await db.update(gmailThreads)
-			.set({
+	// Atomic upsert — avoids race condition between concurrent syncs
+	await db.insert(gmailThreads)
+		.values({
+			id: threadId,
+			userId,
+			subject: latest.subject,
+			snippet: latest.snippet,
+			lastMessageAt: latest.internalDate,
+			messageCount: messages.length,
+			isRead,
+			isStarred,
+			labels: JSON.stringify(uniqueLabels),
+			category,
+			syncedAt: now
+		})
+		.onConflictDoUpdate({
+			target: gmailThreads.id,
+			set: {
 				subject: latest.subject,
 				snippet: latest.snippet,
 				lastMessageAt: latest.internalDate,
@@ -312,24 +356,8 @@ async function updateThreadFromMessages(threadId: string, userId: string): Promi
 				labels: JSON.stringify(uniqueLabels),
 				category,
 				syncedAt: now
-			})
-			.where(eq(gmailThreads.id, threadId));
-	} else {
-		await db.insert(gmailThreads)
-			.values({
-				id: threadId,
-				userId,
-				subject: latest.subject,
-				snippet: latest.snippet,
-				lastMessageAt: latest.internalDate,
-				messageCount: messages.length,
-				isRead,
-				isStarred,
-				labels: JSON.stringify(uniqueLabels),
-				category,
-				syncedAt: now
-			});
-	}
+			}
+		});
 
 	// Index for search
 	indexDocument('email_threads', {
