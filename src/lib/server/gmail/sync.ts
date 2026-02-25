@@ -13,7 +13,10 @@ import {
 	extractBody,
 	extractAttachments,
 	determineCategory,
+	validateConnection,
 	HistoryExpiredError,
+	GmailAuthError,
+	GmailApiError,
 	type GmailMessage
 } from './gmail-api.js';
 import { autoLinkThread } from './auto-link.js';
@@ -50,19 +53,49 @@ async function pollAllUsers(): Promise<void> {
 
 	for (const integration of integrations) {
 		try {
+			await db.update(gmailIntegrations)
+				.set({ syncStatus: 'syncing', updatedAt: Date.now() })
+				.where(eq(gmailIntegrations.userId, integration.userId));
+
 			if (integration.historyId) {
 				await incrementalSync(integration.userId);
 			} else {
 				await initialSync(integration.userId);
 			}
+
+			await db.update(gmailIntegrations)
+				.set({ syncStatus: 'ok', syncError: null, updatedAt: Date.now() })
+				.where(eq(gmailIntegrations.userId, integration.userId));
 		} catch (err) {
-			console.error(`[gmail/sync] Failed for user ${integration.userId}:`, err);
+			const errorMsg = classifySyncError(err);
+			console.error(`[gmail/sync] Failed for user ${integration.userId}:`, errorMsg);
+			await db.update(gmailIntegrations)
+				.set({ syncStatus: 'error', syncError: errorMsg, updatedAt: Date.now() })
+				.where(eq(gmailIntegrations.userId, integration.userId));
 		}
 	}
 }
 
+function classifySyncError(err: unknown): string {
+	if (err instanceof GmailAuthError) return err.message;
+	if (err instanceof GmailApiError) return err.message;
+	if (err instanceof Error) {
+		if (err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED')) {
+			return 'Network error connecting to Gmail API. Check your server\'s internet connectivity.';
+		}
+		return err.message;
+	}
+	return 'Unknown sync error';
+}
+
 export async function initialSync(userId: string): Promise<void> {
 	console.log(`[gmail/sync] Starting initial sync for user ${userId}`);
+
+	// Validate connection before attempting sync
+	const validation = await validateConnection(userId);
+	if (!validation.ok) {
+		throw new GmailApiError(validation.error || 'Gmail connection validation failed', 0);
+	}
 
 	const messageRefs = await listMessages(userId, 'newer_than:30d', 500);
 	if (messageRefs.length === 0) {

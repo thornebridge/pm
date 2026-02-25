@@ -19,6 +19,7 @@
 	let selectedThread = $state<any>(null);
 	let showCompose = $state(false);
 	let syncing = $state(false);
+	let syncError = $state<string | null>(data.syncError);
 
 	// Handle OAuth callback messages
 	$effect(() => {
@@ -87,13 +88,17 @@
 
 	async function triggerSync(full = false) {
 		syncing = true;
+		syncError = null;
 		try {
 			const url = full ? '/api/crm/gmail/sync?full=true' : '/api/crm/gmail/sync';
 			await api(url, { method: 'POST' });
 			await loadThreads();
+			syncError = null;
 			showToast(full ? 'Full sync complete' : 'Email synced');
-		} catch {
-			showToast('Sync failed', 'error');
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : 'Sync failed';
+			syncError = msg;
+			showToast(msg, 'error');
 		} finally {
 			syncing = false;
 		}
@@ -134,7 +139,38 @@
 		<GmailConnectCard />
 	</div>
 {:else}
-	<div class="flex h-full">
+	<div class="flex h-full flex-col">
+	{#if syncError}
+		<div class="shrink-0 border-b border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/30">
+			<div class="flex items-start gap-3">
+				<svg xmlns="http://www.w3.org/2000/svg" class="mt-0.5 h-5 w-5 shrink-0 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+					<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+				</svg>
+				<div class="flex-1 min-w-0">
+					<p class="text-sm font-medium text-red-800 dark:text-red-300">Gmail sync error</p>
+					<p class="mt-0.5 text-xs text-red-700 dark:text-red-400">{syncError}</p>
+				</div>
+				<div class="flex shrink-0 gap-2">
+					<button
+						onclick={() => triggerSync(true)}
+						disabled={syncing}
+						class="rounded-md bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900/70 disabled:opacity-50"
+					>
+						{syncing ? 'Retrying...' : 'Retry full sync'}
+					</button>
+					<button
+						onclick={() => (syncError = null)}
+						class="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+	<div class="flex flex-1 min-h-0">
 		<!-- Left sidebar: categories + search -->
 		<div class="flex w-56 shrink-0 flex-col border-r border-surface-300 dark:border-surface-800 {selectedThreadId ? 'hidden md:flex' : ''}">
 			<div class="border-b border-surface-300 p-3 dark:border-surface-800">
@@ -239,6 +275,7 @@
 				<p class="text-sm text-surface-500">Select a conversation to read</p>
 			</div>
 		{/if}
+	</div>
 	</div>
 {/if}
 

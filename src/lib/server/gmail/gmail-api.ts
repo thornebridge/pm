@@ -37,23 +37,109 @@ export async function getValidGmailToken(userId: string): Promise<string | null>
 	return integration.accessToken;
 }
 
+export class GmailAuthError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'GmailAuthError';
+	}
+}
+
+export class GmailApiError extends Error {
+	status: number;
+	constructor(message: string, status: number) {
+		super(message);
+		this.name = 'GmailApiError';
+		this.status = status;
+	}
+}
+
 export async function gmailFetch(
 	userId: string,
 	path: string,
 	options: RequestInit = {}
 ): Promise<Response> {
 	const token = await getValidGmailToken(userId);
-	if (!token) throw new Error('Gmail not connected or token invalid');
+	if (!token) throw new GmailAuthError('Gmail token expired or refresh failed. Try disconnecting and reconnecting Gmail.');
 
 	const headers = new Headers(options.headers);
 	headers.set('Authorization', `Bearer ${token}`);
 
-	return fetch(`${GMAIL_API}${path}`, { ...options, headers });
+	const res = await fetch(`${GMAIL_API}${path}`, { ...options, headers });
+
+	// Detect common API errors and provide actionable messages
+	if (res.status === 403) {
+		const body = await res.json().catch(() => ({}));
+		const reason = body?.error?.errors?.[0]?.reason || '';
+		const msg = body?.error?.message || '';
+		if (reason === 'accessNotConfigured' || msg.includes('has not been used') || msg.includes('is not enabled')) {
+			throw new GmailApiError(
+				'Gmail API is not enabled. Go to Google Cloud Console → APIs & Services → Enable "Gmail API".',
+				403
+			);
+		}
+		if (reason === 'insufficientPermissions' || msg.includes('Insufficient Permission')) {
+			throw new GmailApiError(
+				'Insufficient Gmail permissions. Disconnect and reconnect Gmail to re-authorize with the required scopes.',
+				403
+			);
+		}
+		throw new GmailApiError(`Gmail API access denied: ${msg || reason || 'Unknown 403 error'}`, 403);
+	}
+
+	if (res.status === 401) {
+		throw new GmailAuthError('Gmail authentication failed. Token may be revoked. Try disconnecting and reconnecting Gmail.');
+	}
+
+	return res;
+}
+
+/**
+ * Validate that the Gmail integration is working (token is valid, API is accessible).
+ * Returns { ok: true } or { ok: false, error: string } with an actionable message.
+ */
+export async function validateConnection(userId: string): Promise<{ ok: boolean; error?: string }> {
+	try {
+		const token = await getValidGmailToken(userId);
+		if (!token) {
+			return { ok: false, error: 'Gmail token expired or refresh failed. Try disconnecting and reconnecting Gmail.' };
+		}
+
+		const headers = new Headers();
+		headers.set('Authorization', `Bearer ${token}`);
+		const res = await fetch(`${GMAIL_API}/profile`, { headers });
+
+		if (res.status === 401) {
+			return { ok: false, error: 'Gmail authentication failed. Token may be revoked. Disconnect and reconnect Gmail.' };
+		}
+		if (res.status === 403) {
+			const body = await res.json().catch(() => ({}));
+			const msg = body?.error?.message || '';
+			if (msg.includes('has not been used') || msg.includes('is not enabled')) {
+				return { ok: false, error: 'Gmail API is not enabled in your Google Cloud project. Enable it at: Google Cloud Console → APIs & Services → Library → Gmail API.' };
+			}
+			if (msg.includes('Insufficient Permission')) {
+				return { ok: false, error: 'Insufficient Gmail permissions. Disconnect and reconnect Gmail to grant the required scopes.' };
+			}
+			return { ok: false, error: `Gmail API access denied: ${msg}` };
+		}
+		if (!res.ok) {
+			return { ok: false, error: `Gmail API returned HTTP ${res.status}. Check your Google Cloud project configuration.` };
+		}
+
+		return { ok: true };
+	} catch (err) {
+		if (err instanceof GmailAuthError) return { ok: false, error: err.message };
+		if (err instanceof GmailApiError) return { ok: false, error: err.message };
+		return { ok: false, error: `Connection test failed: ${err instanceof Error ? err.message : 'Unknown error'}` };
+	}
 }
 
 export async function getProfile(userId: string): Promise<{ email: string; historyId: string }> {
 	const res = await gmailFetch(userId, '/profile');
-	if (!res.ok) throw new Error(`Gmail profile fetch failed (${res.status})`);
+	if (!res.ok) {
+		const body = await res.text().catch(() => '');
+		throw new GmailApiError(`Gmail profile fetch failed (${res.status}): ${body}`, res.status);
+	}
 	const data = await res.json();
 	return { email: data.emailAddress, historyId: data.historyId };
 }
@@ -74,7 +160,10 @@ export async function listMessages(
 	do {
 		if (pageToken) params.set('pageToken', pageToken);
 		const res = await gmailFetch(userId, `/messages?${params}`);
-		if (!res.ok) throw new Error(`Gmail listMessages failed (${res.status})`);
+		if (!res.ok) {
+			const body = await res.text().catch(() => '');
+			throw new GmailApiError(`Gmail listMessages failed (${res.status}): ${body}`, res.status);
+		}
 		const data = await res.json();
 		if (data.messages) all.push(...data.messages);
 		pageToken = data.nextPageToken;
@@ -88,7 +177,7 @@ export async function getMessage(
 	messageId: string
 ): Promise<GmailMessage> {
 	const res = await gmailFetch(userId, `/messages/${messageId}?format=full`);
-	if (!res.ok) throw new Error(`Gmail getMessage failed (${res.status})`);
+	if (!res.ok) throw new GmailApiError(`Gmail getMessage failed (${res.status})`, res.status);
 	return res.json();
 }
 
@@ -114,7 +203,7 @@ export async function listHistory(
 			// historyId expired — caller should do full re-sync
 			throw new HistoryExpiredError();
 		}
-		if (!res.ok) throw new Error(`Gmail listHistory failed (${res.status})`);
+		if (!res.ok) throw new GmailApiError(`Gmail listHistory failed (${res.status})`, res.status);
 
 		const data = await res.json();
 		if (data.history) allHistory.push(...data.history);

@@ -5,7 +5,7 @@ import { db } from '$lib/server/db/index.js';
 import { gmailIntegrations } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { getGoogleConfig, exchangeCodeForTokens } from '$lib/server/google-auth.js';
-import { getProfile } from '$lib/server/gmail/gmail-api.js';
+import { getProfile, validateConnection } from '$lib/server/gmail/gmail-api.js';
 import { nanoid } from 'nanoid';
 
 export const GET: RequestHandler = async (event) => {
@@ -54,6 +54,7 @@ export const GET: RequestHandler = async (event) => {
 			accessToken: tokens.accessToken,
 			refreshToken: tokens.refreshToken,
 			tokenExpiry: now + tokens.expiresIn * 1000,
+			syncStatus: 'idle',
 			createdAt: now,
 			updatedAt: now
 		});
@@ -69,6 +70,16 @@ export const GET: RequestHandler = async (event) => {
 			.where(eq(gmailIntegrations.userId, user.id));
 	} catch (err) {
 		console.error('[gmail] Failed to fetch profile:', err);
+	}
+
+	// Validate that the connection actually works before reporting success
+	const validation = await validateConnection(user.id);
+	if (!validation.ok) {
+		console.error('[gmail] Connection validation failed after OAuth:', validation.error);
+		await db.update(gmailIntegrations)
+			.set({ syncStatus: 'error', syncError: validation.error || 'Connection validation failed', updatedAt: Date.now() })
+			.where(eq(gmailIntegrations.userId, user.id));
+		// Still redirect to success — the UI will show the error banner
 	}
 
 	redirect(302, '/crm/email?success=gmail_connected');

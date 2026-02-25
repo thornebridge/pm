@@ -1462,6 +1462,10 @@ export const gmailIntegrations = pgTable('gmail_integrations', {
 	tokenExpiry: bigint('token_expiry', { mode: 'number' }).notNull(),
 	historyId: text('history_id'),
 	lastSyncAt: bigint('last_sync_at', { mode: 'number' }),
+	syncStatus: text('sync_status', {
+		enum: ['idle', 'syncing', 'error', 'ok']
+	}).notNull().default('idle'),
+	syncError: text('sync_error'),
 	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
 });

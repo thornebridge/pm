@@ -43,6 +43,13 @@
       "when": 1771981387219,
       "tag": "0005_new_magus",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771984788498,
+      "tag": "0006_nice_forgotten_one",
+      "breakpoints": true
     }
   ]
 }
