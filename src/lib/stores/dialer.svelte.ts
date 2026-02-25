@@ -167,42 +167,39 @@ function handleNotification(notification: any) {
 	const type = notification?.type;
 	const call = notification?.call;
 
+	console.log('[Dialer] notification:', type, 'state:', call?.state, 'dir:', call?.direction, 'expecting:', expectingServerCall);
+
 	if (type === 'callUpdate' && call) {
 		const state = call.state;
-		console.log('[Dialer] callUpdate:', state, call.cause || '', call.causeCode || '');
 
 		// Attach remote stream to audio element
 		if (_audioElement && call.remoteStream) {
 			_audioElement.srcObject = call.remoteStream;
 		}
 
+		// Auto-answer Leg B: if we're expecting a server call and ANY inbound call arrives, answer it
+		if (expectingServerCall && call.direction === 'inbound' && !activeCall && state !== 'hangup' && state !== 'destroy' && state !== 'purge') {
+			console.log('[Dialer] Auto-answering server Leg B (state:', state, ')');
+			call.answer({ audio: true, video: false });
+			activeCall = call;
+			_clearSipTimeout();
+			_startRingback();
+			return;
+		}
+
 		switch (state) {
 			case 'new':
 			case 'trying':
 			case 'requesting':
-				if (call.direction === 'inbound' && expectingServerCall) {
-					// This is Leg B from our server — auto-answer
-					console.log('[Dialer] Auto-answering server Leg B');
-					call.answer({ audio: true, video: false });
-					activeCall = call;
-					_clearSipTimeout();
-					_startRingback();
-				} else if (call.direction === 'inbound' && callState === 'idle') {
-					// Genuine inbound call
+				if (call.direction === 'inbound' && callState === 'idle') {
+					// Genuine inbound call (not server-initiated)
 					handleIncomingCall(call);
 				}
 				break;
 
 			case 'ringing':
 			case 'early':
-				if (call.direction === 'inbound' && expectingServerCall) {
-					// Leg B ringing — auto-answer
-					console.log('[Dialer] Auto-answering server Leg B (ringing)');
-					call.answer({ audio: true, video: false });
-					activeCall = call;
-					_clearSipTimeout();
-					_startRingback();
-				} else if (call.direction === 'inbound' && callState === 'idle') {
+				if (call.direction === 'inbound' && callState === 'idle') {
 					handleIncomingCall(call);
 				}
 				break;
