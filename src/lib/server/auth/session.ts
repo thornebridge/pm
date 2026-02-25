@@ -4,6 +4,7 @@ import { eq, and, gt } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import type { Cookies } from '@sveltejs/kit';
 import { getRedis, isRedisConnected } from '../redis/index.js';
+import type { Role } from '$lib/config/workspaces';
 
 const SESSION_COOKIE = 'pm_session';
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -16,7 +17,7 @@ function generateSessionId(): string {
 interface SessionData {
 	sessionId: string;
 	expiresAt: number;
-	user: { id: string; email: string; name: string; role: 'admin' | 'member' };
+	user: { id: string; email: string; name: string; role: Role };
 }
 
 export async function createSession(userId: string): Promise<string> {
@@ -43,7 +44,7 @@ export async function createSession(userId: string): Promise<string> {
 				const data: SessionData = {
 					sessionId: id,
 					expiresAt: now + SESSION_MAX_AGE,
-					user: { id: userRow.id, email: userRow.email, name: userRow.name, role: userRow.role as 'admin' | 'member' }
+					user: { id: userRow.id, email: userRow.email, name: userRow.name, role: userRow.role as Role }
 				};
 				await redis.set(`session:${id}`, JSON.stringify(data), 'EX', REDIS_SESSION_TTL).catch(() => {});
 			}
@@ -115,7 +116,7 @@ export async function validateSession(sessionId: string) {
 			id: result.userId,
 			email: result.email,
 			name: result.name,
-			role: result.role as 'admin' | 'member'
+			role: result.role as Role
 		}
 	};
 

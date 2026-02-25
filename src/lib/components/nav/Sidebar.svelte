@@ -5,6 +5,7 @@
 	import NotificationBell from '$lib/components/notifications/NotificationBell.svelte';
 	import Avatar from '$lib/components/ui/Avatar.svelte';
 	import { page } from '$app/state';
+	import { getVisibleModes, type SidebarMode as WorkspaceMode } from '$lib/config/workspaces';
 	interface Props {
 		user: { name: string; role: string } | null;
 		folders: Array<{ id: string; name: string; slug: string; parentId: string | null; color: string | null; position: number }>;
@@ -131,9 +132,20 @@
 	const adminMode: { key: SidebarMode; label: string; icon: string } = { key: 'admin', label: 'Admin', icon: 'M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z' };
 
 	const hasWorkspace = $derived(folders.length > 0 || projects.length > 0);
-	const isAdmin = $derived(user?.role === 'admin');
 
-	const visibleModes = $derived(isAdmin ? [...modes, adminMode] : modes);
+	const allModes = [...modes, adminMode];
+	const visibleModes = $derived.by(() => {
+		if (!user?.role) return modes;
+		const allowed = getVisibleModes(user.role as WorkspaceMode extends string ? any : never);
+		return allModes.filter((m) => allowed.includes(m.key));
+	});
+
+	// Default to the first allowed mode for the user's role
+	const defaultMode = $derived.by((): SidebarMode => {
+		if (!user?.role) return 'ops';
+		const allowed = getVisibleModes(user.role as any);
+		return (allowed[0] as SidebarMode) || 'ops';
+	});
 
 	// Mode state with URL auto-detection
 	let activeMode = $state<SidebarMode>(
@@ -151,8 +163,14 @@
 	$effect(() => {
 		const mode = detectedMode;
 		untrack(() => {
-			activeMode = mode;
-			if (browser) localStorage.setItem('pm-sidebar-mode', mode);
+			// Only switch to modes the user can access
+			const allowed = user?.role ? getVisibleModes(user.role as any) : modes.map((m) => m.key);
+			if (allowed.includes(mode)) {
+				activeMode = mode;
+			} else {
+				activeMode = defaultMode;
+			}
+			if (browser) localStorage.setItem('pm-sidebar-mode', activeMode);
 		});
 	});
 

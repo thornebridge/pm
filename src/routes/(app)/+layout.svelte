@@ -9,6 +9,7 @@
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
 	import QuickCreateTask from '$lib/components/task/QuickCreateTask.svelte';
 	import DialerWidget from '$lib/components/crm/DialerWidget.svelte';
+	import { canAccessRoute, type Role } from '$lib/config/workspaces';
 
 	import { browser } from '$app/environment';
 
@@ -89,22 +90,25 @@
 		html.dataset.animation = vars?.['--pm-animation'] || 'subtle';
 	});
 
+	const userRole = $derived((data.user?.role || 'member') as Role);
+
 	onMount(() => {
 		connectWs();
+		const r = (data.user?.role || 'member') as Role;
 		registerShortcut('?', () => (showShortcuts = !showShortcuts));
-		registerShortcut('p', () => goto('/projects'));
-		registerShortcut('d', () => goto('/dashboard'));
-		registerShortcut('m', () => goto('/my-tasks'));
-		registerShortcut('a', () => goto('/activity'));
+		if (canAccessRoute(r, '/projects')) registerShortcut('p', () => goto('/projects'));
+		if (canAccessRoute(r, '/dashboard')) registerShortcut('d', () => goto('/dashboard'));
+		if (canAccessRoute(r, '/my-tasks')) registerShortcut('m', () => goto('/my-tasks'));
+		if (canAccessRoute(r, '/activity')) registerShortcut('a', () => goto('/activity'));
 		registerShortcut('/', () => (showSearch = true));
-		registerShortcut('n', () => (showQuickCreate = true));
+		if (canAccessRoute(r, '/projects')) registerShortcut('n', () => (showQuickCreate = true));
 		registerShortcut('escape', () => {
 			showShortcuts = false;
 			showSearch = false;
 			showQuickCreate = false;
 		});
 		registerMetaShortcut('k', () => (showSearch = true));
-		registerMetaShortcut('n', () => (showQuickCreate = true));
+		if (canAccessRoute(r, '/projects')) registerMetaShortcut('n', () => (showQuickCreate = true));
 	});
 	onDestroy(() => {
 		disconnectWs();
@@ -175,15 +179,18 @@
 	onclose={() => (showSearch = false)}
 	projectSlug={currentProjectSlug}
 	isAdmin={data.user?.role === 'admin'}
+	userRole={data.user?.role}
 />
 
 <!-- Quick create task -->
-<QuickCreateTask
-	open={showQuickCreate}
-	onclose={() => (showQuickCreate = false)}
-	projects={data.sidebarProjects}
-	currentProjectId={currentProjectId}
-/>
+{#if canAccessRoute(userRole, '/projects')}
+	<QuickCreateTask
+		open={showQuickCreate}
+		onclose={() => (showQuickCreate = false)}
+		projects={data.sidebarProjects}
+		currentProjectId={currentProjectId}
+	/>
+{/if}
 
 <!-- Telnyx dialer widget -->
 {#if data.telnyxEnabled}

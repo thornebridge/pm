@@ -7,6 +7,7 @@ import { db } from '$lib/server/db/index.js';
 import { users } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { ROLE_DEFAULT_ROUTE, type Role } from '$lib/config/workspaces';
 
 export const load: PageServerLoad = async ({ params }) => {
 	const invite = await validateInvite(params.token);
@@ -63,7 +64,7 @@ export const actions: Actions = {
 				email,
 				name,
 				passwordHash: hash,
-				role: invite.role as 'admin' | 'member',
+				role: invite.role as Role,
 				createdAt: now,
 				updatedAt: now
 			});
@@ -73,6 +74,6 @@ export const actions: Actions = {
 		const sessionId = await createSession(userId);
 		setSessionCookie(cookies, sessionId);
 
-		throw redirect(302, '/projects');
+		throw redirect(302, ROLE_DEFAULT_ROUTE[invite.role as Role] || '/dashboard');
 	}
 };

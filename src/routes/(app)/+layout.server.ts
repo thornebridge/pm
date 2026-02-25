@@ -4,25 +4,33 @@ import { db } from '$lib/server/db/index.js';
 import { folders, projects, users, userThemes, orgSettings } from '$lib/server/db/schema.js';
 import { desc, eq, and, sql } from 'drizzle-orm';
 import { getBuiltinTheme, BUILTIN_THEMES } from '$lib/server/theme/builtins.js';
+import { ROLE_MODES } from '$lib/config/workspaces';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) {
 		throw redirect(302, '/login');
 	}
 
-	const allFolders = await db.select().from(folders).orderBy(folders.position);
-	const allProjects = await db
-		.select({
-			id: projects.id,
-			name: projects.name,
-			slug: projects.slug,
-			color: projects.color,
-			folderId: projects.folderId,
-			archived: projects.archived,
-			hasLogo: sql<boolean>`${projects.logoData} is not null`.as('has_logo')
-		})
-		.from(projects)
-		.orderBy(desc(projects.updatedAt));
+	// Skip ops data for roles that don't have ops workspace access
+	const needsOpsData = ROLE_MODES[locals.user.role]?.includes('ops') ?? true;
+
+	const allFolders = needsOpsData
+		? await db.select().from(folders).orderBy(folders.position)
+		: [];
+	const allProjects = needsOpsData
+		? await db
+				.select({
+					id: projects.id,
+					name: projects.name,
+					slug: projects.slug,
+					color: projects.color,
+					folderId: projects.folderId,
+					archived: projects.archived,
+					hasLogo: sql<boolean>`${projects.logoData} is not null`.as('has_logo')
+				})
+				.from(projects)
+				.orderBy(desc(projects.updatedAt))
+		: [];
 
 	// Sidebar only shows non-archived projects
 	const sidebarProjects = allProjects.filter((p) => !p.archived);

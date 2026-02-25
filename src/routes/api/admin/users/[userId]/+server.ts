@@ -4,6 +4,7 @@ import { requireAdmin } from '$lib/server/auth/guard.js';
 import { db } from '$lib/server/db/index.js';
 import { users, sessions } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
+import { ROLES } from '$lib/config/workspaces';
 
 export const PATCH: RequestHandler = async (event) => {
 	const admin = requireAdmin(event);
@@ -20,7 +21,7 @@ export const PATCH: RequestHandler = async (event) => {
 	const updates: Record<string, unknown> = { updatedAt: Date.now() };
 
 	if (body.role !== undefined) {
-		if (!['admin', 'member'].includes(body.role)) {
+		if (!(ROLES as readonly string[]).includes(body.role)) {
 			return json({ error: 'Invalid role' }, { status: 400 });
 		}
 		updates.role = body.role;

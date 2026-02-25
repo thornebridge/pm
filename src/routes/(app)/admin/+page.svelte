@@ -4,6 +4,7 @@
 	import { showToast } from '$lib/stores/toasts.js';
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { ROLES, ROLE_LABELS, type Role } from '$lib/config/workspaces';
 
 	let { data } = $props();
 
@@ -246,7 +247,7 @@
 
 	// Invite state
 	let email = $state('');
-	let role = $state<'member' | 'admin'>('member');
+	let role = $state<Role>('member');
 	let creating = $state(false);
 
 	// Webhook state
@@ -815,8 +816,9 @@
 				bind:value={role}
 				class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1.5 text-sm text-surface-900 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-200"
 			>
-				<option value="member">Member</option>
-				<option value="admin">Admin</option>
+				{#each ROLES as r}
+					<option value={r}>{ROLE_LABELS[r]}</option>
+				{/each}
 			</select>
 			<button type="submit" disabled={creating} class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50">
 				Create invite
@@ -864,8 +866,9 @@
 							disabled={user.id === data.user?.id}
 							class="rounded-md border border-surface-300 bg-surface-50 px-2 py-1 text-xs text-surface-700 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300"
 						>
-							<option value="member">Member</option>
-							<option value="admin">Admin</option>
+							{#each ROLES as r}
+								<option value={r}>{ROLE_LABELS[r]}</option>
+							{/each}
 						</select>
 						{#if user.id !== data.user?.id}
 							<button onclick={() => deleteUser(user.id, user.name)} class="text-xs text-surface-400 hover:text-red-500">Delete</button>

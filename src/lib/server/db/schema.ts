@@ -7,7 +7,7 @@ export const users = pgTable('users', {
 	email: text('email').notNull().unique(),
 	name: text('name').notNull(),
 	passwordHash: text('password_hash').notNull(),
-	role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
+	role: text('role', { enum: ['admin', 'member', 'sales'] }).notNull().default('member'),
 	activeThemeId: text('active_theme_id'),
 	createdAt: bigint('created_at', { mode: 'number' }).notNull(),
 	updatedAt: bigint('updated_at', { mode: 'number' }).notNull()
@@ -26,7 +26,7 @@ export const inviteTokens = pgTable('invite_tokens', {
 	id: text('id').primaryKey(),
 	token: text('token').notNull().unique(),
 	email: text('email'),
-	role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
+	role: text('role', { enum: ['admin', 'member', 'sales'] }).notNull().default('member'),
 	createdBy: text('created_by')
 		.notNull()
 		.references(() => users.id),

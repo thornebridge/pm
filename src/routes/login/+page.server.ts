@@ -5,9 +5,10 @@ import { createSession, setSessionCookie } from '$lib/server/auth/session.js';
 import { db } from '$lib/server/db/index.js';
 import { users } from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
+import { ROLE_DEFAULT_ROUTE, type Role } from '$lib/config/workspaces';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	if (locals.user) throw redirect(302, '/projects');
+	if (locals.user) throw redirect(302, ROLE_DEFAULT_ROUTE[locals.user.role] || '/dashboard');
 };
 
 export const actions: Actions = {
@@ -29,6 +30,6 @@ export const actions: Actions = {
 		const sessionId = await createSession(user.id);
 		setSessionCookie(cookies, sessionId);
 
-		throw redirect(302, '/projects');
+		throw redirect(302, ROLE_DEFAULT_ROUTE[user.role as Role] || '/dashboard');
 	}
 };

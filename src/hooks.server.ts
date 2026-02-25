@@ -19,6 +19,7 @@ import { eq, and } from 'drizzle-orm';
 import { getBuiltinTheme } from '$lib/server/theme/builtins.js';
 import { reportError } from '@thornebridge/watchtower-client';
 import { connectRedis } from '$lib/server/redis/index.js';
+import { canAccessRoute, ROLE_DEFAULT_ROUTE } from '$lib/config/workspaces.js';
 
 // Run seed on first request
 let seeded = false;
@@ -56,6 +57,18 @@ export const handle: Handle = async ({ event, resolve }) => {
 	} else {
 		event.locals.user = null;
 		event.locals.sessionId = null;
+	}
+
+	// Workspace route enforcement — redirect scoped roles to their default workspace
+	if (event.locals.user && !event.url.pathname.startsWith('/api/')) {
+		const pathname = event.url.pathname;
+		const isPublicPath = pathname === '/' || pathname.startsWith('/login') || pathname.startsWith('/invite');
+		if (!isPublicPath && !canAccessRoute(event.locals.user.role, pathname)) {
+			return new Response(null, {
+				status: 302,
+				headers: { Location: ROLE_DEFAULT_ROUTE[event.locals.user.role] || '/dashboard' }
+			});
+		}
 	}
 
 	// Determine theme mode for SSR

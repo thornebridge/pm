@@ -2,15 +2,19 @@
 	import { goto } from '$app/navigation';
 	import { fade, scale } from 'svelte/transition';
 	import { themeMode, toggleTheme } from '$lib/stores/theme.js';
+	import { canAccessRoute, type Role } from '$lib/config/workspaces';
 
 	interface Props {
 		open: boolean;
 		onclose: () => void;
 		projectSlug?: string | null;
 		isAdmin?: boolean;
+		userRole?: string;
 	}
 
-	let { open, onclose, projectSlug = null, isAdmin = false }: Props = $props();
+	let { open, onclose, projectSlug = null, isAdmin = false, userRole = 'member' }: Props = $props();
+
+	const role = $derived((userRole || 'member') as Role);
 
 	let query = $state('');
 	let results = $state<{
@@ -39,21 +43,21 @@
 	}
 
 	const commands = $derived.by((): Command[] => {
-		const cmds: Command[] = [
-			// Navigation
-			{ id: 'nav-dashboard', label: 'Go to Dashboard', group: 'Navigation', shortcut: 'D', action: () => navigate('/dashboard') },
-			{ id: 'nav-projects', label: 'Go to Projects', group: 'Navigation', shortcut: 'P', action: () => navigate('/projects') },
-			{ id: 'nav-my-tasks', label: 'Go to My Tasks', group: 'Navigation', shortcut: 'M', action: () => navigate('/my-tasks') },
-			{ id: 'nav-activity', label: 'Go to Activity', group: 'Navigation', shortcut: 'A', action: () => navigate('/activity') },
-			// Actions
-			{ id: 'action-theme', label: `Toggle Theme (${$themeMode === 'light' ? 'to dark' : 'to light'})`, group: 'Actions', action: () => { toggleTheme(); onclose(); } }
-		];
+		const cmds: Command[] = [];
 
-		if (isAdmin) {
-			cmds.push({ id: 'nav-admin', label: 'Go to Admin', group: 'Navigation', action: () => navigate('/admin') });
-		}
+		// Navigation — only show routes the user can access
+		if (canAccessRoute(role, '/dashboard')) cmds.push({ id: 'nav-dashboard', label: 'Go to Dashboard', group: 'Navigation', shortcut: 'D', action: () => navigate('/dashboard') });
+		if (canAccessRoute(role, '/projects')) cmds.push({ id: 'nav-projects', label: 'Go to Projects', group: 'Navigation', shortcut: 'P', action: () => navigate('/projects') });
+		if (canAccessRoute(role, '/my-tasks')) cmds.push({ id: 'nav-my-tasks', label: 'Go to My Tasks', group: 'Navigation', shortcut: 'M', action: () => navigate('/my-tasks') });
+		if (canAccessRoute(role, '/activity')) cmds.push({ id: 'nav-activity', label: 'Go to Activity', group: 'Navigation', shortcut: 'A', action: () => navigate('/activity') });
+		if (canAccessRoute(role, '/crm')) cmds.push({ id: 'nav-crm', label: 'Go to Pipeline', group: 'Navigation', action: () => navigate('/crm/pipeline') });
+		if (canAccessRoute(role, '/financials')) cmds.push({ id: 'nav-financials', label: 'Go to Financials', group: 'Navigation', action: () => navigate('/financials/dashboard') });
+		if (canAccessRoute(role, '/admin')) cmds.push({ id: 'nav-admin', label: 'Go to Admin', group: 'Navigation', action: () => navigate('/admin') });
 
-		if (projectSlug) {
+		// Actions
+		cmds.push({ id: 'action-theme', label: `Toggle Theme (${$themeMode === 'light' ? 'to dark' : 'to light'})`, group: 'Actions', action: () => { toggleTheme(); onclose(); } });
+
+		if (projectSlug && canAccessRoute(role, '/projects')) {
 			cmds.push(
 				{ id: 'proj-home', label: 'Go to Home', group: 'Project', action: () => navigate(`/projects/${projectSlug}/home`) },
 				{ id: 'proj-board', label: 'Go to Board', group: 'Project', action: () => navigate(`/projects/${projectSlug}/board`) },
@@ -91,14 +95,28 @@
 		type: 'project' | 'task' | 'comment' | 'contact' | 'company' | 'opportunity' | 'lead';
 	}
 
+	// Filter results by workspace access
+	const canOps = $derived(canAccessRoute(role, '/projects'));
+	const canCrm = $derived(canAccessRoute(role, '/crm'));
+
+	const filteredResults = $derived({
+		projects: canOps ? results.projects : [],
+		tasks: canOps ? results.tasks : [],
+		comments: canOps ? results.comments : [],
+		contacts: canCrm ? results.contacts : [],
+		companies: canCrm ? results.companies : [],
+		opportunities: canCrm ? results.opportunities : [],
+		leads: canCrm ? results.leads : []
+	});
+
 	const flatResults = $derived<FlatItem[]>([
-		...results.projects.map((p) => ({ url: `/projects/${p.slug}/home`, type: 'project' as const })),
-		...results.tasks.map((t) => ({ url: `/projects/${t.projectSlug}/task/${t.number}`, type: 'task' as const })),
-		...results.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const })),
-		...results.contacts.map((c) => ({ url: `/crm/contacts/${c.id}`, type: 'contact' as const })),
-		...results.companies.map((c) => ({ url: `/crm/companies/${c.id}`, type: 'company' as const })),
-		...results.opportunities.map((o) => ({ url: `/crm/opportunities/${o.id}`, type: 'opportunity' as const })),
-		...results.leads.map((l) => ({ url: `/crm/leads/${l.id}`, type: 'lead' as const }))
+		...filteredResults.projects.map((p) => ({ url: `/projects/${p.slug}/home`, type: 'project' as const })),
+		...filteredResults.tasks.map((t) => ({ url: `/projects/${t.projectSlug}/task/${t.number}`, type: 'task' as const })),
+		...filteredResults.comments.map((c) => ({ url: `/projects/${c.projectSlug}/task/${c.taskNumber}`, type: 'comment' as const })),
+		...filteredResults.contacts.map((c) => ({ url: `/crm/contacts/${c.id}`, type: 'contact' as const })),
+		...filteredResults.companies.map((c) => ({ url: `/crm/companies/${c.id}`, type: 'company' as const })),
+		...filteredResults.opportunities.map((o) => ({ url: `/crm/opportunities/${o.id}`, type: 'opportunity' as const })),
+		...filteredResults.leads.map((l) => ({ url: `/crm/leads/${l.id}`, type: 'lead' as const }))
 	]);
 
 	const totalItems = $derived(isCommandMode ? filteredCommands.length : flatResults.length);
@@ -174,17 +192,17 @@
 	}
 
 	const hasResults = $derived(
-		results.tasks.length > 0 || results.projects.length > 0 || results.comments.length > 0 ||
-		results.contacts.length > 0 || results.companies.length > 0 || results.opportunities.length > 0 ||
-		results.leads.length > 0
+		filteredResults.tasks.length > 0 || filteredResults.projects.length > 0 || filteredResults.comments.length > 0 ||
+		filteredResults.contacts.length > 0 || filteredResults.companies.length > 0 || filteredResults.opportunities.length > 0 ||
+		filteredResults.leads.length > 0
 	);
 	const projectsOffset = 0;
-	const tasksOffset = $derived(results.projects.length);
-	const commentsOffset = $derived(results.projects.length + results.tasks.length);
-	const contactsOffset = $derived(results.projects.length + results.tasks.length + results.comments.length);
-	const companiesOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length);
-	const opportunitiesOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length + results.companies.length);
-	const leadsOffset = $derived(results.projects.length + results.tasks.length + results.comments.length + results.contacts.length + results.companies.length + results.opportunities.length);
+	const tasksOffset = $derived(filteredResults.projects.length);
+	const commentsOffset = $derived(filteredResults.projects.length + filteredResults.tasks.length);
+	const contactsOffset = $derived(filteredResults.projects.length + filteredResults.tasks.length + filteredResults.comments.length);
+	const companiesOffset = $derived(filteredResults.projects.length + filteredResults.tasks.length + filteredResults.comments.length + filteredResults.contacts.length);
+	const opportunitiesOffset = $derived(filteredResults.projects.length + filteredResults.tasks.length + filteredResults.comments.length + filteredResults.contacts.length + filteredResults.companies.length);
+	const leadsOffset = $derived(filteredResults.projects.length + filteredResults.tasks.length + filteredResults.comments.length + filteredResults.contacts.length + filteredResults.companies.length + filteredResults.opportunities.length);
 </script>
 
 {#if open}
@@ -243,10 +261,10 @@
 			{:else if hasResults}
 				<!-- Search results -->
 				<div class="max-h-80 overflow-y-auto p-2">
-					{#if results.projects.length > 0}
+					{#if filteredResults.projects.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Projects</span>
-							{#each results.projects as project, i}
+							{#each filteredResults.projects as project, i}
 								<button
 									onclick={() => navigate(`/projects/${project.slug}/home`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(projectsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
@@ -257,10 +275,10 @@
 						</div>
 					{/if}
 
-					{#if results.tasks.length > 0}
+					{#if filteredResults.tasks.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Tasks</span>
-							{#each results.tasks as task, i}
+							{#each filteredResults.tasks as task, i}
 								<button
 									onclick={() => navigate(`/projects/${task.projectSlug}/task/${task.number}`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(tasksOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'hover:bg-surface-200 dark:hover:bg-surface-800'}"
@@ -273,10 +291,10 @@
 						</div>
 					{/if}
 
-					{#if results.comments.length > 0}
+					{#if filteredResults.comments.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Comments</span>
-							{#each results.comments as comment, i}
+							{#each filteredResults.comments as comment, i}
 								<button
 									onclick={() => navigate(`/projects/${comment.projectSlug}/task/${comment.taskNumber}`)}
 									class="mt-0.5 flex w-full flex-col rounded-md px-2 py-1.5 text-left {isSelected(commentsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'hover:bg-surface-200 dark:hover:bg-surface-800'}"
@@ -288,10 +306,10 @@
 						</div>
 					{/if}
 
-					{#if results.contacts.length > 0}
+					{#if filteredResults.contacts.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Contacts</span>
-							{#each results.contacts as contact, i}
+							{#each filteredResults.contacts as contact, i}
 								<button
 									onclick={() => navigate(`/crm/contacts/${contact.id}`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(contactsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
@@ -305,10 +323,10 @@
 						</div>
 					{/if}
 
-					{#if results.companies.length > 0}
+					{#if filteredResults.companies.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Companies</span>
-							{#each results.companies as company, i}
+							{#each filteredResults.companies as company, i}
 								<button
 									onclick={() => navigate(`/crm/companies/${company.id}`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(companiesOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
@@ -319,10 +337,10 @@
 						</div>
 					{/if}
 
-					{#if results.opportunities.length > 0}
+					{#if filteredResults.opportunities.length > 0}
 						<div class="mb-2">
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Opportunities</span>
-							{#each results.opportunities as opp, i}
+							{#each filteredResults.opportunities as opp, i}
 								<button
 									onclick={() => navigate(`/crm/opportunities/${opp.id}`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(opportunitiesOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
@@ -333,10 +351,10 @@
 						</div>
 					{/if}
 
-					{#if results.leads.length > 0}
+					{#if filteredResults.leads.length > 0}
 						<div>
 							<span class="px-2 text-[10px] font-semibold uppercase tracking-wider text-surface-500">Leads</span>
-							{#each results.leads as lead, i}
+							{#each filteredResults.leads as lead, i}
 								<button
 									onclick={() => navigate(`/crm/leads/${lead.id}`)}
 									class="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm {isSelected(leadsOffset, i) ? 'bg-brand-100 text-brand-700 dark:bg-brand-900 dark:text-brand-300' : 'text-surface-700 hover:bg-surface-200 dark:text-surface-300 dark:hover:bg-surface-800'}"
