@@ -1,5 +1,6 @@
 import { api } from '$lib/utils/api.js';
 import { normalizePhoneNumber } from '$lib/utils/phone.js';
+import { onWsEvent } from './websocket.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -30,12 +31,18 @@ let incomingCall = $state<IncomingCallInfo | null>(null);
 let error = $state<string | null>(null);
 let localCallLogId = $state<string | null>(null);
 let callerNumbers = $state<string[]>([]);
-let _rotationIndex = 0;
 let recordCalls = $state(false);
+
+// Server-side call control state
+let activeSessionId = $state<string | null>(null);
+let expectingServerCall = $state(false);
 
 let _durationInterval: ReturnType<typeof setInterval> | null = null;
 let _callStartTime: number | null = null;
 let _audioElement: HTMLAudioElement | null = null;
+let _ringbackAudio: HTMLAudioElement | null = null;
+let _sipTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+let _wsUnsubscribers: (() => void)[] = [];
 
 // ─── Exported Getters ───────────────────────────────────────────────────────
 
@@ -64,10 +71,59 @@ export function setAudioElement(el: HTMLAudioElement) {
 	_audioElement = el;
 }
 
+// ─── WebSocket Event Subscriptions ──────────────────────────────────────────
+
+function subscribeWsEvents() {
+	_wsUnsubscribers.push(
+		onWsEvent('telnyx:call_connecting', (msg) => {
+			// This fires after our POST to /api/telnyx/dial succeeds
+			// State is already set by makeCall() — this is mainly for multi-tab sync
+			if (msg.sessionId && msg.sessionId !== activeSessionId && callState === 'idle') {
+				activeSessionId = msg.sessionId;
+				localCallLogId = msg.callLogId;
+				currentNumber = msg.toNumber || '';
+				currentContactName = msg.contactName || null;
+				currentContactId = msg.contactId || null;
+				currentCompanyId = msg.companyId || null;
+				callState = 'connecting';
+				dialerOpen = true;
+			}
+		}),
+
+		onWsEvent('telnyx:call_ringing', (msg) => {
+			if (msg.sessionId === activeSessionId) {
+				callState = 'ringing';
+			}
+		}),
+
+		onWsEvent('telnyx:call_active', (msg) => {
+			if (msg.sessionId === activeSessionId) {
+				callState = 'active';
+				_stopRingback();
+				_startDurationTimer();
+			}
+		}),
+
+		onWsEvent('telnyx:call_ended', (msg) => {
+			if (msg.sessionId === activeSessionId) {
+				if (msg.error) {
+					error = msg.error;
+				}
+				_handleCallEnd();
+			}
+		})
+	);
+}
+
 // ─── Client Initialization ──────────────────────────────────────────────────
 
 export async function initClient() {
 	if (client) return;
+
+	// Subscribe to WS events on first init
+	if (_wsUnsubscribers.length === 0) {
+		subscribeWsEvents();
+	}
 
 	try {
 		// Fetch token from server
@@ -124,52 +180,83 @@ function handleNotification(notification: any) {
 			case 'new':
 			case 'trying':
 			case 'requesting':
-				if (call.direction === 'inbound' && callState === 'idle') {
-					// Incoming call
+				if (call.direction === 'inbound' && expectingServerCall) {
+					// This is Leg B from our server — auto-answer
+					console.log('[Dialer] Auto-answering server Leg B');
+					call.answer({ audio: true, video: false });
+					activeCall = call;
+					_clearSipTimeout();
+					_startRingback();
+				} else if (call.direction === 'inbound' && callState === 'idle') {
+					// Genuine inbound call
 					handleIncomingCall(call);
-				} else {
-					callState = 'connecting';
 				}
 				break;
 
 			case 'ringing':
 			case 'early':
-				if (call.direction === 'inbound' && callState === 'idle') {
+				if (call.direction === 'inbound' && expectingServerCall) {
+					// Leg B ringing — auto-answer
+					console.log('[Dialer] Auto-answering server Leg B (ringing)');
+					call.answer({ audio: true, video: false });
+					activeCall = call;
+					_clearSipTimeout();
+					_startRingback();
+				} else if (call.direction === 'inbound' && callState === 'idle') {
 					handleIncomingCall(call);
-				} else {
-					callState = 'ringing';
 				}
 				break;
 
 			case 'active':
-				callState = 'active';
-				activeCall = call;
-				incomingCall = null;
-				_startDurationTimer();
+				if (expectingServerCall) {
+					// Leg B is now active (audio connected to agent)
+					// The actual "Active" state transition happens when the server bridges
+					// (via telnyx:call_active WS event). For now, agent just hears ringback.
+					activeCall = call;
+					_clearSipTimeout();
+				} else {
+					// Legacy/inbound call went active
+					callState = 'active';
+					activeCall = call;
+					incomingCall = null;
+					_startDurationTimer();
+				}
 				break;
 
 			case 'held':
-				// Still active, just on hold
 				break;
 
 			case 'hangup':
 			case 'destroy': {
-				// Surface the hangup reason so we can diagnose call failures
 				const cause = call.cause || '';
 				const sipCode = call.sipCode || '';
 				const sipReason = call.sipReason || '';
 				if (cause || sipCode) {
 					console.error(`[Dialer] Call ended: cause=${cause} causeCode=${call.causeCode || ''} sipCode=${sipCode} sipReason=${sipReason}`);
 				}
-				// Show error for unexpected hangups (call never reached 'active')
-				if (callState === 'connecting' || callState === 'ringing') {
-					error = sipReason
-						? `Call failed: ${sipReason} (${sipCode})`
-						: cause
-							? `Call failed: ${cause}`
-							: 'Call failed to connect';
+
+				if (expectingServerCall) {
+					// Leg B hung up — the server webhook will handle cleanup
+					// but surface errors if call never connected
+					if (callState === 'connecting' || callState === 'ringing') {
+						error = sipReason
+							? `Call failed: ${sipReason} (${sipCode})`
+							: cause
+								? `Call failed: ${cause}`
+								: 'Call failed to connect';
+					}
+					activeCall = null;
+				} else {
+					// Legacy call ended
+					if (callState === 'connecting' || callState === 'ringing') {
+						error = sipReason
+							? `Call failed: ${sipReason} (${sipCode})`
+							: cause
+								? `Call failed: ${cause}`
+								: 'Call failed to connect';
+					}
+					_handleCallEnd();
 				}
-				_handleCallEnd();
 				break;
 			}
 
@@ -196,9 +283,6 @@ function handleIncomingCall(call: any) {
 		companyId: null
 	};
 
-	// Try to look up caller in CRM via the server
-	lookupCaller(callerNum);
-
 	// Browser notification for incoming call
 	if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
 		new Notification('Incoming Call', {
@@ -206,16 +290,6 @@ function handleIncomingCall(call: any) {
 			icon: '/favicon.png',
 			tag: 'incoming-call'
 		});
-	}
-}
-
-async function lookupCaller(phone: string) {
-	try {
-		const normalized = normalizePhoneNumber(phone);
-		const results = await api<any[]>(`/api/telnyx/calls?lookup=${encodeURIComponent(normalized)}`);
-		// The lookup is done server-side via the webhook; for now just leave as-is
-	} catch {
-		// Lookup failed, that's okay
 	}
 }
 
@@ -241,36 +315,43 @@ export async function makeCall(
 	callState = 'connecting';
 	dialerOpen = true;
 	error = null;
+	expectingServerCall = true;
 
 	try {
-		// Create call log record on server
-		const logResult = await api<{ id: string }>('/api/telnyx/calls', {
+		// POST to server — creates both PSTN + SIP legs
+		const result = await api<{ callLogId: string; sessionId: string }>('/api/telnyx/dial', {
 			method: 'POST',
 			body: JSON.stringify({
 				toNumber: normalized,
 				contactId: opts?.contactId || null,
 				companyId: opts?.companyId || null,
-				direction: 'outbound'
+				contactName: opts?.contactName || null
 			})
 		});
-		localCallLogId = logResult.id;
 
-		// Place the call — rotate through caller numbers
-		const outboundNumber = callerNumbers.length > 0
-			? callerNumbers[_rotationIndex++ % callerNumbers.length]
-			: '';
-		const call = client.newCall({
-			destinationNumber: normalized,
-			callerNumber: outboundNumber,
-			audio: true,
-			video: false
-		});
+		localCallLogId = result.callLogId;
+		activeSessionId = result.sessionId;
 
-		activeCall = call;
+		// 10-second timeout: if Leg B (SIP call) never arrives at the browser
+		_sipTimeoutTimer = setTimeout(() => {
+			if (expectingServerCall && !activeCall) {
+				console.error('[Dialer] SIP call (Leg B) never arrived — timing out');
+				error = 'Call setup timed out. Please try again.';
+				// Tell server to clean up
+				if (activeSessionId) {
+					api('/api/telnyx/hangup', {
+						method: 'POST',
+						body: JSON.stringify({ sessionId: activeSessionId })
+					}).catch(() => {});
+				}
+				_handleCallEnd();
+			}
+		}, 10000);
 	} catch (err) {
 		console.error('Failed to place call:', err);
 		error = err instanceof Error ? err.message : 'Failed to place call';
 		callState = 'idle';
+		expectingServerCall = false;
 	}
 }
 
@@ -296,9 +377,19 @@ export function rejectCall() {
 }
 
 export function hangup() {
+	// Hang up local WebRTC call
 	if (activeCall) {
 		activeCall.hangup();
 	}
+
+	// Tell server to hang up both PSTN + SIP legs
+	if (activeSessionId) {
+		api('/api/telnyx/hangup', {
+			method: 'POST',
+			body: JSON.stringify({ sessionId: activeSessionId })
+		}).catch(() => {});
+	}
+
 	_handleCallEnd();
 }
 
@@ -332,7 +423,36 @@ export function closeDialer() {
 	}
 }
 
+// ─── Ringback Audio ─────────────────────────────────────────────────────────
+
+function _startRingback() {
+	_stopRingback();
+	try {
+		_ringbackAudio = new Audio('/audio/ringback.wav');
+		_ringbackAudio.loop = true;
+		_ringbackAudio.volume = 0.3;
+		_ringbackAudio.play().catch(() => {});
+	} catch {
+		// Audio playback not critical
+	}
+}
+
+function _stopRingback() {
+	if (_ringbackAudio) {
+		_ringbackAudio.pause();
+		_ringbackAudio.src = '';
+		_ringbackAudio = null;
+	}
+}
+
 // ─── Internal Helpers ───────────────────────────────────────────────────────
+
+function _clearSipTimeout() {
+	if (_sipTimeoutTimer) {
+		clearTimeout(_sipTimeoutTimer);
+		_sipTimeoutTimer = null;
+	}
+}
 
 function _startDurationTimer() {
 	_callStartTime = Date.now();
@@ -346,23 +466,9 @@ function _startDurationTimer() {
 
 function _handleCallEnd() {
 	callState = 'ending';
-
-	// Update call log on server with final state
-	if (localCallLogId) {
-		const updates: Record<string, unknown> = {
-			status: 'completed',
-			endedAt: Date.now(),
-			durationSeconds: callDuration
-		};
-		if (activeCall?.telnyxIDs) {
-			updates.telnyxCallControlId = activeCall.telnyxIDs.telnyxCallControlId;
-			updates.telnyxCallSessionId = activeCall.telnyxIDs.telnyxSessionId;
-		}
-		api(`/api/telnyx/calls/${localCallLogId}`, {
-			method: 'PATCH',
-			body: JSON.stringify(updates)
-		}).catch(() => {}); // Best effort
-	}
+	_stopRingback();
+	_clearSipTimeout();
+	expectingServerCall = false;
 
 	setTimeout(() => _resetCallState(), 1500);
 }
@@ -382,6 +488,10 @@ function _resetCallState() {
 	currentContactId = null;
 	currentCompanyId = null;
 	localCallLogId = null;
+	activeSessionId = null;
+	expectingServerCall = false;
+	_stopRingback();
+	_clearSipTimeout();
 	// Keep error visible briefly so user can read it
 	const pendingError = error;
 	if (pendingError) {
@@ -394,6 +504,9 @@ function _resetCallState() {
 
 export function destroy() {
 	_resetCallState();
+	// Unsubscribe WS event handlers
+	for (const unsub of _wsUnsubscribers) unsub();
+	_wsUnsubscribers = [];
 	if (client) {
 		client.disconnect();
 		client = null;

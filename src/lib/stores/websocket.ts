@@ -10,6 +10,24 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectDelay = 1000;
 const MAX_DELAY = 30000;
 
+// ─── Event Callback System ──────────────────────────────────────────────────
+
+type WsEventHandler = (msg: any) => void;
+const eventHandlers = new Map<string, Set<WsEventHandler>>();
+
+/** Register a handler for a specific WS event type. Returns unsubscribe function. */
+export function onWsEvent(type: string, handler: WsEventHandler): () => void {
+	if (!eventHandlers.has(type)) {
+		eventHandlers.set(type, new Set());
+	}
+	eventHandlers.get(type)!.add(handler);
+	return () => {
+		eventHandlers.get(type)?.delete(handler);
+	};
+}
+
+// ─── Connection Management ──────────────────────────────────────────────────
+
 export function connectWs() {
 	if (!browser) return;
 	if (ws && ws.readyState <= 1) return; // Already connected/connecting
@@ -74,13 +92,27 @@ function send(msg: unknown) {
 	}
 }
 
-function handleWsEvent(msg: { type: string }) {
-	// Any server event with a type triggers a full data refresh.
-	// This covers tasks, comments, projects, folders, statuses, labels,
-	// checklists, reactions, watchers, dependencies, time entries,
-	// attachments, automations, views, notifications, and admin changes.
-	if (msg.type) {
-		invalidateAll();
-		refreshUnreadCount();
+function handleWsEvent(msg: { type: string; [key: string]: unknown }) {
+	if (!msg.type) return;
+
+	// Dispatch to registered event handlers
+	const handlers = eventHandlers.get(msg.type);
+	if (handlers && handlers.size > 0) {
+		for (const handler of handlers) {
+			try {
+				handler(msg);
+			} catch (err) {
+				console.error(`[WS] Handler error for ${msg.type}:`, err);
+			}
+		}
 	}
+
+	// Skip invalidateAll for telnyx:* events — the dialer store handles them directly
+	if (msg.type.startsWith('telnyx:')) {
+		return;
+	}
+
+	// Default: full data refresh for other event types
+	invalidateAll();
+	refreshUnreadCount();
 }
