@@ -20,6 +20,7 @@ import { getBuiltinTheme } from '$lib/server/theme/builtins.js';
 import { reportError } from '@thornebridge/watchtower-client';
 import { connectRedis } from '$lib/server/redis/index.js';
 import { canAccessRoute, ROLE_DEFAULT_ROUTE } from '$lib/config/workspaces.js';
+import { validateApiKey } from '$lib/server/auth/api-key.js';
 
 // Run seed on first request
 let seeded = false;
@@ -57,6 +58,19 @@ export const handle: Handle = async ({ event, resolve }) => {
 	} else {
 		event.locals.user = null;
 		event.locals.sessionId = null;
+	}
+
+	// API key fallback for Bearer token auth (MCP / external integrations)
+	if (!event.locals.user) {
+		const authHeader = event.request.headers.get('authorization');
+		if (authHeader?.startsWith('Bearer ')) {
+			const key = authHeader.slice(7);
+			const user = await validateApiKey(key);
+			if (user) {
+				event.locals.user = user;
+				event.locals.isApiKey = true;
+			}
+		}
 	}
 
 	// Workspace route enforcement — redirect scoped roles to their default workspace
@@ -128,7 +142,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 			// Skip CSRF for login/register (no session yet), webhooks (external), and form actions
 			const skipCsrf = event.url.pathname.startsWith('/api/auth/') || event.url.pathname.startsWith('/api/webhooks/');
 
-			if (!skipCsrf && event.locals.user) {
+			if (!skipCsrf && event.locals.user && !event.locals.isApiKey) {
 				if (!validateCsrf(event.cookies, event.request)) {
 					return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
 						status: 403,

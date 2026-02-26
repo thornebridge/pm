@@ -57,6 +57,13 @@
       "when": 1771988672430,
       "tag": "0007_damp_white_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772140934457,
+      "tag": "0008_youthful_hellion",
+      "breakpoints": true
     }
   ]
 }

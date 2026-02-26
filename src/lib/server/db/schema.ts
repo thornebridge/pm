@@ -36,6 +36,18 @@ export const inviteTokens = pgTable('invite_tokens', {
 	createdAt: bigint('created_at', { mode: 'number' }).notNull()
 });
 
+export const apiKeys = pgTable('api_keys', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	keyHash: text('key_hash').notNull(),
+	keyPrefix: text('key_prefix').notNull(), // first 8 chars for display
+	userId: text('user_id')
+		.notNull()
+		.references(() => users.id, { onDelete: 'cascade' }),
+	lastUsedAt: bigint('last_used_at', { mode: 'number' }),
+	createdAt: bigint('created_at', { mode: 'number' }).notNull()
+});
+
 // ─── Folders ──────────────────────────────────────────────────────────────────
 
 export const folders = pgTable('folders', {

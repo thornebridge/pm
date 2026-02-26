@@ -10,6 +10,7 @@ declare global {
 				role: Role;
 			} | null;
 			sessionId: string | null;
+			isApiKey?: boolean;
 			themeMode: 'dark' | 'light';
 		}
 	}
