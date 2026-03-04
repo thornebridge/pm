@@ -202,6 +202,9 @@ export const PATCH: RequestHandler = async (event) => {
 	if (body.parentId !== undefined) {
 		updates.parentId = body.parentId || null;
 	}
+	if (body.estimatePoints !== undefined) {
+		updates.estimatePoints = body.estimatePoints;
+	}
 	if (body.recurrence !== undefined) {
 		updates.recurrence = body.recurrence ? JSON.stringify(body.recurrence) : null;
 	}
